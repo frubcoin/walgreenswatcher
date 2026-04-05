@@ -106,7 +106,7 @@ http://localhost:5000
    - Switch to the **Settings** tab
    - Enter your **ZIP Code** (default is 85209)
    - Add your **Discord Webhooks**
-   - Use the **Add Product From Link** feature to track specific items (like Lego or Pokémon cards)
+   - Use the **Add Product From Link** feature to track specific items (like Pokemon cards)
    - Click **Save Settings**
 3. **Start the Monitor**:
    - Click the **Start** button in the header or the settings panel
