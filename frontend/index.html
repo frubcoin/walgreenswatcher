@@ -67,6 +67,9 @@
       --scrollbar-thumb-hover-start: rgba(243, 117, 32, 0.92);
       --scrollbar-thumb-hover-end: rgba(198, 31, 0, 0.9);
       --scrollbar-thumb-border: rgba(31, 35, 39, 0.94);
+      --footer-text: rgba(152, 164, 174, 0.96);
+      --footer-text-hover: #f4f7f9;
+      --footer-text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
       --shell-footer-gap: 92px;
       --radius: 10px;
       --radius-sm: 6px;
@@ -2687,7 +2690,7 @@
       justify-content: center;
       gap: 12px;
       flex-wrap: wrap;
-      color: var(--text-muted);
+      color: var(--footer-text);
       z-index: 3;
       text-align: center;
       pointer-events: auto;
@@ -2696,7 +2699,7 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       font-family: 'Space Mono', monospace;
-      text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
+      text-shadow: var(--footer-text-shadow);
     }
 
     body:not(.auth-gate-active) .site-footer {
@@ -2728,7 +2731,7 @@
     .site-footer-link:hover,
     .site-footer-link:focus-visible {
       opacity: 1;
-      color: var(--text-primary);
+      color: var(--footer-text-hover);
     }
 
     .site-footer-link:focus-visible {
@@ -3022,7 +3025,10 @@
       scrollbarThumbEnd: 'rgba(154,18,0,0.82)',
       scrollbarThumbHoverStart: 'rgba(243,117,32,0.92)',
       scrollbarThumbHoverEnd: 'rgba(198,31,0,0.9)',
-      scrollbarThumbBorder: 'rgba(31,35,39,0.94)'
+      scrollbarThumbBorder: 'rgba(31,35,39,0.94)',
+      footerText: 'rgba(152,164,174,0.96)',
+      footerTextHover: '#f4f7f9',
+      footerTextShadow: '0 1px 12px rgba(0, 0, 0, 0.65)'
     };
     const RESULTS_MAP_THEME_STORAGE_KEY = 'walgreens_results_map_theme';
     const RESULTS_MAP_THEMES = {
@@ -3148,6 +3154,8 @@
       const thumbHoverStartRgb = mixRgb(accentRgb, { r: 255, g: 255, b: 255 }, 0.3);
       const thumbHoverEndRgb = mixRgb(accentRgb, { r: 243, g: 117, b: 32 }, 0.2);
       const trackRgb = mixRgb(accentRgb, { r: 255, g: 255, b: 255 }, 0.08);
+      const luminance = ((0.2126 * accentRgb.r) + (0.7152 * accentRgb.g) + (0.0722 * accentRgb.b)) / 255;
+      const useDarkFooterText = luminance > 0.62;
 
       return {
         accent: accentHex,
@@ -3163,7 +3171,10 @@
         scrollbarThumbEnd: rgbaString(thumbEndRgb, 0.78),
         scrollbarThumbHoverStart: rgbaString(thumbHoverStartRgb, 0.94),
         scrollbarThumbHoverEnd: rgbaString(thumbHoverEndRgb, 0.86),
-        scrollbarThumbBorder: rgbaString(mixRgb(accentRgb, { r: 18, g: 22, b: 27 }, 0.82), 0.92)
+        scrollbarThumbBorder: rgbaString(mixRgb(accentRgb, { r: 18, g: 22, b: 27 }, 0.82), 0.92),
+        footerText: useDarkFooterText ? 'rgba(20,24,29,0.9)' : 'rgba(236,241,245,0.92)',
+        footerTextHover: useDarkFooterText ? '#05080b' : '#ffffff',
+        footerTextShadow: useDarkFooterText ? '0 1px 10px rgba(255, 255, 255, 0.28)' : '0 1px 12px rgba(0, 0, 0, 0.65)'
       };
     }
 
@@ -3183,6 +3194,9 @@
       root.style.setProperty('--scrollbar-thumb-hover-start', tokens.scrollbarThumbHoverStart);
       root.style.setProperty('--scrollbar-thumb-hover-end', tokens.scrollbarThumbHoverEnd);
       root.style.setProperty('--scrollbar-thumb-border', tokens.scrollbarThumbBorder);
+      root.style.setProperty('--footer-text', tokens.footerText);
+      root.style.setProperty('--footer-text-hover', tokens.footerTextHover);
+      root.style.setProperty('--footer-text-shadow', tokens.footerTextShadow);
     }
 
     function setPokemonBackgroundSelectState() {
@@ -3347,9 +3361,9 @@
               <div class="auth-install-copy install-app-copy" hidden>Optional: install it for faster access from your desktop or home screen.</div>
             </div>
             <ul class="auth-note-list">
-              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>No shared settings between users.</span></li>
-              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Discord webhooks are saved under your own account.</span></li>
-              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>The onboarding guide will walk you through ZIP code, products, and your first scan.</span></li>
+           <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Product info auto resolved from links.</span></li>
+              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Discord webhooks with configurable role notifications.</span></li>
+              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Beat everyone else to the product.</span></li>
             </ul>
             <div class="auth-legal-note">By continuing, you agree to the <a class="inline-legal-link" href="/terms" target="_blank" rel="noopener noreferrer">Terms</a> and acknowledge the <a class="inline-legal-link" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and <a class="inline-legal-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>.</div>
             <div id="auth-status-text" class="auth-status"></div>
