@@ -525,50 +525,59 @@
       text-transform: uppercase;
       letter-spacing: 2px;
       display: inline-block;
-      --auth-eyebrow-shimmer-angle: 15deg;
-      --auth-eyebrow-shimmer-spread: 56px;
-      --auth-eyebrow-shimmer-base: rgba(214, 220, 225, 0.74);
-      --auth-eyebrow-shimmer-highlight: rgba(255, 255, 255, 0.98);
-      --auth-eyebrow-shimmer-accent: rgba(243, 117, 32, 0.96);
     }
 
     @supports ((-webkit-background-clip: text) or (background-clip: text)) {
       .auth-eyebrow.shimmer-text {
+        display: inline-block;
         color: transparent;
-        -webkit-text-fill-color: transparent;
-        background-image: linear-gradient(
-          calc(90deg + var(--auth-eyebrow-shimmer-angle)),
-          var(--auth-eyebrow-shimmer-base) 0,
-          var(--auth-eyebrow-shimmer-base) calc(50% - var(--auth-eyebrow-shimmer-spread)),
-          var(--auth-eyebrow-shimmer-highlight) 50%,
-          var(--auth-eyebrow-shimmer-accent) calc(50% + 18px),
-          var(--auth-eyebrow-shimmer-base) calc(50% + var(--auth-eyebrow-shimmer-spread)),
-          var(--auth-eyebrow-shimmer-base) 100%
+        background: #acacac -webkit-gradient(
+          linear,
+          100% 0,
+          0 0,
+          from(#acacac),
+          color-stop(0.5, #ffffff),
+          to(#acacac)
         );
+        background-position: -4rem top;
         background-repeat: no-repeat;
-        background-size: 250% 100%;
-        background-position: 140% 50%;
         -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         background-clip: text;
-        animation: auth-eyebrow-shimmer 3.2s linear infinite;
+        -webkit-animation-name: auth-eyebrow-shimmer;
+        -webkit-animation-duration: 2.2s;
+        -webkit-animation-iteration-count: infinite;
+        -webkit-background-size: 4rem 100%;
+        animation: auth-eyebrow-shimmer 2.2s infinite;
+        background-size: 4rem 100%;
+      }
+    }
+
+    @-webkit-keyframes auth-eyebrow-shimmer {
+      0% {
+        background-position: -4rem top;
+      }
+
+      70% {
+        background-position: 12.5rem top;
+      }
+
+      100% {
+        background-position: 12.5rem top;
       }
     }
 
     @keyframes auth-eyebrow-shimmer {
       0% {
-        background-position: 140% 50%;
+        background-position: -4rem top;
       }
 
-      24% {
-        background-position: 140% 50%;
-      }
-
-      72% {
-        background-position: -140% 50%;
+      70% {
+        background-position: 12.5rem top;
       }
 
       100% {
-        background-position: -140% 50%;
+        background-position: 12.5rem top;
       }
     }
 
