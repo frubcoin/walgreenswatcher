@@ -17,6 +17,9 @@ from config import USER_AGENTS
 SKU_PATH_PATTERN = re.compile(r"/(?P<sku>\d+)\.p(?:$|[?#])", re.IGNORECASE)
 SKU_TEXT_PATTERN = re.compile(r"\bSKU:\s*(?P<sku>\d{5,})\b", re.IGNORECASE)
 TITLE_SUFFIX_PATTERN = re.compile(r"\s*-\s*Best Buy\s*$", re.IGNORECASE)
+BESTBUY_BOOTSTRAP_TIMEOUT = (5, 5)
+BESTBUY_PRODUCT_TIMEOUT = (8, 12)
+BESTBUY_RESOLVE_ATTEMPTS = 2
 
 
 class BestBuyProductResolver:
@@ -51,26 +54,54 @@ class BestBuyProductResolver:
         return ""
 
     @staticmethod
-    def _request_headers(*, accept: str) -> Dict[str, str]:
+    def _request_headers(*, accept: str, referer: str = "https://www.bestbuy.com/") -> Dict[str, str]:
         return {
             "User-Agent": random.choice(USER_AGENTS),
             "Accept": accept,
             "Accept-Language": "en-US,en;q=0.9",
             "Cache-Control": "no-cache",
             "Pragma": "no-cache",
+            "Referer": referer,
+            "Origin": "https://www.bestbuy.com",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin",
+            "Upgrade-Insecure-Requests": "1",
+            "Connection": "close",
         }
 
     @classmethod
     def _fetch_html(cls, product_link: str) -> str:
-        response = requests.get(
-            product_link,
-            headers=cls._request_headers(
-                accept="text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
-            ),
-            timeout=30,
-        )
-        response.raise_for_status()
-        return response.text
+        last_error: Exception | None = None
+        accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+
+        for _ in range(BESTBUY_RESOLVE_ATTEMPTS):
+            session = requests.Session()
+            try:
+                bootstrap_headers = cls._request_headers(accept=accept, referer="https://www.bestbuy.com/")
+                for bootstrap_url in ("https://www.bestbuy.com/", product_link):
+                    try:
+                        response = session.get(
+                            bootstrap_url,
+                            headers=bootstrap_headers,
+                            timeout=BESTBUY_BOOTSTRAP_TIMEOUT if bootstrap_url == "https://www.bestbuy.com/" else BESTBUY_PRODUCT_TIMEOUT,
+                        )
+                        response.raise_for_status()
+                        if bootstrap_url == product_link and "html" in response.headers.get("content-type", "").lower():
+                            return response.text
+                    except requests.RequestException as exc:
+                        last_error = exc
+                        if bootstrap_url == product_link:
+                            break
+            finally:
+                session.close()
+
+        if last_error is not None:
+            raise ValueError(
+                "Best Buy timed out from the server while resolving that product link. "
+                "Please try again, or use a connection/VPS that Best Buy will answer."
+            ) from last_error
+        raise ValueError("Best Buy did not return an HTML product page for that link")
 
     @staticmethod
     def _load_json(value: str) -> Any:

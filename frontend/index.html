@@ -2294,21 +2294,19 @@
       margin-bottom: 6px;
     }
 
-    .retailer-chip {
-      display: inline-flex;
+    .product-name-row {
+      display: flex;
       align-items: center;
-      justify-content: center;
-      min-height: 22px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(72, 156, 212, 0.28);
-      background: rgba(72, 156, 212, 0.1);
-      color: var(--text-secondary);
-      font-size: 10px;
-      font-family: 'Space Mono', monospace;
-      text-transform: uppercase;
-      letter-spacing: 1.1px;
-      white-space: nowrap;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .product-retailer-icon {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      flex-shrink: 0;
+      border-radius: 6px;
     }
 
     .result-card-kicker-icon {
@@ -2740,10 +2738,14 @@
       font-weight: 600;
       font-size: 14px;
       word-break: break-word;
+      min-width: 0;
+      flex: 1;
     }
 
     .product-name-input {
-      margin-bottom: 8px;
+      margin-bottom: 0;
+      min-width: 0;
+      flex: 1;
     }
 
     .product-actions {
@@ -5542,8 +5544,16 @@
         return sanitizeHttpUrl(value, { hostValidator: isAllowedProductImageHost });
       }
 
+      function retailerKey(retailer) {
+        return String(retailer || 'walgreens').trim().toLowerCase() === 'bestbuy' ? 'bestbuy' : 'walgreens';
+      }
+
       function retailerLabel(retailer) {
-        return String(retailer || 'walgreens').trim().toLowerCase() === 'bestbuy' ? 'Best Buy Beta' : 'Walgreens';
+        return retailerKey(retailer) === 'bestbuy' ? 'Best Buy Beta' : 'Walgreens';
+      }
+
+      function retailerIconPath(retailer) {
+        return retailerKey(retailer) === 'bestbuy' ? '/icons/bestbuy.png' : '/icons/walgreens.png';
       }
 
       function renderTrackedProducts(products = trackedProductsCache) {
@@ -5557,15 +5567,18 @@
           const safePlanogram = escapeHtml(p.planogram || 'missing-planogram');
           const safeId = escapeHtml(p.id || '');
           const safeRetailer = escapeHtml(retailerLabel(p.retailer));
+          const safeRetailerIcon = escapeHtml(retailerIconPath(p.retailer));
 
           return `
             <div class="product-item${isEditing ? ' is-editing' : ''}" data-product-id="${safeId}">
               <div class="product-info">
-                <div class="retailer-chip">${safeRetailer}</div>
-                ${isEditing
-                  ? `<input type="text" class="form-input product-name-input" value="${safeName}" maxlength="160" placeholder="Product name">`
-                  : `<div class="product-name">${safeName}</div>`
-                }
+                <div class="product-name-row">
+                  <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailer}" title="${safeRetailer}">
+                  ${isEditing
+                    ? `<input type="text" class="form-input product-name-input" value="${safeName}" maxlength="160" placeholder="Product name">`
+                    : `<div class="product-name">${safeName}</div>`
+                  }
+                </div>
                 <div class="product-id">${safeId} | ${safePlanogram}</div>
               </div>
               <div class="product-actions">
