@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import DEFAULT_CHECK_INTERVAL_MINUTES, DEFAULT_TRACKED_PRODUCTS, TARGET_ZIP_CODE
+from bestbuy_scraper import BestBuyStockChecker
 from database import StockDatabase
 from discord_notifier import DiscordNotifier
 from walgreens_scraper import WalgreensStockChecker
@@ -55,7 +56,8 @@ class StockCheckScheduler:
         self.scheduler: Optional[BackgroundScheduler] = None
         self.state_lock = threading.RLock()
 
-        self.checker = WalgreensStockChecker()
+        self.walgreens_checker = WalgreensStockChecker()
+        self.bestbuy_checker = BestBuyStockChecker()
         self.notifier = DiscordNotifier([])
         self.is_running = False
         self.last_check_time: Optional[datetime] = None
@@ -107,6 +109,7 @@ class StockCheckScheduler:
                 self.db.add_tracked_product(
                     self.user_id,
                     article_id,
+                    product.get("retailer", "walgreens"),
                     product["name"],
                     product["planogram"],
                     image_url=product.get("image_url", ""),
@@ -124,6 +127,7 @@ class StockCheckScheduler:
         self.notifier = DiscordNotifier(self.discord_destinations or None)
         self.tracked_products = {
             product["id"]: {
+                "retailer": product.get("retailer", "walgreens"),
                 "name": product["name"],
                 "planogram": product["planogram"],
                 "image_url": product.get("image_url", ""),
@@ -132,7 +136,8 @@ class StockCheckScheduler:
             }
             for product in products
         }
-        self.checker.current_zip_code = self.current_zipcode
+        self.walgreens_checker.current_zip_code = self.current_zipcode
+        self.bestbuy_checker.current_zip_code = self.current_zipcode
 
     @staticmethod
     def _validate_interval_minutes(interval_minutes: Any) -> int:
@@ -195,6 +200,7 @@ class StockCheckScheduler:
     def add_product(
         self,
         article_id: str,
+        retailer: str,
         product_name: str,
         planogram: str,
         image_url: str = "",
@@ -204,6 +210,7 @@ class StockCheckScheduler:
         success = self.db.add_tracked_product(
             self.user_id,
             article_id.strip(),
+            retailer.strip() or "walgreens",
             product_name.strip(),
             planogram.strip(),
             image_url=image_url.strip(),
@@ -270,6 +277,7 @@ class StockCheckScheduler:
         return [
             {
                 "article_id": article_id,
+                "retailer": product.get("retailer", "walgreens"),
                 "name": product["name"],
                 "planogram": product["planogram"],
                 "image_url": product.get("image_url", ""),
@@ -299,6 +307,38 @@ class StockCheckScheduler:
     @property
     def _job_id(self) -> str:
         return f"stock_check_user_{self.user_id}"
+
+    @staticmethod
+    def _extract_products_with_stock(check_results: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        products_with_stock: Dict[str, Dict[str, Any]] = {}
+
+        for product_id, product_data in check_results.items():
+            availability = dict(product_data.get("availability") or {})
+            in_stock_stores = [store_id for store_id, in_stock in availability.items() if in_stock]
+            if not in_stock_stores:
+                continue
+
+            stores = sorted(
+                (product_data.get("stores") or {}).values(),
+                key=lambda store: (
+                    store.get("distance") is None,
+                    store.get("distance") if store.get("distance") is not None else float("inf"),
+                    -store.get("inventory_count", 0),
+                ),
+            )
+
+            products_with_stock[product_id] = {
+                "retailer": product_data.get("retailer", "walgreens"),
+                "product_name": product_data.get("name") or product_id,
+                "image_url": product_data.get("image_url", ""),
+                "source_url": product_data.get("source_url", ""),
+                "store_ids": in_stock_stores,
+                "count": len(in_stock_stores),
+                "total_inventory": sum(store.get("inventory_count", 0) for store in stores),
+                "stores": stores,
+            }
+
+        return products_with_stock
 
     def _check_stock(self) -> None:
         try:
@@ -383,40 +423,94 @@ class StockCheckScheduler:
                     last_logged["product"] = current_product
                     last_logged["stores_processed"] = stores_processed
 
-            self.checker.progress_callback = update_progress
-            self.checker.current_zip_code = self.current_zipcode
+            self.walgreens_checker.progress_callback = update_progress
+            self.walgreens_checker.current_zip_code = self.current_zipcode
+            self.bestbuy_checker.progress_callback = update_progress
+            self.bestbuy_checker.current_zip_code = self.current_zipcode
 
-            self._set_progress(
-                current_phase="locating_stores",
-                progress_message=f"Finding Walgreens stores near {self.current_zipcode}...",
-                current_store="Store locator",
-                progress_completed_units=0.0,
-                progress_total_units=progress_total_units,
-            )
-            stores = self.checker._fetch_stores_near_zip(self.current_zipcode)
-            if not stores:
+            walgreens_products = [
+                product for product in product_specs if product.get("retailer", "walgreens") == "walgreens"
+            ]
+            walgreens_stores: List[Dict[str, Any]] = []
+            scanned_store_keys = set()
+
+            if walgreens_products:
                 self._set_progress(
-                    current_phase="error",
-                    progress_message=f"No Walgreens stores found near {self.current_zipcode}",
+                    current_phase="locating_stores",
+                    progress_message=f"Finding Walgreens stores near {self.current_zipcode}...",
                     current_store="Store locator",
-                    progress_completed_units=progress_total_units,
+                    progress_completed_units=0.0,
+                    progress_total_units=progress_total_units,
                 )
-                return
+                walgreens_stores = self.walgreens_checker._fetch_stores_near_zip(self.current_zipcode)
+                if not walgreens_stores:
+                    self._set_progress(
+                        current_phase="error",
+                        progress_message=f"No Walgreens stores found near {self.current_zipcode}",
+                        current_store="Store locator",
+                        progress_completed_units=progress_total_units,
+                    )
+                    return
 
-            self.total_stores = len(stores)
-            self._set_progress(
-                current_phase="stores_loaded",
-                progress_message=f"Found {len(stores)} Walgreens stores near {self.current_zipcode}",
-                current_store="Store list ready",
-                progress_completed_units=1.0,
-                progress_total_units=progress_total_units,
-            )
+                scanned_store_keys.update(
+                    f"walgreens:{store.get('storeNumber')}"
+                    for store in walgreens_stores
+                    if store.get("storeNumber")
+                )
+                self.total_stores = len(walgreens_stores)
+                self._set_progress(
+                    current_phase="stores_loaded",
+                    progress_message=f"Found {len(walgreens_stores)} Walgreens stores near {self.current_zipcode}",
+                    current_store="Store list ready",
+                    progress_completed_units=1.0,
+                    progress_total_units=progress_total_units,
+                )
 
-            self.checker.custom_product_names = {
-                product["article_id"]: product["name"] for product in product_specs
+            self.walgreens_checker.custom_product_names = {
+                product["article_id"]: product["name"] for product in walgreens_products
             }
-            check_results = self.checker.check_products_at_stores(product_specs, stores)
-            products_with_stock = self.checker.get_stores_with_stock(check_results)
+
+            check_results: Dict[str, Dict[str, Any]] = {}
+            for index, product in enumerate(product_specs, start=1):
+                retailer = product.get("retailer", "walgreens")
+                article_id = str(product["article_id"])
+                product_display_name = product.get("name") or article_id
+
+                logger.info("\n[%s/%s][%s] %s", index, len(product_specs), retailer, product_display_name)
+                logger.info("-" * 50)
+
+                if retailer == "walgreens":
+                    product_result = self.walgreens_checker.check_product_availability(
+                        product,
+                        walgreens_stores,
+                        product_index=index,
+                        product_total=len(product_specs),
+                    )
+                elif retailer == "bestbuy":
+                    product_result = self.bestbuy_checker.check_product_availability(
+                        product,
+                        self.current_zipcode,
+                        product_index=index,
+                        product_total=len(product_specs),
+                    )
+                    scanned_store_keys.update(
+                        f"bestbuy:{location_id}"
+                        for location_id in product_result.get("location_ids", [])
+                        if location_id
+                    )
+                else:
+                    raise ValueError(f"Unsupported retailer: {retailer}")
+
+                check_results[article_id] = {
+                    "retailer": retailer,
+                    "name": product_display_name,
+                    "image_url": product.get("image_url", ""),
+                    "source_url": product.get("source_url", ""),
+                    "availability": product_result["availability"],
+                    "stores": product_result["stores"],
+                }
+
+            products_with_stock = self._extract_products_with_stock(check_results)
 
             timestamp = datetime.utcnow().isoformat()
             self._set_progress(
@@ -430,7 +524,7 @@ class StockCheckScheduler:
             )
             self.db.add_check_result(
                 self.user_id,
-                total_stores_checked=len(stores),
+                total_stores_checked=len(scanned_store_keys),
                 products_with_stock=products_with_stock,
                 timestamp=timestamp,
             )
@@ -478,7 +572,7 @@ class StockCheckScheduler:
             "interval",
             minutes=self.check_interval_minutes,
             id=self._job_id,
-            name=f"Walgreens Stock Check (user {self.user_id})",
+            name=f"Retail Stock Check (user {self.user_id})",
             replace_existing=True,
         )
         self.scheduler.start()
@@ -556,6 +650,7 @@ class StockCheckScheduler:
         products_list = [
             {
                 "id": article_id,
+                "retailer": product.get("retailer", "walgreens"),
                 "name": product["name"],
                 "planogram": product["planogram"],
                 "image_url": product.get("image_url", ""),

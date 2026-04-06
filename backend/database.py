@@ -72,6 +72,7 @@ class StockDatabase:
                 CREATE TABLE IF NOT EXISTS tracked_products (
                     user_id INTEGER NOT NULL,
                     article_id TEXT NOT NULL,
+                    retailer TEXT NOT NULL DEFAULT 'walgreens',
                     name TEXT NOT NULL,
                     planogram TEXT NOT NULL,
                     image_url TEXT DEFAULT '',
@@ -101,6 +102,29 @@ class StockDatabase:
                 );
                 """
             )
+            self._ensure_column(
+                conn,
+                "tracked_products",
+                "retailer",
+                "TEXT NOT NULL DEFAULT 'walgreens'",
+            )
+
+    @staticmethod
+    def _ensure_column(
+        conn: sqlite3.Connection,
+        table_name: str,
+        column_name: str,
+        definition_sql: str,
+    ) -> None:
+        existing_columns = {
+            row["name"]
+            for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name in existing_columns:
+            return
+        conn.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition_sql}"
+        )
 
     @staticmethod
     def _row_to_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, Any]]:
@@ -253,7 +277,7 @@ class StockDatabase:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT article_id, name, planogram, image_url, source_url, product_id
+                SELECT article_id, retailer, name, planogram, image_url, source_url, product_id
                 FROM tracked_products
                 WHERE user_id = ?
                 ORDER BY created_at ASC, article_id ASC
@@ -264,6 +288,7 @@ class StockDatabase:
         return [
             {
                 "id": row["article_id"],
+                "retailer": row["retailer"] or "walgreens",
                 "name": row["name"],
                 "planogram": row["planogram"],
                 "image_url": row["image_url"] or "",
@@ -277,6 +302,7 @@ class StockDatabase:
         self,
         user_id: int,
         article_id: str,
+        retailer: str,
         name: str,
         planogram: str,
         image_url: str = "",
@@ -289,13 +315,14 @@ class StockDatabase:
                 conn.execute(
                     """
                     INSERT INTO tracked_products (
-                        user_id, article_id, name, planogram, image_url, source_url, product_id, created_at
+                        user_id, article_id, retailer, name, planogram, image_url, source_url, product_id, created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
                         article_id,
+                        retailer,
                         name,
                         planogram,
                         image_url,

@@ -2294,6 +2294,23 @@
       margin-bottom: 6px;
     }
 
+    .retailer-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 22px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(72, 156, 212, 0.28);
+      background: rgba(72, 156, 212, 0.1);
+      color: var(--text-secondary);
+      font-size: 10px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      white-space: nowrap;
+    }
+
     .result-card-kicker-icon {
       width: 18px;
       height: 18px;
@@ -2715,6 +2732,8 @@
     .product-info {
       flex: 1;
       min-width: 0;
+      display: grid;
+      gap: 6px;
     }
 
     .product-name {
@@ -3091,10 +3110,14 @@
         position: sticky;
         bottom: 0;
         display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-rows: minmax(52px, auto);
         gap: 8px;
         left: 0;
         width: 100%;
-        margin-left: 0;
+        max-width: 360px;
+        margin-right: auto;
+        margin-left: auto;
         padding-top: 10px;
         padding-right: max(16px, env(safe-area-inset-right, 0px));
         padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
@@ -3102,28 +3125,23 @@
         background: linear-gradient(180deg, rgba(27, 30, 34, 0.82), rgba(20, 23, 27, 0.98));
         backdrop-filter: blur(16px);
         box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.18);
-        justify-items: center;
+        justify-items: stretch;
+        align-items: stretch;
       }
 
       .onboarding-actions-group {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-        width: 100%;
-        max-width: 328px;
-        justify-content: center;
-        justify-items: center;
-        justify-self: center;
+        display: contents;
       }
 
       .onboarding-actions .btn {
-        min-height: 44px;
-        height: auto;
+        min-height: 52px;
+        height: 100%;
         padding: 10px 12px;
         font-size: 13px;
         line-height: 1.15;
         white-space: normal;
         text-align: center;
+        align-items: center;
         justify-content: center;
         width: 100%;
       }
@@ -3847,7 +3865,7 @@
             <div class="auth-feature">
               <div class="auth-feature-kicker">Inventory Workflow</div>
               <div class="auth-feature-title">Fast first scan</div>
-              <div class="auth-feature-copy">Paste a Walgreens product link, save your area, and run your first check in a couple of minutes.</div>
+              <div class="auth-feature-copy">Paste a Walgreens link or try a Best Buy product link in beta, save your area, and run your first check in a couple of minutes.</div>
             </div>
             <div class="auth-feature">
               <div class="auth-feature-kicker">Hosted Reliability</div>
@@ -4184,14 +4202,14 @@
           <div style="margin-top:16px;">
             <div class="form-group">
               <input type="url" class="form-input" id="new-product-url"
-                placeholder="Paste a Walgreens product link">
+                placeholder="Paste a Walgreens or Best Buy product link">
             </div>
             <div class="form-group" style="margin-top:10px;">
               <input type="text" class="form-input" id="new-product-name"
                 placeholder="Optional custom name (e.g., Pokemon Booster Bundle)">
             </div>
-            <div class="form-hint" style="margin-bottom:12px;">Paste a Walgreens product link and the app will extract
-              the article ID, planogram, and product image automatically. If you enter a custom name, that label will be
+            <div class="form-hint" style="margin-bottom:12px;">Paste a Walgreens product link or a Best Buy link in beta and the app will extract
+              the product metadata and image automatically. If you enter a custom name, that label will be
               used everywhere in the app and Discord alerts.</div>
             <button class="btn btn-primary" type="button" data-action="add-product">+ Add Product From Link</button>
           </div>
@@ -4737,7 +4755,7 @@
             bullets: [
               'Your search area and scan cadence.',
               'A Discord destination for alerts, if you want push notifications.',
-              'The Walgreens product links you actually want monitored.'
+              'The Walgreens or Best Buy product links you actually want monitored.'
             ],
             actionLabel: 'Open dashboard',
             action: () => openTab('results'),
@@ -4808,11 +4826,11 @@
           },
           {
             tag: 'Products',
-            title: 'Add the first Walgreens product you want watched.',
-            copy: 'Paste one Walgreens product link and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
+            title: 'Add the first product you want watched.',
+            copy: 'Paste one Walgreens product link or try one Best Buy product link in beta and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
             calloutTitle: 'Add at least one tracked item',
             bullets: [
-              'Paste the Walgreens product page URL.',
+              'Paste a Walgreens product page URL, or a Best Buy product page URL in beta.',
               'Use a custom name if you want cleaner Discord labels.',
               `You currently have ${trackedCount} tracked product${trackedCount === 1 ? '' : 's'} saved.`
             ],
@@ -4826,8 +4844,8 @@
               <div class="onboarding-form-card">
                 <div class="onboarding-form-card-title">First tracked product</div>
                 <div class="form-group">
-                  <label class="form-label" for="onboarding-product-url">Walgreens Product URL</label>
-                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a Walgreens product link" value="${escapeHtml(draft.productUrl)}">
+                  <label class="form-label" for="onboarding-product-url">Product URL</label>
+                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a Walgreens or Best Buy product link" value="${escapeHtml(draft.productUrl)}">
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-name">Custom Name</label>
@@ -5133,13 +5151,13 @@
             setOnboardingFeedback('You already have a tracked product, so we can move on.', 'success');
             return true;
           }
-          setOnboardingFeedback('Paste a Walgreens product link before continuing.', 'error');
+          setOnboardingFeedback('Paste a Walgreens or Best Buy product link before continuing.', 'error');
           return false;
         }
 
         const resolved = await apiCall('/api/products/resolve', 'POST', { url });
         if (!resolved) {
-          setOnboardingFeedback('That link did not resolve. Double-check the Walgreens product URL.', 'error');
+          setOnboardingFeedback('That link did not resolve. Double-check the product URL.', 'error');
           return false;
         }
 
@@ -5488,6 +5506,20 @@
         return Boolean(normalized) && (normalized === 'walgreens.com' || normalized.endsWith('.walgreens.com'));
       }
 
+      function isAllowedBestBuyHost(hostname) {
+        const normalized = String(hostname || '').trim().toLowerCase();
+        return Boolean(normalized) && (normalized === 'bestbuy.com' || normalized.endsWith('.bestbuy.com'));
+      }
+
+      function isAllowedProductSourceHost(hostname) {
+        return isAllowedWalgreensHost(hostname) || isAllowedBestBuyHost(hostname);
+      }
+
+      function isAllowedProductImageHost(hostname) {
+        const normalized = String(hostname || '').trim().toLowerCase();
+        return isAllowedProductSourceHost(normalized) || normalized.endsWith('.bbystatic.com');
+      }
+
       function sanitizeHttpUrl(value, { hostValidator = null } = {}) {
         const normalized = String(value || '').trim();
         if (!normalized) return '';
@@ -5503,11 +5535,15 @@
       }
 
       function sanitizeProductSourceUrl(value) {
-        return sanitizeHttpUrl(value, { hostValidator: isAllowedWalgreensHost });
+        return sanitizeHttpUrl(value, { hostValidator: isAllowedProductSourceHost });
       }
 
       function sanitizeProductImageUrl(value) {
-        return sanitizeHttpUrl(value, { hostValidator: isAllowedWalgreensHost });
+        return sanitizeHttpUrl(value, { hostValidator: isAllowedProductImageHost });
+      }
+
+      function retailerLabel(retailer) {
+        return String(retailer || 'walgreens').trim().toLowerCase() === 'bestbuy' ? 'Best Buy Beta' : 'Walgreens';
       }
 
       function renderTrackedProducts(products = trackedProductsCache) {
@@ -5520,10 +5556,12 @@
           const safeName = escapeHtml(p.name || 'Unnamed product');
           const safePlanogram = escapeHtml(p.planogram || 'missing-planogram');
           const safeId = escapeHtml(p.id || '');
+          const safeRetailer = escapeHtml(retailerLabel(p.retailer));
 
           return `
             <div class="product-item${isEditing ? ' is-editing' : ''}" data-product-id="${safeId}">
               <div class="product-info">
+                <div class="retailer-chip">${safeRetailer}</div>
                 ${isEditing
                   ? `<input type="text" class="form-input product-name-input" value="${safeName}" maxlength="160" placeholder="Product name">`
                   : `<div class="product-name">${safeName}</div>`
@@ -6012,11 +6050,11 @@
   `).join('');
       }
 
-      function renderStockKicker(zipDisplay) {
+      function renderStockKicker(zipDisplay, retailer) {
         return `
     <div class="result-card-kicker">
       <span class="result-card-kicker-icon" aria-hidden="true"></span>
-      <span>In Stock Near ${zipDisplay}</span>
+      <span>${escapeHtml(retailerLabel(retailer))} In Stock Near ${zipDisplay}</span>
     </div>
   `;
       }
@@ -6035,7 +6073,7 @@
     <article class="result-card">
       <div class="result-card-header">
         <div class="result-card-copy">
-          ${renderStockKicker(zipDisplay)}
+          ${renderStockKicker(zipDisplay, product.retailer)}
           <div class="result-card-title-row">
             <div class="result-card-title">${productName}</div>
             ${sourceUrl ? `<a class="result-card-link" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Product Page</a>` : ''}
@@ -6616,7 +6654,7 @@
         }
 
         if (phase === 'fetching_inventory') {
-          document.getElementById('progress-count').textContent = `Store processing: Walgreens is checking all ${total} stores in one live request | Current product hits: ${storesWithStock}`;
+          document.getElementById('progress-count').textContent = `Store processing: the retailer is checking all ${total} stores in one live request | Current product hits: ${storesWithStock}`;
           return;
         }
 
@@ -6628,7 +6666,7 @@
         const customName = document.getElementById('new-product-name').value.trim();
 
         if (!url) {
-          showToast('Paste a Walgreens product link first', 'error');
+          showToast('Paste a Walgreens or Best Buy product link first', 'error');
           return;
         }
 

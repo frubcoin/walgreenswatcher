@@ -31,8 +31,8 @@ from config import (  # noqa: E402
     SESSION_COOKIE_SECURE,
 )
 from database import StockDatabase  # noqa: E402
+from product_resolver import resolve_product_link  # noqa: E402
 from scheduler import SchedulerManager  # noqa: E402
-from walgreens_product_resolver import WalgreensProductResolver  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -77,6 +77,24 @@ def _is_allowed_walgreens_host(hostname: str) -> bool:
     return bool(normalized) and (normalized == "walgreens.com" or normalized.endswith(".walgreens.com"))
 
 
+def _is_allowed_bestbuy_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return bool(normalized) and (normalized == "bestbuy.com" or normalized.endswith(".bestbuy.com"))
+
+
+def _is_allowed_product_source_host(hostname: str) -> bool:
+    return _is_allowed_walgreens_host(hostname) or _is_allowed_bestbuy_host(hostname)
+
+
+def _is_allowed_product_image_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return (
+        _is_allowed_product_source_host(normalized)
+        or normalized.endswith(".bbystatic.com")
+        or normalized == "pisces.bbystatic.com"
+    )
+
+
 def _normalize_external_url(
     value: Any,
     *,
@@ -96,7 +114,7 @@ def _normalize_external_url(
 
     hostname = (parsed.hostname or "").lower()
     if host_validator and not host_validator(hostname):
-        raise ValueError(f"{field_name} must point to an allowed Walgreens host")
+        raise ValueError(f"{field_name} must point to an allowed retailer host")
 
     return parsed.geturl()
 
@@ -105,7 +123,7 @@ def _sanitize_product_source_url(value: Any, *, allow_empty: bool = True) -> str
     return _normalize_external_url(
         value,
         field_name="Product source URL",
-        host_validator=_is_allowed_walgreens_host,
+        host_validator=_is_allowed_product_source_host,
         allow_empty=allow_empty,
     )
 
@@ -114,7 +132,7 @@ def _sanitize_product_image_url(value: Any, *, allow_empty: bool = True) -> str:
     return _normalize_external_url(
         value,
         field_name="Product image URL",
-        host_validator=_is_allowed_walgreens_host,
+        host_validator=_is_allowed_product_image_host,
         allow_empty=allow_empty,
     )
 
@@ -464,10 +482,11 @@ def add_product(user: Dict[str, Any]):
 
     if product_link:
         try:
-            resolved = WalgreensProductResolver.resolve_product_link(product_link)
+            resolved = resolve_product_link(product_link)
         except Exception as exc:
             return jsonify({"error": str(exc)}), 400
 
+        retailer = str(resolved.get("retailer", "walgreens")).strip() or "walgreens"
         article_id = resolved["article_id"]
         product_name = custom_name or resolved["name"]
         planogram = resolved["planogram"]
@@ -488,6 +507,7 @@ def add_product(user: Dict[str, Any]):
                 return jsonify({"error": str(exc)}), 400
         resolved_product_id = resolved.get("product_id", "")
     else:
+        retailer = str(data.get("retailer", "walgreens")).strip() or "walgreens"
         article_id = str(data.get("id", "")).strip()
         product_name = custom_name
         planogram = str(data.get("planogram", "")).strip()
@@ -504,6 +524,7 @@ def add_product(user: Dict[str, Any]):
 
     success = scheduler.add_product(
         article_id,
+        retailer,
         product_name,
         planogram,
         image_url=image_url,
@@ -518,6 +539,7 @@ def add_product(user: Dict[str, Any]):
         {
             "message": "Product added",
             "id": article_id,
+            "retailer": retailer,
             "name": product_name,
             "planogram": planogram,
             "image_url": image_url,
@@ -537,7 +559,7 @@ def resolve_product(user: Dict[str, Any]):
         return jsonify({"error": "Product URL required"}), 400
 
     try:
-        resolved = WalgreensProductResolver.resolve_product_link(product_link)
+        resolved = resolve_product_link(product_link)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(resolved)
