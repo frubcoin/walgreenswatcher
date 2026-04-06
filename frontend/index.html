@@ -398,6 +398,8 @@
       display: grid;
       align-content: space-between;
       gap: 28px;
+      overflow: hidden;
+      isolation: isolate;
       border-right: 1px solid rgba(255, 255, 255, 0.06);
       background:
         radial-gradient(circle at top left, rgba(230, 38, 0, 0.28), transparent 42%),
@@ -405,21 +407,31 @@
         linear-gradient(180deg, rgba(60, 46, 49, 0.84), rgba(40, 43, 49, 0.9));
     }
 
+    .auth-showcase::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        url('/topography.svg') center / 820px auto repeat,
+        linear-gradient(132deg, rgba(255, 255, 255, 0.05), transparent 36%),
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 34%),
+        linear-gradient(180deg, rgba(12, 14, 18, 0.08), rgba(12, 14, 18, 0.26));
+      opacity: 0.26;
+      filter: brightness(0) invert(1) contrast(0.9);
+      pointer-events: none;
+      z-index: 0;
+    }
+
     .auth-showcase::after {
       content: '';
       position: absolute;
       inset: 0;
-      background: rgba(236, 240, 245, 0.13);
-      -webkit-mask-image: url('/topography.svg');
-      mask-image: url('/topography.svg');
-      -webkit-mask-size: 980px auto;
-      mask-size: 980px auto;
-      -webkit-mask-position: center;
-      mask-position: center;
-      -webkit-mask-repeat: repeat;
-      mask-repeat: repeat;
-      opacity: 0.42;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 48%);
       pointer-events: none;
+      z-index: 0;
+      opacity: 0.9;
     }
 
     .auth-showcase>* {
@@ -596,7 +608,6 @@
       padding: 24px;
       background: rgba(9, 11, 15, 0.72);
       backdrop-filter: blur(12px);
-      clip-path: inset(12px round 24px);
       overflow-y: auto;
       scrollbar-gutter: stable both-edges;
     }
@@ -629,6 +640,14 @@
         radial-gradient(circle at top left, rgba(72, 156, 212, 0.18), transparent 42%),
         linear-gradient(180deg, rgba(44, 49, 54, 0.98), rgba(28, 31, 35, 0.98));
       border-right: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .onboarding-main {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      overflow: hidden;
     }
 
     .onboarding-kicker {
@@ -882,17 +901,13 @@
     }
 
     .onboarding-actions {
-      flex: 0 0 auto;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       gap: 12px;
-      margin-top: auto;
-      padding: 18px 0 0;
-      position: sticky;
-      bottom: 0;
+      padding: 18px 32px 32px;
       z-index: 2;
-      background: linear-gradient(180deg, rgba(31, 35, 39, 0), rgba(31, 35, 39, 0.92) 18%, rgba(31, 35, 39, 0.98) 100%);
+      background: rgba(31, 35, 39, 0.98);
       border-top: 1px solid rgba(255, 255, 255, 0.06);
     }
 
@@ -2610,19 +2625,21 @@
           <p>The guide keeps the first-run path short: configure your search area, connect alerts, add products, and launch the first scan.</p>
           <div id="onboarding-progress" class="onboarding-progress"></div>
         </aside>
-        <section class="onboarding-content">
-          <div class="onboarding-step-meta">
-            <span id="onboarding-step-counter">Step 1 of 4</span>
-            <span id="onboarding-step-tag">Welcome</span>
+        <section class="onboarding-main">
+          <div class="onboarding-content">
+            <div class="onboarding-step-meta">
+              <span id="onboarding-step-counter">Step 1 of 4</span>
+              <span id="onboarding-step-tag">Welcome</span>
+            </div>
+            <div class="onboarding-step-title" id="onboarding-step-title">Welcome aboard</div>
+            <div class="onboarding-step-copy" id="onboarding-step-copy"></div>
+            <div class="onboarding-callout">
+              <div class="onboarding-callout-title" id="onboarding-callout-title">What to do here</div>
+              <ul class="onboarding-step-list" id="onboarding-step-list"></ul>
+            </div>
+            <div id="onboarding-step-form" class="onboarding-step-form" hidden></div>
+            <div id="onboarding-inline-status" class="onboarding-inline-status" aria-live="polite"></div>
           </div>
-          <div class="onboarding-step-title" id="onboarding-step-title">Welcome aboard</div>
-          <div class="onboarding-step-copy" id="onboarding-step-copy"></div>
-          <div class="onboarding-callout">
-            <div class="onboarding-callout-title" id="onboarding-callout-title">What to do here</div>
-            <ul class="onboarding-step-list" id="onboarding-step-list"></ul>
-          </div>
-          <div id="onboarding-step-form" class="onboarding-step-form" hidden></div>
-          <div id="onboarding-inline-status" class="onboarding-inline-status" aria-live="polite"></div>
           <div class="onboarding-actions">
             <div class="onboarding-actions-group">
               <button class="btn btn-secondary" type="button" id="onboarding-skip-btn" onclick="closeOnboarding(true)">Skip guide</button>
@@ -2866,7 +2883,6 @@
         </div>
       </div>
     </div>
-
     <script>
       let currentTab = 'results';
       let isStatusRefreshInFlight = false;
