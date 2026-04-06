@@ -524,6 +524,59 @@
       font-family: 'Space Mono', monospace;
       text-transform: uppercase;
       letter-spacing: 2px;
+      display: inline-block;
+      --auth-eyebrow-shimmer-angle: 15deg;
+      --auth-eyebrow-shimmer-spread: 56px;
+      --auth-eyebrow-shimmer-base: rgba(214, 220, 225, 0.74);
+      --auth-eyebrow-shimmer-highlight: rgba(255, 255, 255, 0.98);
+      --auth-eyebrow-shimmer-accent: rgba(243, 117, 32, 0.96);
+    }
+
+    @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+      .auth-eyebrow.shimmer-text {
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+        background-image: linear-gradient(
+          calc(90deg + var(--auth-eyebrow-shimmer-angle)),
+          var(--auth-eyebrow-shimmer-base) 0,
+          var(--auth-eyebrow-shimmer-base) calc(50% - var(--auth-eyebrow-shimmer-spread)),
+          var(--auth-eyebrow-shimmer-highlight) 50%,
+          var(--auth-eyebrow-shimmer-accent) calc(50% + 18px),
+          var(--auth-eyebrow-shimmer-base) calc(50% + var(--auth-eyebrow-shimmer-spread)),
+          var(--auth-eyebrow-shimmer-base) 100%
+        );
+        background-repeat: no-repeat;
+        background-size: 250% 100%;
+        background-position: 140% 50%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        animation: auth-eyebrow-shimmer 3.2s linear infinite;
+      }
+    }
+
+    @keyframes auth-eyebrow-shimmer {
+      0% {
+        background-position: 140% 50%;
+      }
+
+      24% {
+        background-position: 140% 50%;
+      }
+
+      72% {
+        background-position: -140% 50%;
+      }
+
+      100% {
+        background-position: -140% 50%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .auth-eyebrow.shimmer-text {
+        animation: none;
+        background-position: 50% 50%;
+      }
     }
 
     .auth-title {
@@ -2745,13 +2798,104 @@
       outline: none;
     }
 
+    @media (max-width: 900px) {
+      .wrapper {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .auth-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .auth-showcase {
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .auth-showcase,
+      .auth-panel {
+        padding: 28px 24px;
+      }
+
+      body.auth-gate-active .auth-gate {
+        max-height: calc(100dvh - 96px);
+      }
+
+      body.auth-gate-active .auth-layout {
+        grid-template-rows: none;
+        height: auto;
+      }
+
+      .auth-metrics {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .auth-feature-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .app-window {
+        border-radius: 16px;
+      }
+
+      .status-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .header-actions {
+        width: 100%;
+      }
+
+      .header-primary-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .header-primary-actions .btn {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .settings-actions {
+        flex-wrap: wrap;
+      }
+
+      .settings-actions .btn {
+        flex: 1 1 220px;
+      }
+
+      .results-map-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .results-map-card,
+      .results-map-sidebar,
+      .results-map-canvas {
+        height: 360px;
+        min-height: 0;
+      }
+
+      .site-footer {
+        width: min(calc(100% - 24px), 760px);
+      }
+
+      .shell-scrollbar {
+        display: none !important;
+      }
+    }
+
     @media (max-width: 640px) {
       .onboarding-modal {
         clip-path: none;
         padding: 12px;
       }
 
-      .auth-layout,
       .onboarding-dialog,
       .tech-stack-dialog {
         grid-template-columns: 1fr;
@@ -2769,11 +2913,6 @@
         max-height: calc(100vh - 24px);
       }
 
-      .auth-showcase {
-        border-right: none;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      }
-
       body.auth-gate-active {
         overflow: hidden;
       }
@@ -2788,20 +2927,8 @@
 
       body.auth-gate-active .auth-gate {
         margin-top: 0;
-        height: calc(100dvh - 104px);
+        max-height: calc(100dvh - 104px);
         min-height: 0;
-      }
-
-      body.auth-gate-active .auth-layout {
-        height: 100%;
-        grid-template-rows: minmax(0, 1.05fr) minmax(0, 0.95fr);
-      }
-
-      body.auth-gate-active .auth-showcase,
-      body.auth-gate-active .auth-panel {
-        min-height: 0;
-        overflow-y: auto;
-        overscroll-behavior: contain;
       }
 
       body.auth-gate-active .auth-showcase {
@@ -2845,7 +2972,6 @@
       }
 
       .auth-metrics,
-      .auth-feature-grid,
       .onboarding-form-grid {
         grid-template-columns: 1fr;
       }
@@ -2885,17 +3011,6 @@
         text-align: center;
       }
 
-      .results-map-shell {
-        grid-template-columns: 1fr;
-      }
-
-      .results-map-card,
-      .results-map-sidebar,
-      .results-map-canvas {
-        height: 360px;
-        min-height: 0;
-      }
-
       .product-item {
         align-items: flex-start;
         flex-direction: column;
@@ -2918,15 +3033,7 @@
         border-radius: 14px;
       }
 
-      .app-window {
-        padding: 0 14px 22px;
-      }
-
       .status-bar {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .settings-grid {
         grid-template-columns: 1fr;
       }
 
@@ -2935,25 +3042,25 @@
         align-items: flex-start;
       }
 
-      .header-actions {
-        width: 100%;
-      }
-
       .header-primary-actions {
-        width: 100%;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .header-primary-actions .btn {
-        width: 100%;
-        min-width: 0;
+        grid-template-columns: 1fr;
       }
 
       .header-actions .btn,
-      .header-actions .user-pill {
+      .header-actions .user-pill,
+      .header-primary-actions .btn {
         width: 100%;
         justify-content: center;
+      }
+
+      .tabs {
+        gap: 0;
+      }
+
+      .tab {
+        flex: 1 1 0;
+        text-align: center;
+        padding: 10px 8px;
       }
 
       .result-card-header {
@@ -3312,7 +3419,7 @@
       <div class="auth-layout">
         <section class="auth-showcase">
           <div class="auth-card">
-            <div class="auth-eyebrow">Early Access</div>
+            <div class="auth-eyebrow shimmer-text">Early Access</div>
             <div class="auth-title">Run private Walgreens alerts from a hosted dashboard. Never miss a restock at your Walgreens again.</div>
             <div class="auth-copy">Sign in once, keep your own ZIP code, Discord destinations, tracked products, and automation settings isolated from every other user on the service.</div>
             <div class="auth-metrics">
