@@ -11,6 +11,7 @@ const APP_SHELL = [
   '/topography.svg',
   '/settings.webp',
   '/refresh.webp',
+  '/install_desktop.svg',
   '/power.webp',
   '/no-power.webp',
   '/out-of-stock.webp',
