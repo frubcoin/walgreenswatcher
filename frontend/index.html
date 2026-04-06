@@ -2916,12 +2916,13 @@
 
       .onboarding-modal {
         clip-path: none;
-        padding: 12px;
-      }
-
-      .onboarding-dialog,
-      .tech-stack-dialog {
-        grid-template-columns: 1fr;
+        padding: 0;
+        align-items: stretch;
+        justify-content: stretch;
+        background:
+          linear-gradient(180deg, rgba(12, 14, 18, 0.98), rgba(18, 20, 24, 0.98));
+        backdrop-filter: none;
+        overscroll-behavior: contain;
       }
 
       .auth-showcase,
@@ -2931,9 +2932,168 @@
         padding: 24px 20px;
       }
 
+      .onboarding-dialog,
+      .tech-stack-dialog {
+        grid-template-columns: 1fr;
+      }
+
       .onboarding-dialog {
-        height: calc(100vh - 24px);
-        max-height: calc(100vh - 24px);
+        width: 100%;
+        min-height: 100dvh;
+        height: auto;
+        max-height: none;
+        margin: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        background: transparent;
+      }
+
+      .onboarding-main {
+        min-height: 0;
+        overflow: visible;
+        background: linear-gradient(180deg, rgba(29, 32, 36, 0.98), rgba(22, 25, 29, 0.98));
+      }
+
+      .onboarding-sidebar {
+        gap: 14px;
+        padding: calc(18px + env(safe-area-inset-top, 0px)) 18px 16px;
+        background:
+          radial-gradient(circle at top left, rgba(72, 156, 212, 0.22), transparent 38%),
+          radial-gradient(circle at top right, rgba(230, 38, 0, 0.12), transparent 30%),
+          linear-gradient(180deg, rgba(40, 45, 50, 0.98), rgba(28, 31, 35, 0.98));
+      }
+
+      .onboarding-kicker {
+        letter-spacing: 1.4px;
+      }
+
+      .onboarding-sidebar h2 {
+        font-size: clamp(24px, 8vw, 30px);
+        line-height: 1.04;
+      }
+
+      .onboarding-sidebar p {
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .onboarding-progress {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        margin: 2px -2px 0;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+      }
+
+      .onboarding-progress::-webkit-scrollbar {
+        display: none;
+      }
+
+      .onboarding-progress-item {
+        flex: 0 0 auto;
+        min-width: max-content;
+        padding: 10px 12px;
+        gap: 10px;
+        scroll-snap-align: start;
+      }
+
+      .onboarding-progress-text {
+        white-space: nowrap;
+      }
+
+      .onboarding-content {
+        gap: 18px;
+        padding: 18px 18px 28px;
+      }
+
+      .onboarding-step-meta {
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 11px;
+        letter-spacing: 1.1px;
+      }
+
+      .onboarding-step-title {
+        font-size: clamp(22px, 8vw, 28px);
+        line-height: 1.08;
+      }
+
+      .onboarding-step-copy {
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .onboarding-callout,
+      .onboarding-form-card,
+      .onboarding-summary,
+      .onboarding-choice {
+        border-radius: 14px;
+      }
+
+      .onboarding-callout,
+      .onboarding-form-card,
+      .onboarding-summary {
+        padding: 16px;
+      }
+
+      .onboarding-step-list {
+        gap: 12px;
+      }
+
+      .onboarding-step-list li {
+        gap: 10px;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .onboarding-step-list li::before {
+        margin-top: 6px;
+      }
+
+      .onboarding-step-form {
+        gap: 14px;
+      }
+
+      .onboarding-choice {
+        padding: 14px;
+      }
+
+      .onboarding-choice input {
+        width: 18px;
+        height: 18px;
+      }
+
+      .onboarding-summary-row {
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .onboarding-inline-help {
+        justify-content: flex-start;
+      }
+
+      .onboarding-actions {
+        position: sticky;
+        bottom: 0;
+        display: grid;
+        gap: 10px;
+        padding: 14px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+        background: linear-gradient(180deg, rgba(27, 30, 34, 0.82), rgba(20, 23, 27, 0.98));
+        backdrop-filter: blur(16px);
+        box-shadow: 0 -14px 30px rgba(0, 0, 0, 0.22);
+      }
+
+      .onboarding-actions-group {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .onboarding-actions-group:last-child {
+        grid-template-columns: 1fr;
       }
 
       body.auth-gate-active {
@@ -3053,11 +3213,6 @@
       .tech-stack-sidebar {
         border-right: none;
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      }
-
-      .onboarding-actions,
-      .onboarding-actions-group {
-        flex-direction: column;
       }
 
       .onboarding-actions .btn,
