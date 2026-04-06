@@ -7,7 +7,7 @@ import logging
 import os
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional
 
 from config import APP_DATABASE_FILE, DATA_DIR, DEFAULT_CHECK_INTERVAL_MINUTES, TARGET_ZIP_CODE
@@ -94,6 +94,11 @@ class StockDatabase:
 
                 CREATE INDEX IF NOT EXISTS idx_check_history_user_time
                     ON check_history(user_id, timestamp DESC);
+
+                CREATE TABLE IF NOT EXISTS service_uptime_samples (
+                    sample_minute TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL
+                );
                 """
             )
 
@@ -445,6 +450,94 @@ class StockDatabase:
             "checks_with_stock": checks_with_stock,
             "success_rate": success_rate,
             "last_check": row["last_check"] if row else None,
+        }
+
+    def get_global_statistics(self) -> Dict[str, int]:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS total_checks,
+                    SUM(CASE WHEN has_stock = 1 THEN 1 ELSE 0 END) AS successful_checks
+                FROM check_history
+                """
+            ).fetchone()
+
+        return {
+            "total_checks": int((row["total_checks"] or 0) if row else 0),
+            "successful_checks": int((row["successful_checks"] or 0) if row else 0),
+        }
+
+    def record_service_heartbeat(self, timestamp: Optional[datetime] = None) -> None:
+        heartbeat_time = timestamp or datetime.utcnow()
+        sample_minute = heartbeat_time.replace(second=0, microsecond=0)
+        created_at = heartbeat_time.isoformat()
+        retention_cutoff = (sample_minute - timedelta(days=14)).isoformat()
+
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO service_uptime_samples (sample_minute, created_at)
+                VALUES (?, ?)
+                ON CONFLICT(sample_minute) DO UPDATE SET created_at = excluded.created_at
+                """,
+                (sample_minute.isoformat(), created_at),
+            )
+            conn.execute(
+                "DELETE FROM service_uptime_samples WHERE sample_minute < ?",
+                (retention_cutoff,),
+            )
+
+    def get_service_uptime_stats(self, hours: int = 24) -> Dict[str, Any]:
+        capped_hours = max(1, min(int(hours or 24), 24 * 14))
+        now = datetime.utcnow().replace(second=0, microsecond=0)
+        window_start = now - timedelta(hours=capped_hours) + timedelta(minutes=1)
+
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS sample_count,
+                    MIN(sample_minute) AS first_sample
+                FROM service_uptime_samples
+                WHERE sample_minute >= ?
+                """,
+                (window_start.isoformat(),),
+            ).fetchone()
+
+        sample_count = int((row["sample_count"] or 0) if row else 0)
+        first_sample_raw = row["first_sample"] if row else None
+
+        if first_sample_raw:
+            try:
+                first_sample = datetime.fromisoformat(str(first_sample_raw))
+            except ValueError:
+                first_sample = now
+        else:
+            first_sample = now
+
+        tracked_minutes = max(
+            1,
+            min(
+                capped_hours * 60,
+                int(((now - max(first_sample, window_start)).total_seconds() // 60) + 1),
+            ),
+        )
+        uptime_percentage = round((sample_count / tracked_minutes) * 100, 1) if tracked_minutes else 0.0
+
+        if tracked_minutes >= 24 * 60:
+            label = f"{uptime_percentage:.1f}% uptime over last 24h"
+        else:
+            tracked_hours = tracked_minutes / 60
+            if tracked_hours >= 1:
+                label = f"{uptime_percentage:.1f}% uptime over last {tracked_hours:.1f}h"
+            else:
+                label = f"{uptime_percentage:.1f}% uptime tracked"
+
+        return {
+            "uptime_percentage": uptime_percentage,
+            "tracked_minutes": tracked_minutes,
+            "label": label,
         }
 
     def list_users_with_enabled_schedulers(self) -> List[Dict[str, Any]]:

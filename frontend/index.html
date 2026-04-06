@@ -568,6 +568,13 @@
       font-family: 'Space Mono', monospace;
     }
 
+    .auth-metric-meta {
+      margin-top: 8px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--text-muted);
+    }
+
     .auth-feature-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3310,12 +3317,14 @@
             <div class="auth-copy">Sign in once, keep your own ZIP code, Discord destinations, tracked products, and automation settings isolated from every other user on the service.</div>
             <div class="auth-metrics">
               <div class="auth-metric">
-                <div class="auth-metric-value">1</div>
-                <div class="auth-metric-label">Account per setup</div>
+                <div class="auth-metric-value" id="auth-global-checks">0</div>
+                <div class="auth-metric-label">Checks run</div>
+                <div class="auth-metric-meta" id="auth-global-successes">0 successful stock checks recorded</div>
               </div>
               <div class="auth-metric">
                 <div class="auth-metric-value">24/7</div>
                 <div class="auth-metric-label">Monitoring</div>
+                <div class="auth-metric-meta" id="auth-service-uptime">Tracking uptime...</div>
               </div>
               <div class="auth-metric">
                 <div class="auth-metric-value">Live</div>
@@ -3752,6 +3761,42 @@
       function apiUrl(path) {
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
         return `${API_BASE}${normalizedPath}`;
+      }
+
+      function formatCompactNumber(value) {
+        return new Intl.NumberFormat().format(Number(value) || 0);
+      }
+
+      function renderPublicStats(stats = null) {
+        const checksNode = document.getElementById('auth-global-checks');
+        const successesNode = document.getElementById('auth-global-successes');
+        const uptimeNode = document.getElementById('auth-service-uptime');
+        if (!checksNode || !successesNode || !uptimeNode) return;
+
+        const totalChecks = Number(stats?.total_checks || 0);
+        const successfulChecks = Number(stats?.successful_checks || 0);
+        const uptimeLabel = String(stats?.service_uptime?.label || 'Tracking uptime...');
+        checksNode.textContent = formatCompactNumber(totalChecks);
+        successesNode.textContent = `${formatCompactNumber(successfulChecks)} successful stock checks recorded`;
+        uptimeNode.textContent = uptimeLabel;
+      }
+
+      async function loadPublicStats() {
+        try {
+          const response = await fetch(apiUrl('/api/public-stats'), { credentials: 'include' });
+          if (!response.ok) return null;
+          const stats = await response.json();
+          renderPublicStats(stats);
+          return stats;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function refreshPublicStatsForLogin() {
+        if (!currentUser) {
+          loadPublicStats();
+        }
       }
 
       function getShellScrollbarElements() {
@@ -4749,6 +4794,7 @@
         if (!currentUser) {
           stopStatusPolling();
           setAuthenticatedUi(false);
+          refreshPublicStatsForLogin();
           if (payload?.google_client_id) {
             const googleReady = await waitForGoogleIdentity();
             if (googleReady) {
@@ -5577,6 +5623,8 @@
             }
           });
         }
+        renderPublicStats();
+        refreshPublicStatsForLogin();
         refreshInstallButtons();
         registerServiceWorker();
         hydrateAuthenticatedSession();

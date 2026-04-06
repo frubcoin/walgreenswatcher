@@ -6,6 +6,8 @@ import logging
 import os
 import secrets
 import sys
+import threading
+import time
 from functools import wraps
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -66,6 +68,8 @@ CORS(
 db = StockDatabase()
 scheduler_manager = SchedulerManager(db)
 scheduler_manager.start_enabled_schedulers()
+SERVICE_UPTIME_HEARTBEAT_SECONDS = 30
+_uptime_tracker_started = False
 
 
 def _is_allowed_walgreens_host(hostname: str) -> bool:
@@ -236,6 +240,37 @@ def _public_auth_payload(user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def _service_uptime_heartbeat_loop() -> None:
+    while True:
+        try:
+            db.record_service_heartbeat()
+        except Exception as exc:
+            logger.warning("Service uptime heartbeat failed: %s", exc)
+        time.sleep(SERVICE_UPTIME_HEARTBEAT_SECONDS)
+
+
+def start_service_uptime_tracker() -> None:
+    global _uptime_tracker_started
+    if _uptime_tracker_started:
+        return
+
+    _uptime_tracker_started = True
+    try:
+        db.record_service_heartbeat()
+    except Exception as exc:
+        logger.warning("Initial service uptime heartbeat failed: %s", exc)
+
+    tracker_thread = threading.Thread(
+        target=_service_uptime_heartbeat_loop,
+        name="service-uptime-heartbeat",
+        daemon=True,
+    )
+    tracker_thread.start()
+
+
+start_service_uptime_tracker()
+
+
 @app.route("/api/auth/session", methods=["GET"])
 def get_auth_session():
     return jsonify(_public_auth_payload(_session_user()))
@@ -289,6 +324,13 @@ def google_sign_in():
 def logout():
     session.clear()
     return jsonify({"success": True})
+
+
+@app.route("/api/public-stats", methods=["GET"])
+def get_public_stats():
+    payload = db.get_global_statistics()
+    payload["service_uptime"] = db.get_service_uptime_stats()
+    return jsonify(payload)
 
 
 @app.route("/api/status", methods=["GET"])
