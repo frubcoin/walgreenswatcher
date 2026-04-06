@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import sys
 from functools import wraps
+from pathlib import Path
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
-from flask import Flask, jsonify, request, send_from_directory, session
+from flask import Flask, Response, g, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -36,6 +39,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+FRONTEND_INDEX_PATH = FRONTEND_DIR / "index.html"
+INLINE_SCRIPT_NONCE_TOKEN = "__CSP_NONCE__"
 app.secret_key = FLASK_SECRET_KEY
 app.config.update(
     SESSION_COOKIE_NAME=SESSION_COOKIE_NAME,
@@ -55,6 +61,113 @@ CORS(
 db = StockDatabase()
 scheduler_manager = SchedulerManager(db)
 scheduler_manager.start_enabled_schedulers()
+
+
+def _is_allowed_walgreens_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return bool(normalized) and (normalized == "walgreens.com" or normalized.endswith(".walgreens.com"))
+
+
+def _normalize_external_url(
+    value: Any,
+    *,
+    field_name: str,
+    host_validator=None,
+    allow_empty: bool = True,
+) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        if allow_empty:
+            return ""
+        raise ValueError(f"{field_name} is required")
+
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError(f"{field_name} must be a valid HTTP or HTTPS URL")
+
+    hostname = (parsed.hostname or "").lower()
+    if host_validator and not host_validator(hostname):
+        raise ValueError(f"{field_name} must point to an allowed Walgreens host")
+
+    return parsed.geturl()
+
+
+def _sanitize_product_source_url(value: Any, *, allow_empty: bool = True) -> str:
+    return _normalize_external_url(
+        value,
+        field_name="Product source URL",
+        host_validator=_is_allowed_walgreens_host,
+        allow_empty=allow_empty,
+    )
+
+
+def _sanitize_product_image_url(value: Any, *, allow_empty: bool = True) -> str:
+    return _normalize_external_url(
+        value,
+        field_name="Product image URL",
+        host_validator=_is_allowed_walgreens_host,
+        allow_empty=allow_empty,
+    )
+
+
+def _build_content_security_policy(nonce: str) -> str:
+    directives = {
+        "default-src": ["'self'"],
+        "base-uri": ["'self'"],
+        "object-src": ["'none'"],
+        "frame-ancestors": ["'none'"],
+        "form-action": ["'self'"],
+        "manifest-src": ["'self'"],
+        "worker-src": ["'self'"],
+        "script-src": [
+            "'self'",
+            f"'nonce-{nonce}'",
+            "https://accounts.google.com",
+            "https://unpkg.com",
+        ],
+        "style-src": [
+            "'self'",
+            "'unsafe-inline'",
+            "https://fonts.googleapis.com",
+            "https://unpkg.com",
+        ],
+        "font-src": [
+            "'self'",
+            "https://fonts.gstatic.com",
+            "data:",
+        ],
+        "img-src": [
+            "'self'",
+            "data:",
+            "https:",
+        ],
+        "connect-src": [
+            "'self'",
+            "https://api.frub.dev",
+            "http://localhost:5000",
+            "http://127.0.0.1:5000",
+            "https://accounts.google.com",
+            "https://*.google.com",
+            "https://*.googleapis.com",
+        ],
+        "frame-src": [
+            "https://accounts.google.com",
+            "https://*.google.com",
+        ],
+    }
+    return "; ".join(
+        f"{directive} {' '.join(sources)}" for directive, sources in directives.items()
+    )
+
+
+def _serve_index_html() -> Response:
+    nonce = secrets.token_urlsafe(16)
+    g.csp_nonce = nonce
+    html = FRONTEND_INDEX_PATH.read_text(encoding="utf-8").replace(
+        INLINE_SCRIPT_NONCE_TOKEN,
+        nonce,
+    )
+    return Response(html, mimetype="text/html")
 
 
 def _session_user() -> Optional[Dict[str, Any]]:
@@ -77,6 +190,17 @@ def require_auth(func):
 
 def _current_scheduler(user: Dict[str, Any]):
     return scheduler_manager.get_or_create(int(user["id"]))
+
+
+@app.after_request
+def apply_security_headers(response: Response) -> Response:
+    nonce = getattr(g, "csp_nonce", "")
+    if nonce and response.mimetype == "text/html":
+        response.headers["Content-Security-Policy"] = _build_content_security_policy(nonce)
+
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
 
 
 def _google_client_configured() -> bool:
@@ -293,19 +417,36 @@ def add_product(user: Dict[str, Any]):
         article_id = resolved["article_id"]
         product_name = custom_name or resolved["name"]
         planogram = resolved["planogram"]
-        image_url = resolved.get("image_url", "")
-        source_url = resolved.get("canonical_url", product_link)
+        try:
+            image_url = _sanitize_product_image_url(resolved.get("image_url", ""))
+        except ValueError:
+            image_url = ""
+
+        try:
+            source_url = _sanitize_product_source_url(
+                resolved.get("canonical_url", "") or product_link,
+                allow_empty=False,
+            )
+        except ValueError:
+            try:
+                source_url = _sanitize_product_source_url(product_link, allow_empty=False)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
         resolved_product_id = resolved.get("product_id", "")
     else:
         article_id = str(data.get("id", "")).strip()
         product_name = custom_name
         planogram = str(data.get("planogram", "")).strip()
-        image_url = str(data.get("image_url", "")).strip()
-        source_url = str(data.get("source_url", "")).strip()
         resolved_product_id = str(data.get("product_id", "")).strip()
 
         if not article_id or not product_name or not planogram:
             return jsonify({"error": "Product URL or product ID, name, and planogram are required"}), 400
+
+        try:
+            image_url = _sanitize_product_image_url(data.get("image_url", ""))
+            source_url = _sanitize_product_source_url(data.get("source_url", ""))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     success = scheduler.add_product(
         article_id,
@@ -393,12 +534,14 @@ def health():
 
 @app.route("/")
 def index():
-    return send_from_directory("../frontend", "index.html")
+    return _serve_index_html()
 
 
 @app.route("/<path:path>")
 def serve_static(path: str):
-    return send_from_directory("../frontend", path)
+    if path == "index.html":
+        return _serve_index_html()
+    return send_from_directory(str(FRONTEND_DIR), path)
 
 
 @app.errorhandler(404)

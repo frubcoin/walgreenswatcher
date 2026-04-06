@@ -2389,7 +2389,7 @@
       <div></div>
     </div>
   </div>
-  <script>
+  <script nonce="__CSP_NONCE__">
     const DEFAULT_POKEMON_BACKGROUND_THEME = 'gyra';
     const DEFAULT_POKEMON_BACKGROUND_ENABLED = false;
     const DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645;
@@ -2652,7 +2652,7 @@
             <div class="auth-panel-copy">First-time users will get a short setup guide after login.</div>
             <div class="auth-actions">
               <div id="google-signin-button"></div>
-              <button class="btn btn-secondary install-app-btn" type="button" onclick="promptInstallApp()" hidden>
+              <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
                 <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
                   <path d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
                 </svg>
@@ -2695,12 +2695,12 @@
           </div>
           <div class="onboarding-actions">
             <div class="onboarding-actions-group">
-              <button class="btn btn-secondary" type="button" id="onboarding-skip-btn" onclick="closeOnboarding(true)">Skip guide</button>
-              <button class="btn btn-secondary" type="button" id="onboarding-back-btn" onclick="goToOnboardingStep(-1)">Back</button>
+              <button class="btn btn-secondary" type="button" id="onboarding-skip-btn" data-action="close-onboarding" data-mark-complete="true">Skip guide</button>
+              <button class="btn btn-secondary" type="button" id="onboarding-back-btn" data-action="onboarding-back">Back</button>
             </div>
             <div class="onboarding-actions-group">
-              <button class="btn btn-secondary" type="button" id="onboarding-jump-btn" onclick="handleOnboardingAction()">Show me</button>
-              <button class="btn btn-primary" type="button" id="onboarding-next-btn" onclick="handleOnboardingNext()">Next step</button>
+              <button class="btn btn-secondary" type="button" id="onboarding-jump-btn" data-action="onboarding-jump">Show me</button>
+              <button class="btn btn-primary" type="button" id="onboarding-next-btn" data-action="onboarding-next">Next step</button>
             </div>
           </div>
         </section>
@@ -2726,35 +2726,35 @@
             </div>
           </div>
           <div class="header-primary-actions">
-            <button class="btn btn-primary start-scheduler-btn" onclick="startScheduler()">
+            <button class="btn btn-primary start-scheduler-btn" type="button" data-action="start-scheduler">
               <span class="btn-icon" style="-webkit-mask-image: url('/power.webp'); mask-image: url('/power.webp');"
                 aria-hidden="true"></span>
               Start
             </button>
-            <button class="btn btn-secondary stop-scheduler-btn" onclick="stopScheduler()" style="display:none;">
+            <button class="btn btn-secondary stop-scheduler-btn" type="button" data-action="stop-scheduler" style="display:none;">
               <span class="btn-icon" style="-webkit-mask-image: url('/no-power.webp'); mask-image: url('/no-power.webp');"
                 aria-hidden="true"></span>
               Stop
             </button>
-            <button class="btn btn-primary" id="check-btn" onclick="triggerManualCheck()">
+            <button class="btn btn-primary" id="check-btn" type="button" data-action="trigger-check">
               <span class="btn-icon" style="-webkit-mask-image: url('/refresh.webp'); mask-image: url('/refresh.webp');"
                 aria-hidden="true"></span>
               <span id="check-btn-text">Check Now</span>
             </button>
           </div>
-          <button id="settings-btn" class="btn btn-secondary" onclick="openTab('settings')">
+          <button id="settings-btn" class="btn btn-secondary" type="button" data-action="open-tab" data-tab-name="settings">
             <span class="btn-icon" style="-webkit-mask-image: url('/settings.webp'); mask-image: url('/settings.webp');"
               aria-hidden="true"></span>
             Settings
           </button>
-          <button class="btn btn-secondary install-app-btn" type="button" onclick="promptInstallApp()" hidden>
+          <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
             <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
               <path d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
             </svg>
             Install App
           </button>
-          <button class="btn btn-secondary" id="guide-btn" onclick="openOnboarding(true)">Guide</button>
-          <button class="btn btn-secondary" id="signout-btn" onclick="logoutUser()">Sign Out</button>
+          <button class="btn btn-secondary" id="guide-btn" type="button" data-action="open-onboarding">Guide</button>
+          <button class="btn btn-secondary" id="signout-btn" type="button" data-action="logout">Sign Out</button>
         </div>
       </header>
 
@@ -2812,9 +2812,9 @@
       </div>
 
       <div class="tabs">
-        <button class="tab active" onclick="openTab('results')" id="tab-results">Results</button>
-        <button class="tab" onclick="openTab('settings')" id="tab-settings">Settings</button>
-        <button class="tab" onclick="openTab('history')" id="tab-history">History</button>
+        <button class="tab active" type="button" data-action="open-tab" data-tab-name="results" id="tab-results">Results</button>
+        <button class="tab" type="button" data-action="open-tab" data-tab-name="settings" id="tab-settings">Settings</button>
+        <button class="tab" type="button" data-action="open-tab" data-tab-name="history" id="tab-history">History</button>
       </div>
 
       <div class="tab-panel active" id="panel-results">
@@ -2892,7 +2892,7 @@
             </label>
             <div id="cfg-discord-destinations" class="discord-destinations"></div>
             <div class="discord-actions">
-              <button class="btn btn-secondary btn-sm" type="button" onclick="addDiscordDestinationRow()">Add
+              <button class="btn btn-secondary btn-sm" type="button" data-action="add-discord-destination">Add
                 Webhook</button>
             </div>
             <span class="form-hint">Set a webhook URL for each destination. Role ID is optional and only applies to that
@@ -2901,9 +2901,9 @@
         </div>
 
         <div class="settings-actions">
-          <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
-          <button class="btn btn-secondary" id="start-btn" onclick="startScheduler()">Start</button>
-          <button class="btn btn-secondary" id="stop-btn" onclick="stopScheduler()" style="display:none;">Stop</button>
+          <button class="btn btn-primary" type="button" data-action="save-settings">Save Settings</button>
+          <button class="btn btn-secondary" id="start-btn" type="button" data-action="start-scheduler">Start</button>
+          <button class="btn btn-secondary" id="stop-btn" type="button" data-action="stop-scheduler" style="display:none;">Stop</button>
         </div>
 
         <div style="margin-top:32px; padding-top:24px; border-top: 1px solid var(--border);">
@@ -2921,7 +2921,7 @@
             <div class="form-hint" style="margin-bottom:12px;">Paste a Walgreens product link and the app will extract
               the article ID, planogram, and product image automatically. If you enter a custom name, that label will be
               used everywhere in the app and Discord alerts.</div>
-            <button class="btn btn-primary" onclick="addProduct()">+ Add Product From Link</button>
+            <button class="btn btn-primary" type="button" data-action="add-product">+ Add Product From Link</button>
           </div>
         </div>
       </div>
@@ -2936,7 +2936,7 @@
         </div>
       </div>
     </div>
-    <script>
+    <script nonce="__CSP_NONCE__">
       let currentTab = 'results';
       let isStatusRefreshInFlight = false;
       let lastResultsSignature = '';
@@ -3793,7 +3793,7 @@
         <input type="text" class="form-input discord-role-id" inputmode="numeric" placeholder="Optional role id" value="${escapeHtml(roleId)}">
       </div>
       <div class="discord-row-actions">
-        <button class="btn btn-danger-icon" type="button" onclick="removeDiscordDestinationRow(this)" title="Remove">
+        <button class="btn btn-danger-icon" type="button" data-action="remove-discord-destination" title="Remove">
           <span class="btn-icon" style="-webkit-mask-image: url('/trash.webp'); mask-image: url('/trash.webp'); width: 20px; height: 20px;" aria-hidden="true"></span>
         </button>
       </div>
@@ -3821,6 +3821,14 @@
         }
       }
 
+      function getProductItemElement(element) {
+        return element ? element.closest('.product-item') : null;
+      }
+
+      function getProductIdFromElement(element) {
+        return getProductItemElement(element)?.dataset?.productId || '';
+      }
+
       function collectDiscordDestinations() {
         return Array.from(document.querySelectorAll('.discord-destination')).map(row => {
           const url = row.querySelector('.discord-webhook-url')?.value.trim() || '';
@@ -3836,7 +3844,35 @@
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;');
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function isAllowedWalgreensHost(hostname) {
+        const normalized = String(hostname || '').trim().toLowerCase();
+        return Boolean(normalized) && (normalized === 'walgreens.com' || normalized.endsWith('.walgreens.com'));
+      }
+
+      function sanitizeHttpUrl(value, { hostValidator = null } = {}) {
+        const normalized = String(value || '').trim();
+        if (!normalized) return '';
+
+        try {
+          const parsed = new URL(normalized);
+          if (!/^https?:$/.test(parsed.protocol)) return '';
+          if (typeof hostValidator === 'function' && !hostValidator(parsed.hostname)) return '';
+          return parsed.toString();
+        } catch (error) {
+          return '';
+        }
+      }
+
+      function sanitizeProductSourceUrl(value) {
+        return sanitizeHttpUrl(value, { hostValidator: isAllowedWalgreensHost });
+      }
+
+      function sanitizeProductImageUrl(value) {
+        return sanitizeHttpUrl(value, { hostValidator: isAllowedWalgreensHost });
       }
 
       function renderTrackedProducts(products = trackedProductsCache) {
@@ -3851,10 +3887,10 @@
           const safeId = escapeHtml(p.id || '');
 
           return `
-            <div class="product-item">
+            <div class="product-item${isEditing ? ' is-editing' : ''}" data-product-id="${safeId}">
               <div class="product-info">
                 ${isEditing
-                  ? `<input type="text" class="form-input product-name-input" id="edit-product-name-${safeId}" value="${safeName}" maxlength="160" placeholder="Product name" onkeydown="handleProductNameKeydown(event, '${safeId}')">`
+                  ? `<input type="text" class="form-input product-name-input" value="${safeName}" maxlength="160" placeholder="Product name">`
                   : `<div class="product-name">${safeName}</div>`
                 }
                 <div class="product-id">${safeId} | ${safePlanogram}</div>
@@ -3862,12 +3898,12 @@
               <div class="product-actions">
                 ${isEditing
                   ? `
-                    <button class="btn btn-secondary btn-sm" type="button" onclick="cancelProductNameEdit()">Cancel</button>
-                    <button class="btn btn-primary btn-sm" type="button" onclick="saveProductName('${safeId}')">Save</button>
+                    <button class="btn btn-secondary btn-sm" type="button" data-action="cancel-product-name-edit">Cancel</button>
+                    <button class="btn btn-primary btn-sm" type="button" data-action="save-product-name">Save</button>
                   `
                   : `
-                    <button class="btn btn-secondary btn-sm" type="button" onclick="startProductNameEdit('${safeId}')">Edit</button>
-                    <button class="btn btn-danger-icon" type="button" onclick="removeProduct('${safeId}')" title="Remove">
+                    <button class="btn btn-secondary btn-sm" type="button" data-action="start-product-name-edit">Edit</button>
+                    <button class="btn btn-danger-icon" type="button" data-action="remove-product" title="Remove">
                       <span class="btn-icon" style="-webkit-mask-image: url('/trash.webp'); mask-image: url('/trash.webp'); width: 20px; height: 20px;" aria-hidden="true"></span>
                     </button>
                   `
@@ -3877,7 +3913,7 @@
         }).join('');
 
         if (editingProductId) {
-          const input = document.getElementById(`edit-product-name-${editingProductId}`);
+          const input = list.querySelector('.product-item.is-editing .product-name-input');
           if (input) {
             input.focus();
             input.select();
@@ -3895,10 +3931,10 @@
         renderTrackedProducts();
       }
 
-      function handleProductNameKeydown(event, productId) {
+      function handleProductNameKeydown(event, productId, sourceElement = null) {
         if (event.key === 'Enter') {
           event.preventDefault();
-          saveProductName(productId);
+          saveProductName(productId, sourceElement);
           return;
         }
 
@@ -3908,8 +3944,9 @@
         }
       }
 
-      async function saveProductName(productId) {
-        const input = document.getElementById(`edit-product-name-${productId}`);
+      async function saveProductName(productId, sourceElement = null) {
+        const row = getProductItemElement(sourceElement);
+        const input = row ? row.querySelector('.product-name-input') : null;
         const nextName = input ? input.value.trim() : '';
 
         if (!nextName) {
@@ -4044,6 +4081,94 @@
         focusResultsMapMarker(locationKey);
       }
 
+      async function handleActionClick(actionElement) {
+        const action = actionElement?.dataset?.action || '';
+        if (!action) return;
+
+        switch (action) {
+          case 'prompt-install':
+            await promptInstallApp();
+            return;
+          case 'close-onboarding':
+            closeOnboarding(actionElement.dataset.markComplete === 'true');
+            return;
+          case 'onboarding-back':
+            goToOnboardingStep(-1);
+            return;
+          case 'onboarding-jump':
+            handleOnboardingAction();
+            return;
+          case 'onboarding-next':
+            await handleOnboardingNext();
+            return;
+          case 'start-scheduler':
+            await startScheduler();
+            return;
+          case 'stop-scheduler':
+            await stopScheduler();
+            return;
+          case 'trigger-check':
+            await triggerManualCheck();
+            return;
+          case 'open-tab':
+            openTab(actionElement.dataset.tabName || 'results');
+            return;
+          case 'open-onboarding':
+            openOnboarding(true);
+            return;
+          case 'logout':
+            await logoutUser();
+            return;
+          case 'add-discord-destination':
+            addDiscordDestinationRow();
+            return;
+          case 'remove-discord-destination':
+            removeDiscordDestinationRow(actionElement);
+            return;
+          case 'save-settings':
+            await saveSettings();
+            return;
+          case 'add-product':
+            await addProduct();
+            return;
+          case 'cancel-product-name-edit':
+            cancelProductNameEdit();
+            return;
+          case 'save-product-name': {
+            const productId = getProductIdFromElement(actionElement);
+            if (productId) {
+              await saveProductName(productId, actionElement);
+            }
+            return;
+          }
+          case 'start-product-name-edit': {
+            const productId = getProductIdFromElement(actionElement);
+            if (productId) {
+              startProductNameEdit(productId);
+            }
+            return;
+          }
+          case 'remove-product': {
+            const productId = getProductIdFromElement(actionElement);
+            if (productId) {
+              await removeProduct(productId);
+            }
+            return;
+          }
+          case 'focus-results-marker':
+            focusResultsMapMarkerByElement(actionElement);
+            return;
+          case 'set-results-view':
+            setResultsView(actionElement.dataset.resultsView || 'cards');
+            return;
+          case 'toggle-history-item':
+            toggleHistoryItem(actionElement);
+            return;
+          default:
+            return;
+        }
+      }
+
       function renderResultsMap(locations = []) {
         const mapElement = document.getElementById('results-map');
         if (!mapElement || typeof L === 'undefined') return;
@@ -4111,7 +4236,7 @@
         return `
           <div class="results-map-list">
             ${locations.map((location, index) => `
-              <button class="results-map-item ${activeResultsMapKey === location.location_key ? 'is-active' : ''}" type="button" data-location-key="${escapeHtml(location.location_key)}" onclick="focusResultsMapMarkerByElement(this)">
+              <button class="results-map-item ${activeResultsMapKey === location.location_key ? 'is-active' : ''}" type="button" data-action="focus-results-marker" data-location-key="${escapeHtml(location.location_key)}">
                 <div class="results-map-item-title">${escapeHtml(location.name)}</div>
                 <div class="results-map-item-address">${escapeHtml(location.address)}</div>
                 <div class="results-map-item-meta">${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
@@ -4146,8 +4271,8 @@
                 <div class="results-toolbar-subtitle">${productCount} product${productCount === 1 ? '' : 's'} hit across ${mapData.locations.length} mapped location${mapData.locations.length === 1 ? '' : 's'} after checking ${total} store${total === 1 ? '' : 's'}${timestamp ? ` on ${formattedDate}` : ''}.</div>
               </div>
               <div class="results-view-switch" role="tablist" aria-label="Results view">
-                <button class="results-view-btn ${currentResultsView === 'cards' ? 'active' : ''}" type="button" onclick="setResultsView('cards')">Cards</button>
-                <button class="results-view-btn ${currentResultsView === 'map' ? 'active' : ''}" type="button" onclick="setResultsView('map')" ${mapData.locations.length ? '' : 'disabled title="Run a new successful scan to enable map pins"'}>Map</button>
+                <button class="results-view-btn ${currentResultsView === 'cards' ? 'active' : ''}" type="button" data-action="set-results-view" data-results-view="cards">Cards</button>
+                <button class="results-view-btn ${currentResultsView === 'map' ? 'active' : ''}" type="button" data-action="set-results-view" data-results-view="map" ${mapData.locations.length ? '' : 'disabled title="Run a new successful scan to enable map pins"'}>Map</button>
               </div>
             </div>
             <div class="results-view ${currentResultsView === 'cards' ? 'active' : ''}" id="results-view-cards">
@@ -4237,8 +4362,8 @@
         const stores = Array.isArray(product.stores) ? product.stores : [];
         const nearest = nearestStore(stores);
         const productName = escapeHtml(product.product_name || 'Tracked product');
-        const imageUrl = escapeHtml(product.image_url || '');
-        const sourceUrl = escapeHtml(product.source_url || '');
+        const imageUrl = sanitizeProductImageUrl(product.image_url || '');
+        const sourceUrl = sanitizeProductSourceUrl(product.source_url || '');
         const zipDisplay = escapeHtml(configuredZip || 'configured ZIP');
         const nearestAddress = nearest ? renderAddressLink(nearest.address) : 'No stores found';
         const nearestDistance = nearest ? formatDistance(nearest.distance) : 'Distance unavailable';
@@ -4250,13 +4375,13 @@
           ${renderStockKicker(zipDisplay)}
           <div class="result-card-title-row">
             <div class="result-card-title">${productName}</div>
-            ${sourceUrl ? `<a class="result-card-link" href="${sourceUrl}" target="_blank" rel="noopener noreferrer">Product Page</a>` : ''}
+            ${sourceUrl ? `<a class="result-card-link" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Product Page</a>` : ''}
           </div>
           <div class="result-card-subtitle">${Number(product.count || 0)} stores in stock | ${Number(product.total_inventory || 0)} total units</div>
         </div>
         ${imageUrl ? `
           <div class="result-card-thumb">
-            <img src="${imageUrl}" alt="${productName}">
+            <img src="${escapeHtml(imageUrl)}" alt="${productName}">
           </div>
         ` : ''}
       </div>
@@ -4341,13 +4466,27 @@
       });
 
       document.addEventListener('keydown', event => {
+        if (event.target instanceof HTMLElement && event.target.classList.contains('product-name-input')) {
+          const productId = getProductIdFromElement(event.target);
+          if (productId) {
+            handleProductNameKeydown(event, productId, event.target);
+            if (event.defaultPrevented) return;
+          }
+        }
+
         if (event.key !== 'Escape') return;
         const modal = document.getElementById('onboarding-modal');
         if (!modal || modal.hidden) return;
         closeOnboarding(false);
       });
 
-      document.addEventListener('click', event => {
+      document.addEventListener('click', async event => {
+        const actionElement = event.target instanceof Element ? event.target.closest('[data-action]') : null;
+        if (actionElement) {
+          await handleActionClick(actionElement);
+          return;
+        }
+
         const modal = document.getElementById('onboarding-modal');
         if (!modal || modal.hidden) return;
         if (event.target === modal) {
@@ -4427,7 +4566,7 @@
           }
 
           html += `
-            <div class="history-item ${canExpand ? 'expandable' : ''}" onclick="${canExpand ? 'toggleHistoryItem(this)' : ''}">
+            <div class="history-item ${canExpand ? 'expandable' : ''}"${canExpand ? ' data-action="toggle-history-item"' : ''}>
               <div class="history-main">
                 <div class="history-meta">
                   <span class="history-time">${timeStr}</span>
