@@ -4261,7 +4261,7 @@
         }
 
         const cardsHtml = Object.entries(products).map(([, product]) => renderResultCard(product, configuredZip)).join('');
-        const formattedDate = timestamp ? new Date(timestamp).toLocaleString() : 'Latest successful scan';
+        const formattedDate = formatLocalDateTime(timestamp) || 'Latest successful scan';
 
         document.getElementById('results-container').innerHTML = `
           <div class="results-shell">
@@ -4307,6 +4307,30 @@
         currentResultsView = view === 'map' ? 'map' : 'cards';
         if (!latestRenderedResults) return;
         renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
+      }
+
+      function parseApiTimestamp(value) {
+        const normalized = String(value || '').trim();
+        if (!normalized) return null;
+
+        const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(normalized);
+        const parsed = new Date(hasTimezone ? normalized : `${normalized}Z`);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+
+      function formatLocalDateTime(value, options = {}) {
+        const parsed = parseApiTimestamp(value);
+        return parsed ? parsed.toLocaleString(undefined, options) : '';
+      }
+
+      function formatLocalDate(value, options = {}) {
+        const parsed = parseApiTimestamp(value);
+        return parsed ? parsed.toLocaleDateString(undefined, options) : '';
+      }
+
+      function formatLocalTime(value, options = {}) {
+        const parsed = parseApiTimestamp(value);
+        return parsed ? parsed.toLocaleTimeString(undefined, options) : '';
       }
 
       function buildDirectionsUrl(address) {
@@ -4543,8 +4567,7 @@
 
         let html = '<div class="history-list">';
         data.history.slice().reverse().forEach(entry => {
-          const date = new Date(entry.timestamp);
-          const timeStr = date.toLocaleString();
+          const timeStr = formatLocalDateTime(entry.timestamp) || 'Unknown time';
           const stockClass = entry.has_stock ? 'status-hit' : 'status-miss';
           const stockText = entry.has_stock ? 'STOCK FOUND' : 'NO STOCK';
           const products = entry.products_found || {};
@@ -4690,9 +4713,22 @@
             syncControls: !isEditingSettingsPanel()
           });
 
+          const statLastCheck = document.getElementById('stat-lastcheck');
           if (status.last_check) {
-            const d = new Date(status.last_check);
-            document.getElementById('stat-lastcheck').textContent = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            const localTime = formatLocalTime(status.last_check, {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            });
+            const localDateTime = formatLocalDateTime(status.last_check, {
+              dateStyle: 'medium',
+              timeStyle: 'short'
+            });
+            statLastCheck.textContent = localTime || '-';
+            statLastCheck.title = localDateTime || '';
+          } else if (statLastCheck) {
+            statLastCheck.textContent = '-';
+            statLastCheck.title = '';
           }
 
           const startBtns = document.querySelectorAll('#start-btn, .start-scheduler-btn');
@@ -4748,7 +4784,7 @@
       <div class="empty-state">
       <div class="empty-icon"><img src="/out-of-stock.webp" alt="Out of stock"></div>
       <div class="empty-title">No stock found</div>
-      <div class="empty-text">Checked ${total} stores${timestamp ? ` on ${new Date(timestamp).toLocaleDateString()}` : ''}</div>
+      <div class="empty-text">Checked ${total} stores${timestamp ? ` on ${formatLocalDate(timestamp)}` : ''}</div>
       </div>`;
           lastResultsSignature = resultsSignature;
           return;
