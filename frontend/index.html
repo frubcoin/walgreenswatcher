@@ -6,6 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Frub's Walgreens Watcher</title>
   <link rel="icon" type="image/png" href="/frubgreens.webp">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <meta name="theme-color" content="#35393d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Walgreens Watcher">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
     href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
@@ -292,22 +299,59 @@
 
     .auth-gate {
       margin-top: 18px;
-      padding: 32px 28px;
-      background: rgba(38, 42, 47, 0.96);
+      padding: 0;
+      background:
+        linear-gradient(140deg, rgba(230, 38, 0, 0.08), rgba(72, 156, 212, 0.08)),
+        rgba(38, 42, 47, 0.96);
       border: 1px solid rgba(116, 129, 141, 0.34);
-      border-radius: 18px;
+      border-radius: 22px;
       box-shadow: 0 22px 60px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.04);
       backdrop-filter: blur(8px);
+      overflow: hidden;
     }
 
     .auth-gate[hidden] {
       display: none;
     }
 
+    .auth-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.95fr);
+      min-height: 540px;
+    }
+
+    .auth-showcase {
+      position: relative;
+      padding: 42px 36px;
+      display: grid;
+      align-content: space-between;
+      gap: 28px;
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+      background:
+        radial-gradient(circle at top left, rgba(230, 38, 0, 0.22), transparent 44%),
+        radial-gradient(circle at bottom right, rgba(72, 156, 212, 0.16), transparent 36%);
+    }
+
+    .auth-showcase::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url('/topography.svg');
+      background-size: cover;
+      background-position: center;
+      opacity: 0.08;
+      pointer-events: none;
+    }
+
+    .auth-showcase>* {
+      position: relative;
+      z-index: 1;
+    }
+
     .auth-card {
-      max-width: 520px;
       display: grid;
       gap: 18px;
+      max-width: 42rem;
     }
 
     .auth-eyebrow {
@@ -331,6 +375,99 @@
       max-width: 46ch;
     }
 
+    .auth-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .auth-metric {
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .auth-metric-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .auth-metric-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .auth-feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .auth-feature {
+      padding: 16px;
+      border-radius: 14px;
+      background: rgba(9, 11, 15, 0.26);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .auth-feature-kicker {
+      font-size: 11px;
+      color: var(--orange);
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 8px;
+    }
+
+    .auth-feature-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .auth-feature-copy {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .auth-panel {
+      padding: 42px 32px;
+      display: grid;
+      align-content: center;
+      gap: 18px;
+      background: linear-gradient(180deg, rgba(43, 47, 52, 0.96), rgba(30, 33, 37, 0.96));
+    }
+
+    .auth-panel-card {
+      display: grid;
+      gap: 18px;
+      padding: 24px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .auth-panel-title {
+      font-size: 22px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .auth-panel-copy {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
     .auth-actions {
       display: flex;
       flex-wrap: wrap;
@@ -338,10 +475,243 @@
       gap: 14px;
     }
 
+    .auth-note-list {
+      display: grid;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .auth-note-item {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .auth-note-bullet {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--orange), var(--red));
+      margin-top: 6px;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 4px rgba(243, 117, 32, 0.12);
+    }
+
+    .auth-api-pill {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(72, 156, 212, 0.12);
+      border: 1px solid rgba(72, 156, 212, 0.28);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .auth-api-pill strong {
+      color: var(--text-primary);
+    }
+
     .auth-status {
       font-size: 13px;
       color: var(--text-muted);
       min-height: 20px;
+    }
+
+    .onboarding-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(9, 11, 15, 0.72);
+      backdrop-filter: blur(12px);
+    }
+
+    .onboarding-modal[hidden] {
+      display: none;
+    }
+
+    .onboarding-dialog {
+      width: min(960px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr);
+      background: rgba(31, 35, 39, 0.98);
+      border: 1px solid rgba(116, 129, 141, 0.34);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.46);
+    }
+
+    .onboarding-sidebar {
+      padding: 28px;
+      display: grid;
+      gap: 18px;
+      background:
+        radial-gradient(circle at top left, rgba(72, 156, 212, 0.18), transparent 42%),
+        linear-gradient(180deg, rgba(44, 49, 54, 0.98), rgba(28, 31, 35, 0.98));
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .onboarding-kicker {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .onboarding-sidebar h2 {
+      font-size: 28px;
+      line-height: 1.05;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .onboarding-sidebar p {
+      color: var(--text-secondary);
+    }
+
+    .onboarding-progress {
+      display: grid;
+      gap: 10px;
+    }
+
+    .onboarding-progress-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid transparent;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .onboarding-progress-item.is-active {
+      background: rgba(72, 156, 212, 0.12);
+      border-color: rgba(72, 156, 212, 0.32);
+    }
+
+    .onboarding-progress-index {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .onboarding-progress-item.is-active .onboarding-progress-index {
+      background: var(--accent);
+      color: var(--accent-contrast);
+    }
+
+    .onboarding-progress-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .onboarding-content {
+      padding: 32px;
+      display: grid;
+      gap: 22px;
+      align-content: start;
+    }
+
+    .onboarding-step-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .onboarding-step-title {
+      font-size: clamp(26px, 3vw, 34px);
+      line-height: 1.05;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .onboarding-step-copy {
+      font-size: 16px;
+      color: var(--text-secondary);
+      max-width: 54ch;
+    }
+
+    .onboarding-callout {
+      padding: 18px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .onboarding-callout-title {
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: var(--green);
+      margin-bottom: 10px;
+    }
+
+    .onboarding-step-list {
+      display: grid;
+      gap: 10px;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .onboarding-step-list li {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      color: var(--text-secondary);
+    }
+
+    .onboarding-step-list li::before {
+      content: '';
+      width: 9px;
+      height: 9px;
+      margin-top: 7px;
+      border-radius: 999px;
+      flex-shrink: 0;
+      background: linear-gradient(180deg, var(--green), rgba(72, 156, 212, 0.45));
+      box-shadow: 0 0 0 4px rgba(72, 156, 212, 0.11);
+    }
+
+    .onboarding-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 8px;
+    }
+
+    .onboarding-actions-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .user-pill {
@@ -1589,6 +1959,44 @@
     }
 
     @media (max-width: 640px) {
+      .auth-layout,
+      .onboarding-dialog {
+        grid-template-columns: 1fr;
+      }
+
+      .auth-showcase,
+      .auth-panel,
+      .onboarding-sidebar,
+      .onboarding-content {
+        padding: 24px 20px;
+      }
+
+      .auth-showcase {
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .auth-metrics,
+      .auth-feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .onboarding-sidebar {
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .onboarding-actions,
+      .onboarding-actions-group {
+        flex-direction: column;
+      }
+
+      .onboarding-actions .btn,
+      .onboarding-actions-group .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
       .results-toolbar {
         align-items: stretch;
       }
@@ -1651,6 +2059,16 @@
       header {
         flex-direction: column;
         align-items: flex-start;
+      }
+
+      .header-actions {
+        width: 100%;
+      }
+
+      .header-actions .btn,
+      .header-actions .user-pill {
+        width: 100%;
+        justify-content: center;
       }
 
       .result-card-header {
@@ -1900,14 +2318,99 @@
   <div id="toast-container"></div>
   <div class="wrapper">
     <div id="auth-gate" class="auth-gate">
-      <div class="auth-card">
-        <div class="auth-eyebrow">Hosted Mode</div>
-        <div class="auth-title">Sign in to your Walgreens watcher</div>
-        <div class="auth-copy">Each Google account gets its own settings, tracked products, scan history, and scheduler state on your VPS.</div>
-        <div class="auth-actions">
-          <div id="google-signin-button"></div>
-        </div>
-        <div id="auth-status-text" class="auth-status"></div>
+      <div class="auth-layout">
+        <section class="auth-showcase">
+          <div class="auth-card">
+            <div class="auth-eyebrow">Production Access</div>
+            <div class="auth-title">Run private Walgreens alerts from a real hosted dashboard.</div>
+            <div class="auth-copy">Sign in once, keep your own ZIP code, Discord destinations, tracked products, and automation settings isolated from every other user on the service.</div>
+            <div class="auth-metrics">
+              <div class="auth-metric">
+                <div class="auth-metric-value">1</div>
+                <div class="auth-metric-label">Account per setup</div>
+              </div>
+              <div class="auth-metric">
+                <div class="auth-metric-value">24/7</div>
+                <div class="auth-metric-label">VPS monitoring</div>
+              </div>
+              <div class="auth-metric">
+                <div class="auth-metric-value">Live</div>
+                <div class="auth-metric-label">Discord alerts</div>
+              </div>
+            </div>
+          </div>
+          <div class="auth-feature-grid">
+            <div class="auth-feature">
+              <div class="auth-feature-kicker">Private State</div>
+              <div class="auth-feature-title">Per-user settings</div>
+              <div class="auth-feature-copy">Your ZIP code, interval, products, and webhook list stay tied to your Google account.</div>
+            </div>
+            <div class="auth-feature">
+              <div class="auth-feature-kicker">Inventory Workflow</div>
+              <div class="auth-feature-title">Fast first scan</div>
+              <div class="auth-feature-copy">Paste a Walgreens product link, save your area, and run your first check in a couple of minutes.</div>
+            </div>
+            <div class="auth-feature">
+              <div class="auth-feature-kicker">Hosted Reliability</div>
+              <div class="auth-feature-title">Background scheduler</div>
+              <div class="auth-feature-copy">Keep monitoring active on the VPS so alerts continue even when your browser is closed.</div>
+            </div>
+            <div class="auth-feature">
+              <div class="auth-feature-kicker">Production Ready</div>
+              <div class="auth-feature-title">Google sign-in</div>
+              <div class="auth-feature-copy">Simple login, no passwords to manage, and a smoother path for onboarding invited users later.</div>
+            </div>
+          </div>
+        </section>
+        <aside class="auth-panel">
+          <div class="auth-panel-card">
+            <div class="auth-panel-title">Sign in with Google</div>
+            <div class="auth-panel-copy">Use the Google account that should own this watcher workspace. First-time users will get a short setup guide after login.</div>
+            <div class="auth-actions">
+              <div id="google-signin-button"></div>
+              <button class="btn btn-secondary install-app-btn" type="button" onclick="promptInstallApp()" hidden>Install App</button>
+            </div>
+            <div id="auth-api-pill" class="auth-api-pill"><strong>API</strong><span id="auth-api-host">Configured locally</span></div>
+            <ul class="auth-note-list">
+              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>No shared settings between users.</span></li>
+              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Discord webhooks are saved under your own account.</span></li>
+              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>The onboarding guide will walk you through ZIP code, products, and your first scan.</span></li>
+            </ul>
+            <div id="auth-status-text" class="auth-status"></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <div id="onboarding-modal" class="onboarding-modal" hidden>
+      <div class="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-step-title">
+        <aside class="onboarding-sidebar">
+          <div class="onboarding-kicker">Quick Start Guide</div>
+          <h2>Set up your watcher without guesswork.</h2>
+          <p>The guide keeps the first-run path short: configure your search area, connect alerts, add products, and launch the first scan.</p>
+          <div id="onboarding-progress" class="onboarding-progress"></div>
+        </aside>
+        <section class="onboarding-content">
+          <div class="onboarding-step-meta">
+            <span id="onboarding-step-counter">Step 1 of 4</span>
+            <span id="onboarding-step-tag">Welcome</span>
+          </div>
+          <div class="onboarding-step-title" id="onboarding-step-title">Welcome aboard</div>
+          <div class="onboarding-step-copy" id="onboarding-step-copy"></div>
+          <div class="onboarding-callout">
+            <div class="onboarding-callout-title" id="onboarding-callout-title">What to do here</div>
+            <ul class="onboarding-step-list" id="onboarding-step-list"></ul>
+          </div>
+          <div class="onboarding-actions">
+            <div class="onboarding-actions-group">
+              <button class="btn btn-secondary" type="button" id="onboarding-skip-btn" onclick="closeOnboarding(true)">Skip guide</button>
+              <button class="btn btn-secondary" type="button" id="onboarding-back-btn" onclick="goToOnboardingStep(-1)">Back</button>
+            </div>
+            <div class="onboarding-actions-group">
+              <button class="btn btn-secondary" type="button" id="onboarding-jump-btn" onclick="handleOnboardingAction()">Show me</button>
+              <button class="btn btn-primary" type="button" id="onboarding-next-btn" onclick="goToOnboardingStep(1)">Next step</button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
     <div class="app-window" id="app-shell" hidden>
@@ -1949,6 +2452,8 @@
               aria-hidden="true"></span>
             <span id="check-btn-text">Check Now</span>
           </button>
+          <button class="btn btn-secondary install-app-btn" type="button" onclick="promptInstallApp()" hidden>Install App</button>
+          <button class="btn btn-secondary" id="guide-btn" onclick="openOnboarding(true)">Guide</button>
           <button class="btn btn-secondary" id="signout-btn" onclick="logoutUser()">Sign Out</button>
         </div>
       </header>
@@ -2148,6 +2653,10 @@
       let authState = null;
       let statusRefreshTimer = null;
       let googleButtonRendered = false;
+      let latestStatusSnapshot = null;
+      let onboardingStepIndex = 0;
+      let onboardingAutoPrompted = false;
+      let deferredInstallPrompt = null;
 
       const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
       const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
@@ -2184,6 +2693,239 @@
         if (statusNode) {
           statusNode.textContent = message;
         }
+      }
+
+      function getApiHostLabel() {
+        if (!API_BASE) return 'Same origin deployment';
+        try {
+          return new URL(API_BASE).host;
+        } catch (e) {
+          return API_BASE;
+        }
+      }
+
+      function syncAuthApiHost() {
+        const hostNode = document.getElementById('auth-api-host');
+        if (hostNode) {
+          hostNode.textContent = getApiHostLabel();
+        }
+      }
+
+      function setInstallButtonsVisible(visible) {
+        document.querySelectorAll('.install-app-btn').forEach(button => {
+          button.hidden = !visible;
+        });
+      }
+
+      async function promptInstallApp() {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        try {
+          await deferredInstallPrompt.userChoice;
+        } catch (e) {
+        }
+        deferredInstallPrompt = null;
+        setInstallButtonsVisible(false);
+      }
+
+      async function registerServiceWorker() {
+        if (!('serviceWorker' in navigator)) return;
+        try {
+          await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        } catch (error) {
+          console.error('Service worker registration failed:', error);
+        }
+      }
+
+      function getOnboardingStorageKey() {
+        if (!currentUser?.id) return '';
+        return `walgreens_onboarding_completed_${currentUser.id}`;
+      }
+
+      function hasCompletedOnboarding() {
+        const key = getOnboardingStorageKey();
+        return key ? localStorage.getItem(key) === 'done' : false;
+      }
+
+      function markOnboardingCompleted() {
+        const key = getOnboardingStorageKey();
+        if (key) {
+          localStorage.setItem(key, 'done');
+        }
+      }
+
+      function resetOnboardingSessionState() {
+        onboardingStepIndex = 0;
+        onboardingAutoPrompted = false;
+      }
+
+      function getOnboardingSteps() {
+        const configuredZip = latestStatusSnapshot?.status?.current_zipcode || document.getElementById('cfg-zip')?.value || 'your ZIP code';
+        return [
+          {
+            tag: 'Welcome',
+            title: 'Here is the fast path.',
+            copy: 'This hosted version keeps your watcher state tied to your Google account, so you only need to set things up once before the VPS can keep scanning for you.',
+            calloutTitle: 'You are about to configure',
+            bullets: [
+              'Your search area and scan cadence.',
+              'Discord destinations for alerts and status messages.',
+              'The Walgreens product links you actually want monitored.'
+            ],
+            actionLabel: 'Open settings',
+            action: () => openTab('settings')
+          },
+          {
+            tag: 'Settings',
+            title: 'Set your search area and alert destination.',
+            copy: `Start in Settings and replace the default ZIP with the area you care about. If you want Discord alerts, add at least one webhook before the first live scan.`,
+            calloutTitle: 'Suggested first save',
+            bullets: [
+              `Update the ZIP code from the default value to your target area.`,
+              'Set the check interval you want the VPS to run automatically.',
+              'Add one or more Discord webhooks if you want push alerts outside the browser.'
+            ],
+            actionLabel: 'Focus settings',
+            action: () => {
+              openTab('settings');
+              document.getElementById('cfg-zip')?.focus();
+              document.getElementById('cfg-zip')?.select?.();
+            }
+          },
+          {
+            tag: 'Products',
+            title: 'Add the products you actually care about.',
+            copy: 'Paste a Walgreens product page URL and the app will resolve the product metadata for you. This is the easiest way to move from a demo account to a real monitor.',
+            calloutTitle: 'Best practice',
+            bullets: [
+              'Paste the Walgreens product link into the Add Product From Link field.',
+              'Use a custom name if you want cleaner Discord alert labels.',
+              'Keep your tracked list tight so scans stay focused and easier to read.'
+            ],
+            actionLabel: 'Jump to product form',
+            action: () => {
+              openTab('settings');
+              document.getElementById('new-product-url')?.focus();
+            }
+          },
+          {
+            tag: 'First Scan',
+            title: 'Run a manual check, then decide on automation.',
+            copy: `After saving your settings, switch back to Results and trigger one manual scan. Once it looks good, start the scheduler and let the VPS keep working in the background for ${configuredZip}.`,
+            calloutTitle: 'Finish strong',
+            bullets: [
+              'Use Check Now to confirm the Walgreens API, product metadata, and ZIP code all behave the way you expect.',
+              'Review the result cards and map output after the scan completes.',
+              'Start the scheduler when you are ready for unattended monitoring.'
+            ],
+            actionLabel: 'Open results',
+            action: () => {
+              openTab('results');
+              document.getElementById('check-btn')?.focus();
+            }
+          }
+        ];
+      }
+
+      function renderOnboarding() {
+        const steps = getOnboardingSteps();
+        const step = steps[onboardingStepIndex] || steps[0];
+        const progressNode = document.getElementById('onboarding-progress');
+        const counterNode = document.getElementById('onboarding-step-counter');
+        const tagNode = document.getElementById('onboarding-step-tag');
+        const titleNode = document.getElementById('onboarding-step-title');
+        const copyNode = document.getElementById('onboarding-step-copy');
+        const calloutTitleNode = document.getElementById('onboarding-callout-title');
+        const listNode = document.getElementById('onboarding-step-list');
+        const backButton = document.getElementById('onboarding-back-btn');
+        const nextButton = document.getElementById('onboarding-next-btn');
+        const jumpButton = document.getElementById('onboarding-jump-btn');
+        const skipButton = document.getElementById('onboarding-skip-btn');
+
+        if (progressNode) {
+          progressNode.innerHTML = steps.map((item, index) => `
+            <div class="onboarding-progress-item ${index === onboardingStepIndex ? 'is-active' : ''}">
+              <span class="onboarding-progress-index">${index + 1}</span>
+              <span class="onboarding-progress-text">${item.tag}</span>
+            </div>
+          `).join('');
+        }
+
+        if (counterNode) counterNode.textContent = `Step ${onboardingStepIndex + 1} of ${steps.length}`;
+        if (tagNode) tagNode.textContent = step.tag;
+        if (titleNode) titleNode.textContent = step.title;
+        if (copyNode) copyNode.textContent = step.copy;
+        if (calloutTitleNode) calloutTitleNode.textContent = step.calloutTitle;
+        if (listNode) {
+          listNode.innerHTML = step.bullets.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+        }
+        if (backButton) backButton.disabled = onboardingStepIndex === 0;
+        if (nextButton) nextButton.textContent = onboardingStepIndex === steps.length - 1 ? 'Finish' : 'Next step';
+        if (jumpButton) jumpButton.textContent = step.actionLabel || 'Show me';
+        if (skipButton) skipButton.textContent = onboardingStepIndex === steps.length - 1 ? 'Close' : 'Skip guide';
+      }
+
+      function openOnboarding(reset = false) {
+        if (!currentUser) return;
+        if (reset) onboardingStepIndex = 0;
+        onboardingAutoPrompted = true;
+        renderOnboarding();
+        const modal = document.getElementById('onboarding-modal');
+        if (modal) {
+          modal.hidden = false;
+        }
+      }
+
+      function closeOnboarding(markComplete = false) {
+        const modal = document.getElementById('onboarding-modal');
+        if (modal) {
+          modal.hidden = true;
+        }
+        if (markComplete) {
+          markOnboardingCompleted();
+        }
+      }
+
+      function goToOnboardingStep(direction) {
+        const steps = getOnboardingSteps();
+        const nextIndex = onboardingStepIndex + direction;
+        if (nextIndex < 0) {
+          onboardingStepIndex = 0;
+          renderOnboarding();
+          return;
+        }
+        if (nextIndex >= steps.length) {
+          closeOnboarding(true);
+          showToast('You can reopen the guide anytime from the header.', 'success');
+          return;
+        }
+        onboardingStepIndex = nextIndex;
+        renderOnboarding();
+      }
+
+      function handleOnboardingAction() {
+        const steps = getOnboardingSteps();
+        const step = steps[onboardingStepIndex];
+        if (step?.action) {
+          closeOnboarding(false);
+          step.action();
+        }
+      }
+
+      function maybeOpenOnboarding(statusPayload) {
+        if (!currentUser || onboardingAutoPrompted || hasCompletedOnboarding()) return;
+
+        const status = statusPayload?.status || {};
+        const stats = statusPayload?.statistics || {};
+        const looksLikeFirstRun = (
+          (stats.total_checks || 0) === 0 &&
+          (status.discord_webhook_count || 0) === 0 &&
+          (status.current_zipcode || '55555') === '55555' &&
+          ((status.tracked_products || []).length <= 1)
+        );
+
+        if (!looksLikeFirstRun) return;
+        openOnboarding(true);
       }
 
       async function waitForGoogleIdentity(maxMs = 10000) {
@@ -2223,7 +2965,7 @@
           size: 'large',
           shape: 'rectangular',
           text: 'continue_with',
-          width: 280
+          width: 320
         });
         googleButtonRendered = true;
         updateAuthStatus('');
@@ -2276,6 +3018,7 @@
         const payload = sessionPayload || await apiCall('/api/auth/session', 'GET', null, { allowUnauthorized: true });
         authState = payload;
         currentUser = payload?.user || null;
+        resetOnboardingSessionState();
         updateCurrentUserDisplay(currentUser);
 
         if (!currentUser) {
@@ -2297,7 +3040,8 @@
         setAuthenticatedUi(true);
         updateAuthStatus('');
         await loadSettings();
-        await loadStatus();
+        const statusPayload = await loadStatus();
+        maybeOpenOnboarding(statusPayload);
         startStatusPolling();
         return true;
       }
@@ -2306,7 +3050,10 @@
         await apiCall('/api/auth/logout', 'POST', {}, { allowUnauthorized: true, suppressAuthRedirect: true });
         currentUser = null;
         authState = null;
+        latestStatusSnapshot = null;
         stopStatusPolling();
+        closeOnboarding(false);
+        resetOnboardingSessionState();
         localStorage.removeItem('cached_api_status');
         localStorage.removeItem('cached_api_last_check');
         updateCurrentUserDisplay(null);
@@ -2930,7 +3677,36 @@
       document.addEventListener('DOMContentLoaded', () => {
         renderCachedState();
         initializePokemonBackgroundControls();
+        syncAuthApiHost();
+        registerServiceWorker();
         hydrateAuthenticatedSession();
+      });
+
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        const modal = document.getElementById('onboarding-modal');
+        if (!modal || modal.hidden) return;
+        closeOnboarding(false);
+      });
+
+      document.addEventListener('click', event => {
+        const modal = document.getElementById('onboarding-modal');
+        if (!modal || modal.hidden) return;
+        if (event.target === modal) {
+          closeOnboarding(false);
+        }
+      });
+
+      window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        setInstallButtonsVisible(true);
+      });
+
+      window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
+        setInstallButtonsVisible(false);
+        showToast('App installed', 'success');
       });
 
       function openTab(name) {
@@ -3086,8 +3862,9 @@
         try {
           const data = await apiCall('/api/status');
           if (!data) {
-            return;
+            return null;
           }
+          latestStatusSnapshot = data;
           localStorage.setItem('cached_api_status', JSON.stringify(data));
           const status = data.status || {};
           const trackedProducts = status.tracked_products || [];
@@ -3134,6 +3911,7 @@
           if (currentTab === 'results') {
             await loadResults(status.current_zipcode || document.getElementById('cfg-zip')?.value || '85209');
           }
+          return data;
         } finally {
           isStatusRefreshInFlight = false;
         }
