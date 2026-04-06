@@ -52,8 +52,8 @@
       --radius: 10px;
       --radius-sm: 6px;
       --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
-      --page-bg: #111111;
-      --noise-image: url("https://assets.iceable.com/img/noise-transparent.png");
+      --page-bg: #0a0a0b;
+      --default-grain-image: none;
       --pokemon-bg-image: url("/bg/gyra.webp");
       --pokemon-bg-size: 645px auto;
       --pokemon-bg-opacity: 1;
@@ -64,6 +64,11 @@
     }
 
     body {
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.055), transparent 24%),
+        radial-gradient(circle at top right, rgba(72, 156, 212, 0.08), transparent 30%),
+        radial-gradient(circle at bottom center, rgba(230, 38, 0, 0.06), transparent 26%),
+        linear-gradient(180deg, #090909 0%, #101214 52%, #090a0b 100%);
       background-color: var(--page-bg);
       color: var(--text-primary);
       font-family: 'Rajdhani', sans-serif;
@@ -81,16 +86,17 @@
     body::before {
       content: '';
       position: fixed;
-      top: -50%;
-      left: -50%;
-      right: -50%;
-      bottom: -50%;
-      width: 200%;
-      height: 200vh;
-      background: transparent var(--noise-image) repeat 0 0;
-      opacity: 0.9;
+      top: -100%;
+      left: -100%;
+      width: 300%;
+      height: 300%;
+      background-image: var(--default-grain-image);
+      background-position: 0 0;
+      background-repeat: repeat;
+      background-size: 180px 180px;
+      opacity: 0.16;
       visibility: visible;
-      animation: bg-animation 0.2s infinite;
+      animation: grained 8s steps(6) infinite;
       pointer-events: none;
       z-index: 0;
     }
@@ -114,49 +120,56 @@
       opacity: var(--pokemon-bg-opacity);
     }
 
-    @keyframes bg-animation {
+    @keyframes grained {
       0% {
-        transform: translate(0, 0);
+        transform: translate(-10%, 10%);
       }
 
       10% {
-        transform: translate(-5%, -5%);
+        transform: translate(-25%, 0%);
       }
 
       20% {
-        transform: translate(-10%, 5%);
+        transform: translate(-30%, 10%);
       }
 
       30% {
-        transform: translate(5%, -10%);
+        transform: translate(-30%, 30%);
       }
 
       40% {
-        transform: translate(-5%, 15%);
+        transform: translate(0%, 0%);
       }
 
       50% {
-        transform: translate(-10%, 5%);
+        transform: translate(-15%, 10%);
       }
 
       60% {
-        transform: translate(15%, 0);
+        transform: translate(-20%, 20%);
       }
 
       70% {
-        transform: translate(0, 10%);
+        transform: translate(-5%, 20%);
       }
 
       80% {
-        transform: translate(-15%, 0);
+        transform: translate(-25%, 5%);
       }
 
       90% {
-        transform: translate(10%, 5%);
+        transform: translate(-30%, 25%);
       }
 
       100% {
-        transform: translate(5%, 0);
+        transform: translate(-10%, 10%);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body::before {
+        animation-duration: 0.01ms;
+        animation-iteration-count: 1;
       }
     }
 
@@ -2220,6 +2233,50 @@
       background: rgba(227, 24, 55, 0.24);
     }
 
+    .site-footer {
+      margin-top: 18px;
+      padding: 18px 20px 24px;
+      border: 1px solid rgba(116, 129, 141, 0.22);
+      border-radius: 16px;
+      background: rgba(15, 18, 21, 0.72);
+      backdrop-filter: blur(8px);
+      color: var(--text-muted);
+      position: relative;
+      z-index: 1;
+    }
+
+    .site-footer-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) auto;
+      gap: 14px 18px;
+      align-items: start;
+    }
+
+    .site-footer-title {
+      font-size: 12px;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      font-family: 'Space Mono', monospace;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .site-footer-copy,
+    .site-footer-meta {
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .site-footer-meta {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .site-footer strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
     @media (max-width: 640px) {
       .onboarding-modal {
         clip-path: none;
@@ -2367,6 +2424,19 @@
       .result-card-stats {
         grid-template-columns: 1fr;
       }
+
+      .site-footer {
+        padding: 16px 16px 20px;
+      }
+
+      .site-footer-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .site-footer-meta {
+        text-align: left;
+        white-space: normal;
+      }
     }
   </style>
 </head>
@@ -2405,6 +2475,42 @@
       border: 'rgba(72,156,212,0.18)',
       borderGlow: 'rgba(230,38,0,0.35)'
     };
+
+    function createGrainedBackgroundDataUrl({
+      patternWidth = 160,
+      patternHeight = 160,
+      grainOpacity = 0.08,
+      grainDensity = 1,
+      grainWidth = 1,
+      grainHeight = 1
+    } = {}) {
+      try {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) return '';
+
+        canvas.width = patternWidth;
+        canvas.height = patternHeight;
+
+        for (let x = 0; x < patternWidth; x += grainDensity) {
+          for (let y = 0; y < patternHeight; y += grainDensity) {
+            const rgb = Math.floor(Math.random() * 256);
+            context.fillStyle = `rgba(${rgb}, ${rgb}, ${rgb}, ${grainOpacity})`;
+            context.fillRect(x, y, grainWidth, grainHeight);
+          }
+        }
+
+        return canvas.toDataURL('image/png');
+      } catch (error) {
+        return '';
+      }
+    }
+
+    const defaultGrainImage = createGrainedBackgroundDataUrl();
+    if (defaultGrainImage) {
+      document.documentElement.style.setProperty('--default-grain-image', `url("${defaultGrainImage}")`);
+    }
+
     const POKEMON_BACKGROUNDS = [
       { value: 'gyra', label: 'Gyarados', file: 'gyra.webp', size: '645px auto', opacity: '1', accent: '#1c98ce' },
       { value: 'ancient', label: 'Ancient', file: 'ancient.webp', size: '645px auto', opacity: '1', accent: '#d67d39' },
@@ -2606,7 +2712,7 @@
         <section class="auth-showcase">
           <div class="auth-card">
             <div class="auth-eyebrow">Early Access</div>
-            <div class="auth-title">Run private Walgreens alerts from a real hosted dashboard. Never miss a restock at your Walgreens again.</div>
+            <div class="auth-title">Run private Walgreens alerts from a hosted dashboard. Never miss a restock at your Walgreens again.</div>
             <div class="auth-copy">Sign in once, keep your own ZIP code, Discord destinations, tracked products, and automation settings isolated from every other user on the service.</div>
             <div class="auth-metrics">
               <div class="auth-metric">
@@ -2637,12 +2743,12 @@
             <div class="auth-feature">
               <div class="auth-feature-kicker">Hosted Reliability</div>
               <div class="auth-feature-title">Background scheduler</div>
-              <div class="auth-feature-copy">Keep monitoring active on a VPS so alerts continue even when your browser is closed.</div>
+              <div class="auth-feature-copy">Keep monitoring active on a server so alerts continue even when your browser is closed.</div>
             </div>
             <div class="auth-feature">
               <div class="auth-feature-kicker">Production Ready</div>
-              <div class="auth-feature-title">Google sign-in</div>
-              <div class="auth-feature-copy">Simple login, no passwords to manage, and a smoother path for onboarding invited users later.</div>
+              <div class="auth-feature-title">Google sync</div>
+              <div class="auth-feature-copy">Simple login, no passwords to manage, and a smoother path.</div>
             </div>
           </div>
         </section>
@@ -2936,6 +3042,22 @@
         </div>
       </div>
     </div>
+    <footer class="site-footer" aria-label="Site footer">
+      <div class="site-footer-grid">
+        <div>
+          <div class="site-footer-title">Frub's Walgreens Watcher</div>
+          <div class="site-footer-copy">Copyright © <span id="footer-year">2026</span> <strong>Frub's Walgreens Watcher</strong>.</div>
+        </div>
+        <div>
+          <div class="site-footer-title">Disclaimer</div>
+          <div class="site-footer-copy">Independent monitoring dashboard for personal use. Walgreens is a trademark of its respective owner, and this project is not affiliated with or endorsed by Walgreens.</div>
+        </div>
+        <div class="site-footer-meta">
+          <div class="site-footer-title">Notes</div>
+          <div class="site-footer-copy">Hosted alerts, local-time results, and account-specific settings.</div>
+        </div>
+      </div>
+    </footer>
     <script nonce="__CSP_NONCE__">
       let currentTab = 'results';
       let isStatusRefreshInFlight = false;
@@ -4466,6 +4588,10 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
+        const footerYear = document.getElementById('footer-year');
+        if (footerYear) {
+          footerYear.textContent = String(new Date().getFullYear());
+        }
         ensureOnboardingModalRoot();
         renderCachedState();
         initializePokemonBackgroundControls();
