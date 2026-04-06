@@ -297,6 +297,18 @@
       flex-wrap: wrap;
     }
 
+    .header-primary-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .header-primary-actions .btn {
+      justify-content: center;
+      min-width: 132px;
+    }
+
     .auth-gate {
       margin-top: 18px;
       padding: 0;
@@ -337,12 +349,16 @@
       content: '';
       position: absolute;
       inset: 0;
-      background-image: url('/topography.svg');
-      background-size: 1200px auto;
-      background-position: center;
-      background-repeat: repeat;
-      opacity: 0.18;
-      mix-blend-mode: screen;
+      background: rgba(236, 240, 245, 0.13);
+      -webkit-mask-image: url('/topography.svg');
+      mask-image: url('/topography.svg');
+      -webkit-mask-size: 980px auto;
+      mask-size: 980px auto;
+      -webkit-mask-position: center;
+      mask-position: center;
+      -webkit-mask-repeat: repeat;
+      mask-repeat: repeat;
+      opacity: 0.42;
       pointer-events: none;
     }
 
@@ -512,7 +528,7 @@
 
     .onboarding-modal {
       position: fixed;
-      inset: 0;
+      inset: 12px;
       z-index: 12000;
       display: flex;
       align-items: center;
@@ -520,6 +536,8 @@
       padding: 24px;
       background: rgba(9, 11, 15, 0.72);
       backdrop-filter: blur(12px);
+      border-radius: 24px;
+      overflow: hidden;
     }
 
     .onboarding-modal[hidden] {
@@ -683,6 +701,109 @@
       flex-shrink: 0;
       background: linear-gradient(180deg, var(--green), rgba(72, 156, 212, 0.45));
       box-shadow: 0 0 0 4px rgba(72, 156, 212, 0.11);
+    }
+
+    .onboarding-step-form {
+      display: grid;
+      gap: 16px;
+    }
+
+    .onboarding-step-form[hidden] {
+      display: none;
+    }
+
+    .onboarding-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .onboarding-form-card {
+      padding: 18px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      display: grid;
+      gap: 12px;
+    }
+
+    .onboarding-form-card-title {
+      font-size: 12px;
+      color: var(--orange);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .onboarding-form-card-copy {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .onboarding-inline-status {
+      min-height: 20px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .onboarding-inline-status.is-success {
+      color: #82e3ac;
+    }
+
+    .onboarding-inline-status.is-error {
+      color: #ff98aa;
+    }
+
+    .onboarding-inline-status.is-info {
+      color: var(--text-secondary);
+    }
+
+    .onboarding-choice-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .onboarding-choice {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: var(--text-secondary);
+    }
+
+    .onboarding-choice input {
+      margin-top: 4px;
+      accent-color: var(--accent);
+    }
+
+    .onboarding-choice strong {
+      display: block;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .onboarding-summary {
+      display: grid;
+      gap: 10px;
+      padding: 16px 18px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .onboarding-summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .onboarding-summary-row strong {
+      color: var(--text-primary);
     }
 
     .onboarding-actions {
@@ -1952,6 +2073,11 @@
     }
 
     @media (max-width: 640px) {
+      .onboarding-modal {
+        inset: 0;
+        border-radius: 0;
+      }
+
       .auth-layout,
       .onboarding-dialog {
         grid-template-columns: 1fr;
@@ -1970,7 +2096,8 @@
       }
 
       .auth-metrics,
-      .auth-feature-grid {
+      .auth-feature-grid,
+      .onboarding-form-grid {
         grid-template-columns: 1fr;
       }
 
@@ -2056,6 +2183,17 @@
 
       .header-actions {
         width: 100%;
+      }
+
+      .header-primary-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .header-primary-actions .btn {
+        width: 100%;
+        min-width: 0;
       }
 
       .header-actions .btn,
@@ -2346,7 +2484,7 @@
             <div class="auth-feature">
               <div class="auth-feature-kicker">Hosted Reliability</div>
               <div class="auth-feature-title">Background scheduler</div>
-              <div class="auth-feature-copy">Keep monitoring active on the VPS so alerts continue even when your browser is closed.</div>
+              <div class="auth-feature-copy">Keep monitoring active on a VPS so alerts continue even when your browser is closed.</div>
             </div>
             <div class="auth-feature">
               <div class="auth-feature-kicker">Production Ready</div>
@@ -2397,6 +2535,8 @@
             <div class="onboarding-callout-title" id="onboarding-callout-title">What to do here</div>
             <ul class="onboarding-step-list" id="onboarding-step-list"></ul>
           </div>
+          <div id="onboarding-step-form" class="onboarding-step-form" hidden></div>
+          <div id="onboarding-inline-status" class="onboarding-inline-status" aria-live="polite"></div>
           <div class="onboarding-actions">
             <div class="onboarding-actions-group">
               <button class="btn btn-secondary" type="button" id="onboarding-skip-btn" onclick="closeOnboarding(true)">Skip guide</button>
@@ -2404,7 +2544,7 @@
             </div>
             <div class="onboarding-actions-group">
               <button class="btn btn-secondary" type="button" id="onboarding-jump-btn" onclick="handleOnboardingAction()">Show me</button>
-              <button class="btn btn-primary" type="button" id="onboarding-next-btn" onclick="goToOnboardingStep(1)">Next step</button>
+              <button class="btn btn-primary" type="button" id="onboarding-next-btn" onclick="handleOnboardingNext()">Next step</button>
             </div>
           </div>
         </section>
@@ -2429,25 +2569,27 @@
               <span class="user-pill-email" id="user-pill-email"></span>
             </div>
           </div>
-          <button class="btn btn-secondary start-scheduler-btn" onclick="startScheduler()">
-            <span class="btn-icon" style="-webkit-mask-image: url('/power.webp'); mask-image: url('/power.webp');"
-              aria-hidden="true"></span>
-            Start
-          </button>
-          <button class="btn btn-secondary stop-scheduler-btn" onclick="stopScheduler()" style="display:none;">
-            <span class="btn-icon" style="-webkit-mask-image: url('/no-power.webp'); mask-image: url('/no-power.webp');"
-              aria-hidden="true"></span>
-            Stop
-          </button>
+          <div class="header-primary-actions">
+            <button class="btn btn-primary start-scheduler-btn" onclick="startScheduler()">
+              <span class="btn-icon" style="-webkit-mask-image: url('/power.webp'); mask-image: url('/power.webp');"
+                aria-hidden="true"></span>
+              Start
+            </button>
+            <button class="btn btn-secondary stop-scheduler-btn" onclick="stopScheduler()" style="display:none;">
+              <span class="btn-icon" style="-webkit-mask-image: url('/no-power.webp'); mask-image: url('/no-power.webp');"
+                aria-hidden="true"></span>
+              Stop
+            </button>
+            <button class="btn btn-primary" id="check-btn" onclick="triggerManualCheck()">
+              <span class="btn-icon" style="-webkit-mask-image: url('/refresh.webp'); mask-image: url('/refresh.webp');"
+                aria-hidden="true"></span>
+              <span id="check-btn-text">Check Now</span>
+            </button>
+          </div>
           <button id="settings-btn" class="btn btn-secondary" onclick="openTab('settings')">
             <span class="btn-icon" style="-webkit-mask-image: url('/settings.webp'); mask-image: url('/settings.webp');"
               aria-hidden="true"></span>
             Settings
-          </button>
-          <button class="btn btn-primary" id="check-btn" onclick="triggerManualCheck()">
-            <span class="btn-icon" style="-webkit-mask-image: url('/refresh.webp'); mask-image: url('/refresh.webp');"
-              aria-hidden="true"></span>
-            <span id="check-btn-text">Check Now</span>
           </button>
           <button class="btn btn-secondary install-app-btn" type="button" onclick="promptInstallApp()" hidden>
             <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
@@ -2658,6 +2800,9 @@
       let latestStatusSnapshot = null;
       let onboardingStepIndex = 0;
       let onboardingAutoPrompted = false;
+      let onboardingDraft = null;
+      let onboardingFeedback = { message: '', type: 'info' };
+      let onboardingBusy = false;
       let deferredInstallPrompt = null;
 
       const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
@@ -2743,10 +2888,69 @@
       function resetOnboardingSessionState() {
         onboardingStepIndex = 0;
         onboardingAutoPrompted = false;
+        onboardingDraft = null;
+        onboardingFeedback = { message: '', type: 'info' };
+        onboardingBusy = false;
+      }
+
+      function buildOnboardingDraft() {
+        const status = latestStatusSnapshot?.status || {};
+        const stats = latestStatusSnapshot?.statistics || {};
+        const primaryDestination = (status.discord_destinations || [])[0] || {};
+
+        return {
+          zipcode: document.getElementById('cfg-zip')?.value.trim() || status.current_zipcode || '',
+          interval: String(document.getElementById('cfg-interval')?.value || status.check_interval_minutes || 60),
+          webhookUrl: primaryDestination.url || '',
+          webhookRoleId: primaryDestination.role_id || '',
+          productUrl: '',
+          productName: '',
+          runManualCheck: (stats.total_checks || 0) === 0,
+          startScheduler: Boolean(status.is_running)
+        };
+      }
+
+      function ensureOnboardingDraft() {
+        if (!onboardingDraft) {
+          onboardingDraft = buildOnboardingDraft();
+        }
+        return onboardingDraft;
+      }
+
+      function setOnboardingFeedback(message = '', type = 'info') {
+        onboardingFeedback = { message, type };
+        const node = document.getElementById('onboarding-inline-status');
+        if (!node) return;
+        node.textContent = message;
+        node.className = `onboarding-inline-status${message ? ` is-${type}` : ''}`;
+      }
+
+      function syncOnboardingDraftFromCurrentStep() {
+        const draft = ensureOnboardingDraft();
+        const zipInput = document.getElementById('onboarding-zip');
+        const intervalInput = document.getElementById('onboarding-interval');
+        const webhookInput = document.getElementById('onboarding-webhook-url');
+        const webhookRoleInput = document.getElementById('onboarding-webhook-role');
+        const productUrlInput = document.getElementById('onboarding-product-url');
+        const productNameInput = document.getElementById('onboarding-product-name');
+        const runCheckInput = document.getElementById('onboarding-run-check');
+        const startSchedulerInput = document.getElementById('onboarding-start-scheduler');
+
+        if (zipInput) draft.zipcode = zipInput.value.trim();
+        if (intervalInput) draft.interval = intervalInput.value.trim();
+        if (webhookInput) draft.webhookUrl = webhookInput.value.trim();
+        if (webhookRoleInput) draft.webhookRoleId = webhookRoleInput.value.replace(/[^\d]/g, '');
+        if (productUrlInput) draft.productUrl = productUrlInput.value.trim();
+        if (productNameInput) draft.productName = productNameInput.value.trim();
+        if (runCheckInput) draft.runManualCheck = runCheckInput.checked;
+        if (startSchedulerInput) draft.startScheduler = startSchedulerInput.checked;
       }
 
       function getOnboardingSteps() {
-        const configuredZip = latestStatusSnapshot?.status?.current_zipcode || document.getElementById('cfg-zip')?.value || 'your ZIP code';
+        const draft = ensureOnboardingDraft();
+        const configuredZip = draft.zipcode || latestStatusSnapshot?.status?.current_zipcode || 'your ZIP code';
+        const trackedCount = trackedProductsCache.length || (latestStatusSnapshot?.status?.tracked_products || []).length || 0;
+
         return [
           {
             tag: 'Welcome',
@@ -2755,60 +2959,138 @@
             calloutTitle: 'You are about to configure',
             bullets: [
               'Your search area and scan cadence.',
-              'Discord destinations for alerts and status messages.',
+              'A Discord destination for alerts, if you want push notifications.',
               'The Walgreens product links you actually want monitored.'
             ],
-            actionLabel: 'Open settings',
-            action: () => openTab('settings')
+            actionLabel: 'Open dashboard',
+            action: () => openTab('results'),
+            nextLabel: 'Start setup',
+            renderForm: () => `
+              <div class="onboarding-form-card">
+                <div class="onboarding-form-card-title">What happens next</div>
+                <div class="onboarding-form-card-copy">The next two steps save your live settings directly from this modal, so you do not have to bounce between tabs before your first scan.</div>
+              </div>
+            `
           },
           {
             tag: 'Settings',
-            title: 'Set your search area and alert destination.',
-            copy: `Start in Settings and replace the default ZIP with the area you care about. If you want Discord alerts, add at least one webhook before the first live scan.`,
-            calloutTitle: 'Suggested first save',
+            title: 'Enter the settings you want the VPS to use.',
+            copy: 'Save your ZIP code, scan interval, and first Discord destination right here. You can add more webhook destinations later from the full Settings page.',
+            calloutTitle: 'Save these live values',
             bullets: [
-              `Update the ZIP code from the default value to your target area.`,
-              'Set the check interval you want the VPS to run automatically.',
-              'Add one or more Discord webhooks if you want push alerts outside the browser.'
+              'Use a real ZIP code instead of the placeholder.',
+              'Pick an interval that matches how often you want checks to run.',
+              'Discord is optional, but helpful if you want alerts outside the browser.'
             ],
-            actionLabel: 'Focus settings',
+            actionLabel: 'Use full settings page',
             action: () => {
               openTab('settings');
               document.getElementById('cfg-zip')?.focus();
               document.getElementById('cfg-zip')?.select?.();
-            }
+            },
+            nextLabel: 'Save & continue',
+            renderForm: () => `
+              <div class="onboarding-form-grid">
+                <div class="form-group">
+                  <label class="form-label" for="onboarding-zip">ZIP Code</label>
+                  <input type="text" class="form-input" id="onboarding-zip" maxlength="10" placeholder="85209" value="${escapeHtml(draft.zipcode)}">
+                  <span class="form-hint">Walgreens store search area.</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="onboarding-interval">Check Interval</label>
+                  <input type="number" class="form-input" id="onboarding-interval" min="1" max="1440" step="1" placeholder="60" value="${escapeHtml(draft.interval)}">
+                  <span class="form-hint">Minutes between automatic checks.</span>
+                </div>
+              </div>
+              <div class="onboarding-form-card">
+                <div class="onboarding-form-card-title">Primary Discord destination</div>
+                <div class="onboarding-form-card-copy">Optional for onboarding. If you leave this blank, alerts will stay in the dashboard until you add a webhook later.</div>
+                <div class="form-group">
+                  <label class="form-label" for="onboarding-webhook-url">Webhook URL</label>
+                  <input type="url" class="form-input" id="onboarding-webhook-url" placeholder="https://discord.com/api/webhooks/..." value="${escapeHtml(draft.webhookUrl)}">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="onboarding-webhook-role">Role ID</label>
+                  <input type="text" class="form-input" id="onboarding-webhook-role" inputmode="numeric" placeholder="Optional role id" value="${escapeHtml(draft.webhookRoleId)}">
+                  <span class="form-hint">Optional. Mention a role only for this webhook.</span>
+                </div>
+              </div>
+            `,
+            onNext: saveOnboardingSettings
           },
           {
             tag: 'Products',
-            title: 'Add the products you actually care about.',
-            copy: 'Paste a Walgreens product page URL and the app will resolve the product metadata for you. This is the easiest way to move from a demo account to a real monitor.',
-            calloutTitle: 'Best practice',
+            title: 'Add the first Walgreens product you want watched.',
+            copy: 'Paste one Walgreens product link and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
+            calloutTitle: 'Add at least one tracked item',
             bullets: [
-              'Paste the Walgreens product link into the Add Product From Link field.',
-              'Use a custom name if you want cleaner Discord alert labels.',
-              'Keep your tracked list tight so scans stay focused and easier to read.'
+              'Paste the Walgreens product page URL.',
+              'Use a custom name if you want cleaner Discord labels.',
+              `You currently have ${trackedCount} tracked product${trackedCount === 1 ? '' : 's'} saved.`
             ],
-            actionLabel: 'Jump to product form',
+            actionLabel: 'Use full settings page',
             action: () => {
               openTab('settings');
               document.getElementById('new-product-url')?.focus();
-            }
+            },
+            nextLabel: 'Add product',
+            renderForm: () => `
+              <div class="onboarding-form-card">
+                <div class="onboarding-form-card-title">First tracked product</div>
+                <div class="form-group">
+                  <label class="form-label" for="onboarding-product-url">Walgreens Product URL</label>
+                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="https://www.walgreens.com/store/c/.../ID=300454138-product" value="${escapeHtml(draft.productUrl)}">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="onboarding-product-name">Custom Name</label>
+                  <input type="text" class="form-input" id="onboarding-product-name" maxlength="160" placeholder="Optional custom name" value="${escapeHtml(draft.productName)}">
+                  <span class="form-hint">Optional, but useful if the Walgreens title is messy.</span>
+                </div>
+              </div>
+            `,
+            onNext: saveOnboardingProduct
           },
           {
-            tag: 'First Scan',
-            title: 'Run a manual check, then decide on automation.',
-            copy: `After saving your settings, switch back to Results and trigger one manual scan. Once it looks good, start the scheduler and let the VPS keep working in the background for ${configuredZip}.`,
+            tag: 'Launch',
+            title: 'Choose how you want to finish setup.',
+            copy: `You are ready to monitor ${configuredZip}. You can kick off a manual check now, start the background scheduler, or do both from this last step.`,
             calloutTitle: 'Finish strong',
             bullets: [
-              'Use Check Now to confirm the Walgreens API, product metadata, and ZIP code all behave the way you expect.',
-              'Review the result cards and map output after the scan completes.',
-              'Start the scheduler when you are ready for unattended monitoring.'
+              'A manual check confirms your ZIP code and product link behave the way you expect.',
+              'Starting the scheduler keeps the VPS scanning even when your browser is closed.',
+              'You can always reopen this guide later from the header.'
             ],
             actionLabel: 'Open results',
             action: () => {
               openTab('results');
               document.getElementById('check-btn')?.focus();
-            }
+            },
+            nextLabel: 'Finish setup',
+            renderForm: () => `
+              <div class="onboarding-summary">
+                <div class="onboarding-summary-row"><span>ZIP code</span><strong>${escapeHtml(configuredZip)}</strong></div>
+                <div class="onboarding-summary-row"><span>Check interval</span><strong>${escapeHtml(draft.interval || '60')} min</strong></div>
+                <div class="onboarding-summary-row"><span>Discord</span><strong>${draft.webhookUrl ? 'Configured' : 'Add later'}</strong></div>
+                <div class="onboarding-summary-row"><span>Tracked products</span><strong>${trackedCount}</strong></div>
+              </div>
+              <div class="onboarding-choice-list">
+                <label class="onboarding-choice">
+                  <input type="checkbox" id="onboarding-run-check" ${draft.runManualCheck ? 'checked' : ''}>
+                  <span>
+                    <strong>Run a manual check now</strong>
+                    Use the live hosted workflow immediately and land on the Results tab when setup finishes.
+                  </span>
+                </label>
+                <label class="onboarding-choice">
+                  <input type="checkbox" id="onboarding-start-scheduler" ${draft.startScheduler ? 'checked' : ''}>
+                  <span>
+                    <strong>Start the background scheduler</strong>
+                    Let the VPS continue checking in the background after onboarding closes.
+                  </span>
+                </label>
+              </div>
+            `,
+            onNext: finishOnboardingLaunch
           }
         ];
       }
@@ -2823,6 +3105,7 @@
         const copyNode = document.getElementById('onboarding-step-copy');
         const calloutTitleNode = document.getElementById('onboarding-callout-title');
         const listNode = document.getElementById('onboarding-step-list');
+        const formNode = document.getElementById('onboarding-step-form');
         const backButton = document.getElementById('onboarding-back-btn');
         const nextButton = document.getElementById('onboarding-next-btn');
         const jumpButton = document.getElementById('onboarding-jump-btn');
@@ -2845,15 +3128,37 @@
         if (listNode) {
           listNode.innerHTML = step.bullets.map(item => `<li>${escapeHtml(item)}</li>`).join('');
         }
-        if (backButton) backButton.disabled = onboardingStepIndex === 0;
-        if (nextButton) nextButton.textContent = onboardingStepIndex === steps.length - 1 ? 'Finish' : 'Next step';
-        if (jumpButton) jumpButton.textContent = step.actionLabel || 'Show me';
-        if (skipButton) skipButton.textContent = onboardingStepIndex === steps.length - 1 ? 'Close' : 'Skip guide';
+        if (formNode) {
+          const formHtml = step.renderForm ? step.renderForm(ensureOnboardingDraft()) : '';
+          formNode.innerHTML = formHtml;
+          formNode.hidden = !formHtml;
+        }
+        if (backButton) backButton.disabled = onboardingBusy || onboardingStepIndex === 0;
+        if (nextButton) {
+          nextButton.disabled = onboardingBusy;
+          nextButton.textContent = onboardingBusy ? 'Saving...' : (step.nextLabel || (onboardingStepIndex === steps.length - 1 ? 'Finish' : 'Next step'));
+        }
+        if (jumpButton) {
+          jumpButton.hidden = !step.action;
+          jumpButton.disabled = onboardingBusy;
+          jumpButton.textContent = step.actionLabel || 'Show me';
+        }
+        if (skipButton) {
+          skipButton.disabled = onboardingBusy;
+          skipButton.textContent = onboardingStepIndex === steps.length - 1 ? 'Close' : 'Skip guide';
+        }
+        setOnboardingFeedback(onboardingFeedback.message, onboardingFeedback.type);
       }
 
       function openOnboarding(reset = false) {
         if (!currentUser) return;
-        if (reset) onboardingStepIndex = 0;
+        if (reset) {
+          onboardingStepIndex = 0;
+          onboardingDraft = buildOnboardingDraft();
+          onboardingFeedback = { message: '', type: 'info' };
+        } else {
+          ensureOnboardingDraft();
+        }
         onboardingAutoPrompted = true;
         renderOnboarding();
         const modal = document.getElementById('onboarding-modal');
@@ -2867,12 +3172,16 @@
         if (modal) {
           modal.hidden = true;
         }
+        onboardingBusy = false;
+        onboardingFeedback = { message: '', type: 'info' };
         if (markComplete) {
           markOnboardingCompleted();
         }
       }
 
       function goToOnboardingStep(direction) {
+        syncOnboardingDraftFromCurrentStep();
+        onboardingFeedback = { message: '', type: 'info' };
         const steps = getOnboardingSteps();
         const nextIndex = onboardingStepIndex + direction;
         if (nextIndex < 0) {
@@ -2889,13 +3198,159 @@
         renderOnboarding();
       }
 
+      async function handleOnboardingNext() {
+        syncOnboardingDraftFromCurrentStep();
+        onboardingFeedback = { message: '', type: 'info' };
+        const steps = getOnboardingSteps();
+        const step = steps[onboardingStepIndex];
+        if (!step) return;
+
+        if (!step.onNext) {
+          goToOnboardingStep(1);
+          return;
+        }
+
+        onboardingBusy = true;
+        renderOnboarding();
+        let result = false;
+        try {
+          result = await step.onNext();
+        } finally {
+          onboardingBusy = false;
+        }
+
+        if (result === false) {
+          renderOnboarding();
+          return;
+        }
+        if (result === 'complete') {
+          return;
+        }
+        goToOnboardingStep(1);
+      }
+
       function handleOnboardingAction() {
+        syncOnboardingDraftFromCurrentStep();
         const steps = getOnboardingSteps();
         const step = steps[onboardingStepIndex];
         if (step?.action) {
           closeOnboarding(false);
           step.action();
         }
+      }
+
+      async function saveOnboardingSettings() {
+        const draft = ensureOnboardingDraft();
+        const zip = draft.zipcode.trim();
+        const interval = Number(draft.interval);
+        const destinations = [];
+
+        if (!/^\d{5}(?:-\d{4})?$/.test(zip)) {
+          setOnboardingFeedback('Enter a valid 5-digit ZIP code before continuing.', 'error');
+          return false;
+        }
+
+        if (!Number.isFinite(interval) || interval < 1 || interval > 1440) {
+          setOnboardingFeedback('Choose an interval between 1 and 1440 minutes.', 'error');
+          return false;
+        }
+
+        if (draft.webhookUrl) {
+          try {
+            const parsed = new URL(draft.webhookUrl);
+            if (!/^https?:$/.test(parsed.protocol)) throw new Error('invalid');
+          } catch (error) {
+            setOnboardingFeedback('Use a valid Discord webhook URL or leave it blank for now.', 'error');
+            return false;
+          }
+          const destination = { url: draft.webhookUrl };
+          if (draft.webhookRoleId) {
+            destination.role_id = draft.webhookRoleId.replace(/[^\d]/g, '');
+          }
+          destinations.push(destination);
+        }
+
+        const result = await apiCall('/api/configure', 'POST', {
+          zipcode: zip,
+          check_interval_minutes: interval,
+          discord_destinations: destinations
+        });
+
+        if (!result) {
+          setOnboardingFeedback('Settings could not be saved. Check the API and try again.', 'error');
+          return false;
+        }
+
+        document.getElementById('cfg-zip').value = zip;
+        document.getElementById('cfg-interval').value = interval;
+        renderDiscordDestinationRows(destinations);
+        await loadSettings();
+        latestStatusSnapshot = await loadStatus();
+        setOnboardingFeedback('Settings saved. Next we will add your first product.', 'success');
+        return true;
+      }
+
+      async function saveOnboardingProduct() {
+        const draft = ensureOnboardingDraft();
+        const url = draft.productUrl.trim();
+        const customName = draft.productName.trim();
+        const existingProducts = trackedProductsCache.length || (latestStatusSnapshot?.status?.tracked_products || []).length || 0;
+
+        if (!url) {
+          if (existingProducts > 0) {
+            setOnboardingFeedback('You already have a tracked product, so we can move on.', 'success');
+            return true;
+          }
+          setOnboardingFeedback('Paste a Walgreens product link before continuing.', 'error');
+          return false;
+        }
+
+        const resolved = await apiCall('/api/products/resolve', 'POST', { url });
+        if (!resolved) {
+          setOnboardingFeedback('That link did not resolve. Double-check the Walgreens product URL.', 'error');
+          return false;
+        }
+
+        const payload = { url };
+        if (customName) payload.name = customName;
+
+        const result = await apiCall('/api/products/add', 'POST', payload);
+        if (!result) {
+          setOnboardingFeedback('The product could not be added right now. Try again in a moment.', 'error');
+          return false;
+        }
+
+        draft.productUrl = '';
+        draft.productName = '';
+        document.getElementById('new-product-url').value = '';
+        document.getElementById('new-product-name').value = '';
+        await loadSettings();
+        latestStatusSnapshot = await loadStatus();
+        setOnboardingFeedback(`Added ${customName || resolved.name}.`, 'success');
+        return true;
+      }
+
+      async function finishOnboardingLaunch() {
+        const draft = ensureOnboardingDraft();
+        const shouldRunCheck = Boolean(draft.runManualCheck);
+        const shouldStartScheduler = Boolean(draft.startScheduler);
+        const schedulerAlreadyRunning = Boolean(latestStatusSnapshot?.status?.is_running);
+
+        closeOnboarding(true);
+        openTab('results');
+
+        if (shouldStartScheduler && !schedulerAlreadyRunning) {
+          await startScheduler();
+        }
+
+        if (shouldRunCheck) {
+          await triggerManualCheck();
+        } else {
+          await loadStatus();
+          showToast(shouldStartScheduler ? 'Setup finished and scheduler started.' : 'Setup finished. Run your first check when ready.', 'success');
+        }
+
+        return 'complete';
       }
 
       function maybeOpenOnboarding(statusPayload) {
