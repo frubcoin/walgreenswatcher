@@ -5345,7 +5345,7 @@
                 <div class="results-toolbar-subtitle">${productCount} product${productCount === 1 ? '' : 's'} hit across ${mapData.locations.length} mapped location${mapData.locations.length === 1 ? '' : 's'} after checking ${total} store${total === 1 ? '' : 's'}${timestamp ? ` on ${formattedDate}` : ''}.</div>
               </div>
               <div class="results-view-switch" role="tablist" aria-label="Results view">
-                <button class="results-view-btn ${currentResultsView === 'cards' ? 'active' : ''}" type="button" data-action="set-results-view" data-results-view="cards">Cards</button>
+                <button class="results-view-btn ${currentResultsView === 'cards' ? 'active' : ''}" type="button" data-action="set-results-view" data-results-view="cards">List</button>
                 <button class="results-view-btn ${currentResultsView === 'map' ? 'active' : ''}" type="button" data-action="set-results-view" data-results-view="map" ${mapData.locations.length ? '' : 'disabled title="Run a new successful scan to enable map pins"'}>Map</button>
               </div>
             </div>
