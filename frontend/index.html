@@ -574,6 +574,18 @@
       line-height: 1.5;
     }
 
+    body.app-installed .install-app-btn,
+    body.app-installed .install-app-copy {
+      display: none !important;
+    }
+
+    @media (display-mode: standalone), (display-mode: window-controls-overlay), (display-mode: minimal-ui), (display-mode: fullscreen) {
+      .install-app-btn,
+      .install-app-copy {
+        display: none !important;
+      }
+    }
+
     .auth-note-list {
       display: grid;
       gap: 10px;
@@ -3011,7 +3023,9 @@
       }
 
       function refreshInstallButtons() {
-        setInstallButtonsVisible(Boolean(deferredInstallPrompt) && !isAppInstalled());
+        const installed = isAppInstalled();
+        document.body.classList.toggle('app-installed', installed);
+        setInstallButtonsVisible(Boolean(deferredInstallPrompt) && !installed);
       }
 
       async function promptInstallApp() {
