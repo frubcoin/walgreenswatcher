@@ -2947,7 +2947,7 @@
       let onboardingFeedback = { message: '', type: 'info' };
       let onboardingBusy = false;
       let deferredInstallPrompt = null;
-      let installDisplayModeQuery = null;
+      let installDisplayModeQueries = [];
 
       const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
       const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
@@ -2995,10 +2995,19 @@
         });
       }
 
+      function matchesDisplayMode(mode) {
+        return Boolean(window.matchMedia && window.matchMedia(`(display-mode: ${mode})`).matches);
+      }
+
       function isAppInstalled() {
-        const isStandaloneDisplayMode = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+        const isInstalledDisplayMode =
+          matchesDisplayMode('standalone')
+          || matchesDisplayMode('window-controls-overlay')
+          || matchesDisplayMode('minimal-ui')
+          || matchesDisplayMode('fullscreen');
         const isIosStandalone = window.navigator && window.navigator.standalone === true;
-        return isStandaloneDisplayMode || isIosStandalone;
+        const isAndroidAppReferrer = document.referrer && document.referrer.startsWith('android-app://');
+        return isInstalledDisplayMode || isIosStandalone || isAndroidAppReferrer;
       }
 
       function refreshInstallButtons() {
@@ -4298,12 +4307,19 @@
         renderCachedState();
         initializePokemonBackgroundControls();
         if (window.matchMedia) {
-          installDisplayModeQuery = window.matchMedia('(display-mode: standalone)');
-          if (typeof installDisplayModeQuery.addEventListener === 'function') {
-            installDisplayModeQuery.addEventListener('change', refreshInstallButtons);
-          } else if (typeof installDisplayModeQuery.addListener === 'function') {
-            installDisplayModeQuery.addListener(refreshInstallButtons);
-          }
+          installDisplayModeQueries = [
+            window.matchMedia('(display-mode: standalone)'),
+            window.matchMedia('(display-mode: window-controls-overlay)'),
+            window.matchMedia('(display-mode: minimal-ui)'),
+            window.matchMedia('(display-mode: fullscreen)')
+          ];
+          installDisplayModeQueries.forEach(query => {
+            if (typeof query.addEventListener === 'function') {
+              query.addEventListener('change', refreshInstallButtons);
+            } else if (typeof query.addListener === 'function') {
+              query.addListener(refreshInstallButtons);
+            }
+          });
         }
         refreshInstallButtons();
         registerServiceWorker();
