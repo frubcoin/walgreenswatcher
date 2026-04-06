@@ -753,6 +753,11 @@
       font-size: 14px;
     }
 
+    .onboarding-inline-help {
+      display: flex;
+      justify-content: flex-end;
+    }
+
     .onboarding-inline-status {
       min-height: 20px;
       font-size: 13px;
@@ -824,7 +829,13 @@
       flex-wrap: wrap;
       justify-content: space-between;
       gap: 12px;
-      padding-top: 8px;
+      margin-top: auto;
+      padding: 18px 0 0;
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      background: linear-gradient(180deg, rgba(31, 35, 39, 0), rgba(31, 35, 39, 0.92) 18%, rgba(31, 35, 39, 0.98) 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .onboarding-actions-group {
@@ -3022,6 +3033,17 @@
               <div class="onboarding-form-card">
                 <div class="onboarding-form-card-title">Primary Discord destination</div>
                 <div class="onboarding-form-card-copy">Optional for onboarding. If you leave this blank, alerts will stay in the dashboard until you add a webhook later.</div>
+                <div class="onboarding-inline-help">
+                  <span class="tooltip-container">
+                    <span>Need help?</span>
+                    <div class="tooltip-content">
+                      <div style="margin-bottom:8px;"><strong>Webhook URL:</strong> In your Discord server, go to <em>Server
+                          Settings > Integrations > Webhooks</em> to create a new webhook and copy its URL.</div>
+                      <div><strong>Role ID:</strong> Type <code>\@RoleName</code> in any Discord channel and press enter. It
+                        will output a numeric ID like <code>&lt;@&amp;123456789&gt;</code>. Paste the numbers here.</div>
+                    </div>
+                  </span>
+                </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-webhook-url">Webhook URL</label>
                   <input type="url" class="form-input" id="onboarding-webhook-url" placeholder="https://discord.com/api/webhooks/..." value="${escapeHtml(draft.webhookUrl)}">
