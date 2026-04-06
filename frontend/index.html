@@ -61,6 +61,12 @@
       --accent-ring: rgba(72, 156, 212, 0.16);
       --accent-soft: rgba(72, 156, 212, 0.12);
       --accent-soft-border: rgba(72, 156, 212, 0.45);
+      --scrollbar-track: rgba(255, 255, 255, 0.035);
+      --scrollbar-thumb-start: rgba(72, 156, 212, 0.78);
+      --scrollbar-thumb-end: rgba(230, 38, 0, 0.74);
+      --scrollbar-thumb-hover-start: rgba(98, 178, 228, 0.9);
+      --scrollbar-thumb-hover-end: rgba(243, 117, 32, 0.84);
+      --scrollbar-thumb-border: rgba(31, 35, 39, 0.94);
       --radius: 10px;
       --radius-sm: 6px;
       --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
@@ -993,7 +999,7 @@
     .onboarding-content,
     .tech-stack-content {
       scrollbar-width: thin;
-      scrollbar-color: rgba(72, 156, 212, 0.78) rgba(255, 255, 255, 0.04);
+      scrollbar-color: var(--scrollbar-thumb-start) var(--scrollbar-track);
     }
 
     .auth-gate::-webkit-scrollbar,
@@ -1006,13 +1012,24 @@
       height: 10px;
     }
 
+    .auth-gate::-webkit-scrollbar-button,
+    .app-window::-webkit-scrollbar-button,
+    .onboarding-modal::-webkit-scrollbar-button,
+    .onboarding-sidebar::-webkit-scrollbar-button,
+    .onboarding-content::-webkit-scrollbar-button,
+    .tech-stack-content::-webkit-scrollbar-button {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+
     .auth-gate::-webkit-scrollbar-track,
     .app-window::-webkit-scrollbar-track,
     .onboarding-modal::-webkit-scrollbar-track,
     .onboarding-sidebar::-webkit-scrollbar-track,
     .onboarding-content::-webkit-scrollbar-track,
     .tech-stack-content::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.035);
+      background: var(--scrollbar-track);
       border-radius: 999px;
     }
 
@@ -1023,8 +1040,8 @@
     .onboarding-content::-webkit-scrollbar-thumb,
     .tech-stack-content::-webkit-scrollbar-thumb {
       border-radius: 999px;
-      border: 2px solid rgba(31, 35, 39, 0.94);
-      background: linear-gradient(180deg, rgba(72, 156, 212, 0.78), rgba(230, 38, 0, 0.74));
+      border: 2px solid var(--scrollbar-thumb-border);
+      background: linear-gradient(180deg, var(--scrollbar-thumb-start), var(--scrollbar-thumb-end));
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
     }
 
@@ -1034,7 +1051,7 @@
     .onboarding-sidebar::-webkit-scrollbar-thumb:hover,
     .onboarding-content::-webkit-scrollbar-thumb:hover,
     .tech-stack-content::-webkit-scrollbar-thumb:hover {
-      background: linear-gradient(180deg, rgba(98, 178, 228, 0.9), rgba(243, 117, 32, 0.84));
+      background: linear-gradient(180deg, var(--scrollbar-thumb-hover-start), var(--scrollbar-thumb-hover-end));
     }
 
     .onboarding-step-meta {
@@ -2922,7 +2939,13 @@
       accentSoft: 'rgba(72,156,212,0.12)',
       accentSoftBorder: 'rgba(72,156,212,0.45)',
       border: 'rgba(72,156,212,0.18)',
-      borderGlow: 'rgba(230,38,0,0.35)'
+      borderGlow: 'rgba(230,38,0,0.35)',
+      scrollbarTrack: 'rgba(255,255,255,0.035)',
+      scrollbarThumbStart: 'rgba(72,156,212,0.78)',
+      scrollbarThumbEnd: 'rgba(230,38,0,0.74)',
+      scrollbarThumbHoverStart: 'rgba(98,178,228,0.9)',
+      scrollbarThumbHoverEnd: 'rgba(243,117,32,0.84)',
+      scrollbarThumbBorder: 'rgba(31,35,39,0.94)'
     };
     const RESULTS_MAP_THEME_STORAGE_KEY = 'walgreens_results_map_theme';
     const RESULTS_MAP_THEMES = {
@@ -3043,6 +3066,12 @@
       const accentRgb = hexToRgb(accentHex);
       if (!accentRgb) return DEFAULT_THEME_TOKENS;
 
+      const thumbStartRgb = mixRgb(accentRgb, { r: 255, g: 255, b: 255 }, 0.18);
+      const thumbEndRgb = mixRgb(accentRgb, { r: 18, g: 22, b: 27 }, 0.22);
+      const thumbHoverStartRgb = mixRgb(accentRgb, { r: 255, g: 255, b: 255 }, 0.3);
+      const thumbHoverEndRgb = mixRgb(accentRgb, { r: 243, g: 117, b: 32 }, 0.2);
+      const trackRgb = mixRgb(accentRgb, { r: 255, g: 255, b: 255 }, 0.08);
+
       return {
         accent: accentHex,
         accentHover: rgbToHex(mixRgb(accentRgb, { r: 18, g: 22, b: 27 }, 0.18)),
@@ -3051,7 +3080,13 @@
         accentSoft: rgbaString(accentRgb, 0.12),
         accentSoftBorder: rgbaString(accentRgb, 0.42),
         border: rgbaString(accentRgb, 0.2),
-        borderGlow: rgbaString(accentRgb, 0.35)
+        borderGlow: rgbaString(accentRgb, 0.35),
+        scrollbarTrack: rgbaString(trackRgb, 0.1),
+        scrollbarThumbStart: rgbaString(thumbStartRgb, 0.88),
+        scrollbarThumbEnd: rgbaString(thumbEndRgb, 0.78),
+        scrollbarThumbHoverStart: rgbaString(thumbHoverStartRgb, 0.94),
+        scrollbarThumbHoverEnd: rgbaString(thumbHoverEndRgb, 0.86),
+        scrollbarThumbBorder: rgbaString(mixRgb(accentRgb, { r: 18, g: 22, b: 27 }, 0.82), 0.92)
       };
     }
 
@@ -3065,6 +3100,12 @@
       root.style.setProperty('--accent-soft-border', tokens.accentSoftBorder);
       root.style.setProperty('--border', tokens.border);
       root.style.setProperty('--border-glow', tokens.borderGlow);
+      root.style.setProperty('--scrollbar-track', tokens.scrollbarTrack);
+      root.style.setProperty('--scrollbar-thumb-start', tokens.scrollbarThumbStart);
+      root.style.setProperty('--scrollbar-thumb-end', tokens.scrollbarThumbEnd);
+      root.style.setProperty('--scrollbar-thumb-hover-start', tokens.scrollbarThumbHoverStart);
+      root.style.setProperty('--scrollbar-thumb-hover-end', tokens.scrollbarThumbHoverEnd);
+      root.style.setProperty('--scrollbar-thumb-border', tokens.scrollbarThumbBorder);
     }
 
     function setPokemonBackgroundSelectState() {
