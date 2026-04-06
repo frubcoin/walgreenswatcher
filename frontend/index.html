@@ -95,6 +95,14 @@
       overflow: hidden;
     }
 
+    body.auth-gate-active {
+      overflow: hidden;
+    }
+
+    body:not(.auth-gate-active) {
+      overflow: hidden;
+    }
+
     body::before {
       content: '';
       position: fixed;
@@ -186,13 +194,12 @@
     }
 
     .wrapper {
-      max-width: 1280px;
+      max-width: 1152px;
       margin: 0 auto;
       padding: 0 20px 60px;
+      display: flow-root;
       position: relative;
       z-index: 1;
-      transform: scale(0.9);
-      transform-origin: center top;
     }
 
     #page-loader {
@@ -325,6 +332,13 @@
       overflow: hidden;
     }
 
+    body:not(.auth-gate-active) .app-window {
+      max-height: calc(100dvh - 110px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable both-edges;
+    }
+
     header {
       display: flex;
       align-items: center;
@@ -411,10 +425,31 @@
       display: none;
     }
 
+    body.auth-gate-active .wrapper {
+      min-height: 100dvh;
+      padding-bottom: 92px;
+    }
+
+    body:not(.auth-gate-active) .wrapper {
+      min-height: 100dvh;
+      padding-bottom: 92px;
+    }
+
+    body.auth-gate-active .auth-gate {
+      min-height: 0;
+      max-height: calc(100dvh - 110px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
     .auth-layout {
       display: grid;
       grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.95fr);
       min-height: 540px;
+    }
+
+    body.auth-gate-active .auth-layout {
+      min-height: 0;
     }
 
     .auth-showcase {
@@ -430,6 +465,10 @@
         radial-gradient(circle at top left, rgba(230, 38, 0, 0.28), transparent 42%),
         radial-gradient(circle at bottom right, rgba(72, 156, 212, 0.22), transparent 34%),
         linear-gradient(180deg, rgba(60, 46, 49, 0.84), rgba(40, 43, 49, 0.9));
+    }
+
+    body.auth-gate-active .auth-showcase {
+      align-content: start;
     }
 
     .auth-showcase::before {
@@ -555,11 +594,37 @@
     }
 
     .auth-panel {
+      position: relative;
       padding: 42px 32px;
       display: grid;
       align-content: center;
       gap: 18px;
-      background: linear-gradient(180deg, rgba(43, 47, 52, 0.96), rgba(30, 33, 37, 0.96));
+      overflow: hidden;
+      isolation: isolate;
+      background:
+        radial-gradient(circle at top left, rgba(230, 38, 0, 0.14), transparent 42%),
+        radial-gradient(circle at bottom left, rgba(72, 156, 212, 0.12), transparent 36%),
+        linear-gradient(180deg, rgba(43, 47, 52, 0.94), rgba(30, 33, 37, 0.96));
+    }
+
+    body.auth-gate-active .auth-panel {
+      align-content: start;
+    }
+
+    .auth-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 40%),
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 46%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .auth-panel>* {
+      position: relative;
+      z-index: 1;
     }
 
     .auth-panel-card {
@@ -1755,6 +1820,7 @@
       height: 520px;
       display: flex;
       flex-direction: column;
+      position: relative;
     }
 
     .results-map-canvas {
@@ -1900,6 +1966,110 @@
       gap: 6px;
       font-size: 13px;
       color: var(--text-secondary);
+    }
+
+    .results-map-card .leaflet-bar a {
+      background: rgba(33, 37, 41, 0.92);
+      color: var(--text-primary);
+      border-bottom-color: rgba(255, 255, 255, 0.08);
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+
+    .results-map-card .leaflet-bar a:hover,
+    .results-map-card .leaflet-bar a:focus-visible {
+      background: rgba(53, 57, 61, 0.96);
+      color: var(--text-primary);
+    }
+
+    .results-map-theme-control {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 999px;
+      background: rgba(27, 31, 36, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .results-map-theme-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 7px 12px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    }
+
+    .results-map-theme-btn:hover,
+    .results-map-theme-btn:focus-visible {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .results-map-theme-btn.is-active {
+      background: var(--accent);
+      color: var(--accent-contrast);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .results-map-card[data-map-theme="light"] .leaflet-container {
+      background: #dfe6ec;
+    }
+
+    .results-map-card[data-map-theme="light"] .leaflet-popup-content-wrapper,
+    .results-map-card[data-map-theme="light"] .leaflet-popup-tip {
+      background: #f8fbfd;
+      color: #15212c;
+      border: 1px solid rgba(62, 81, 98, 0.18);
+      box-shadow: 0 14px 28px rgba(14, 29, 41, 0.18);
+    }
+
+    .results-map-card[data-map-theme="light"] .map-popup-title {
+      color: #15212c;
+    }
+
+    .results-map-card[data-map-theme="light"] .map-popup-address {
+      color: #42515f;
+    }
+
+    .results-map-card[data-map-theme="light"] .map-popup-meta,
+    .results-map-card[data-map-theme="light"] .map-popup-products {
+      color: #4d5c6b;
+    }
+
+    .results-map-card[data-map-theme="light"] .leaflet-bar a {
+      background: rgba(248, 251, 253, 0.96);
+      color: #15212c;
+      border-bottom-color: rgba(62, 81, 98, 0.18);
+    }
+
+    .results-map-card[data-map-theme="light"] .leaflet-bar a:hover,
+    .results-map-card[data-map-theme="light"] .leaflet-bar a:focus-visible {
+      background: #e7eef3;
+      color: #101820;
+    }
+
+    .results-map-card[data-map-theme="light"] .results-map-theme-control {
+      background: rgba(248, 251, 253, 0.94);
+      border-color: rgba(62, 81, 98, 0.18);
+      box-shadow: 0 10px 20px rgba(14, 29, 41, 0.16);
+    }
+
+    .results-map-card[data-map-theme="light"] .results-map-theme-btn {
+      color: #42515f;
+    }
+
+    .results-map-card[data-map-theme="light"] .results-map-theme-btn:hover,
+    .results-map-card[data-map-theme="light"] .results-map-theme-btn:focus-visible {
+      background: rgba(62, 81, 98, 0.08);
+      color: #15212c;
     }
 
     .result-card {
@@ -2403,7 +2573,7 @@
       left: 50%;
       bottom: calc(10px + env(safe-area-inset-bottom, 0px));
       transform: translateX(-50%);
-      width: min(92vw, 920px);
+      width: min(calc(100% - 32px), 920px);
       padding: 0 16px;
       display: flex;
       align-items: center;
@@ -2479,6 +2649,76 @@
       .auth-showcase {
         border-right: none;
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      body.auth-gate-active {
+        overflow: hidden;
+      }
+
+      body.auth-gate-active .wrapper {
+        min-height: 100dvh;
+        padding: 12px 12px 92px;
+        display: grid;
+        align-items: start;
+        transform: none;
+      }
+
+      body.auth-gate-active .auth-gate {
+        margin-top: 0;
+        height: calc(100dvh - 104px);
+        min-height: 0;
+      }
+
+      body.auth-gate-active .auth-layout {
+        height: 100%;
+        grid-template-rows: minmax(0, 1.05fr) minmax(0, 0.95fr);
+      }
+
+      body.auth-gate-active .auth-showcase,
+      body.auth-gate-active .auth-panel {
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+
+      body.auth-gate-active .auth-showcase {
+        gap: 18px;
+      }
+
+      body.auth-gate-active .auth-title {
+        font-size: clamp(22px, 7vw, 30px);
+      }
+
+      body.auth-gate-active .auth-copy,
+      body.auth-gate-active .auth-panel-copy,
+      body.auth-gate-active .auth-note-item {
+        font-size: 14px;
+      }
+
+      body.auth-gate-active .auth-metric {
+        padding: 12px;
+      }
+
+      body.auth-gate-active .auth-metric-value {
+        font-size: 22px;
+      }
+
+      body.auth-gate-active .auth-feature-grid {
+        display: none;
+      }
+
+      body.auth-gate-active .auth-panel-card {
+        padding: 20px;
+        gap: 14px;
+      }
+
+      body.auth-gate-active .auth-note-list {
+        gap: 8px;
+      }
+
+      body.auth-gate-active .auth-legal-note {
+        margin-top: 8px;
+        font-size: 10px;
       }
 
       .auth-metrics,
@@ -2619,7 +2859,10 @@
       }
 
       .site-footer {
-        width: calc(100vw - 24px);
+        left: 12px;
+        right: 12px;
+        width: auto;
+        transform: none;
         bottom: calc(8px + env(safe-area-inset-bottom, 0px));
         font-size: 10px;
         letter-spacing: 0.05em;
@@ -2628,7 +2871,7 @@
   </style>
 </head>
 
-<body>
+<body class="auth-gate-active">
 
   <div id="page-loader">
     <div class="lds-spinner">
@@ -2661,6 +2904,19 @@
       accentSoftBorder: 'rgba(72,156,212,0.45)',
       border: 'rgba(72,156,212,0.18)',
       borderGlow: 'rgba(230,38,0,0.35)'
+    };
+    const RESULTS_MAP_THEME_STORAGE_KEY = 'walgreens_results_map_theme';
+    const RESULTS_MAP_THEMES = {
+      dark: {
+        label: 'Dark',
+        background: '#1f2327',
+        tileUrl: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      },
+      light: {
+        label: 'Light',
+        background: '#dfe6ec',
+        tileUrl: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+      }
     };
 
     function createGrainedBackgroundDataUrl({
@@ -3282,6 +3538,7 @@
         </div>
       </div>
     </div>
+    </div>
     <footer class="site-footer" aria-label="Site footer">
       <span class="site-footer-copy">© <span id="footer-year">2026</span> Frub's Walgreens Watcher • Independent project • Not affiliated with Walgreens</span>
       <span aria-hidden="true">•</span>
@@ -3300,9 +3557,11 @@
       let currentResultsView = 'cards';
       let latestRenderedResults = null;
       let resultsMap = null;
+      let resultsMapBaseLayer = null;
       let resultsMapMarkers = [];
       let resultsMapMarkersByKey = new Map();
       let activeResultsMapKey = null;
+      let currentResultsMapTheme = loadStoredResultsMapTheme();
       let trackedProductsCache = [];
       let editingProductId = null;
       let currentUser = null;
@@ -3330,6 +3589,100 @@
       function apiUrl(path) {
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
         return `${API_BASE}${normalizedPath}`;
+      }
+
+      function normalizeResultsMapTheme(theme) {
+        return theme === 'light' ? 'light' : 'dark';
+      }
+
+      function loadStoredResultsMapTheme() {
+        try {
+          return normalizeResultsMapTheme(localStorage.getItem(RESULTS_MAP_THEME_STORAGE_KEY) || 'dark');
+        } catch (error) {
+          return 'dark';
+        }
+      }
+
+      function persistResultsMapTheme(theme) {
+        try {
+          localStorage.setItem(RESULTS_MAP_THEME_STORAGE_KEY, normalizeResultsMapTheme(theme));
+        } catch (error) {
+        }
+      }
+
+      function getResultsMapTileLayer(theme = currentResultsMapTheme) {
+        const themeConfig = RESULTS_MAP_THEMES[normalizeResultsMapTheme(theme)] || RESULTS_MAP_THEMES.dark;
+        return L.tileLayer(themeConfig.tileUrl, {
+          subdomains: 'abcd',
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+          maxZoom: 19
+        });
+      }
+
+      function updateResultsMapThemeControlState(theme = currentResultsMapTheme) {
+        const normalizedTheme = normalizeResultsMapTheme(theme);
+        document.querySelectorAll('.results-map-theme-btn').forEach(button => {
+          const isActive = button.dataset.mapTheme === normalizedTheme;
+          button.classList.toggle('is-active', isActive);
+          button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+      }
+
+      function applyResultsMapTheme(theme, { persist = true } = {}) {
+        const normalizedTheme = normalizeResultsMapTheme(theme);
+        const mapCard = document.querySelector('.results-map-card');
+        const mapElement = document.getElementById('results-map');
+        const themeConfig = RESULTS_MAP_THEMES[normalizedTheme] || RESULTS_MAP_THEMES.dark;
+
+        currentResultsMapTheme = normalizedTheme;
+
+        if (mapCard) {
+          mapCard.dataset.mapTheme = normalizedTheme;
+        }
+
+        if (mapElement) {
+          mapElement.dataset.mapTheme = normalizedTheme;
+          mapElement.style.background = themeConfig.background;
+        }
+
+        if (resultsMap) {
+          if (resultsMapBaseLayer) {
+            resultsMap.removeLayer(resultsMapBaseLayer);
+          }
+          resultsMapBaseLayer = getResultsMapTileLayer(normalizedTheme).addTo(resultsMap);
+        }
+
+        updateResultsMapThemeControlState(normalizedTheme);
+
+        if (persist) {
+          persistResultsMapTheme(normalizedTheme);
+        }
+      }
+
+      function createResultsMapThemeControl() {
+        const control = L.control({ position: 'topright' });
+        control.onAdd = function onAdd() {
+          const container = L.DomUtil.create('div', 'results-map-theme-control leaflet-bar');
+          container.setAttribute('role', 'group');
+          container.setAttribute('aria-label', 'Map theme');
+          container.innerHTML = Object.entries(RESULTS_MAP_THEMES).map(([theme, config]) => `
+            <button class="results-map-theme-btn ${currentResultsMapTheme === theme ? 'is-active' : ''}" type="button" data-map-theme="${theme}" aria-pressed="${currentResultsMapTheme === theme ? 'true' : 'false'}">${config.label}</button>
+          `).join('');
+
+          L.DomEvent.disableClickPropagation(container);
+          L.DomEvent.disableScrollPropagation(container);
+
+          container.querySelectorAll('.results-map-theme-btn').forEach(button => {
+            L.DomEvent.on(button, 'click', event => {
+              L.DomEvent.stop(event);
+              applyResultsMapTheme(button.dataset.mapTheme || 'dark');
+            });
+          });
+
+          return container;
+        };
+
+        return control;
       }
 
       function stopStatusPolling() {
@@ -4009,6 +4362,8 @@
         const appShell = document.getElementById('app-shell');
         if (authGate) authGate.hidden = isAuthenticated;
         if (appShell) appShell.hidden = !isAuthenticated;
+        document.body.classList.toggle('auth-gate-active', !isAuthenticated);
+        document.body.classList.toggle('app-active', isAuthenticated);
       }
 
       function updateCurrentUserDisplay(user) {
@@ -4427,6 +4782,7 @@
       }
 
       function destroyResultsMap() {
+        resultsMapBaseLayer = null;
         resultsMapMarkers = [];
         resultsMapMarkersByKey = new Map();
         activeResultsMapKey = null;
@@ -4577,11 +4933,8 @@
           scrollWheelZoom: true
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          subdomains: 'abcd',
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
-          maxZoom: 19
-        }).addTo(resultsMap);
+        createResultsMapThemeControl().addTo(resultsMap);
+        applyResultsMapTheme(currentResultsMapTheme, { persist: false });
 
         const bounds = [];
         resultsMapMarkersByKey = new Map();
