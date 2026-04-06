@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
-from flask import Flask, Response, g, jsonify, request, send_from_directory, session
+from flask import Flask, Response, abort, g, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -40,8 +40,13 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-FRONTEND_INDEX_PATH = FRONTEND_DIR / "index.html"
 INLINE_SCRIPT_NONCE_TOKEN = "__CSP_NONCE__"
+FRONTEND_HTML_PAGES = {
+    "index.html",
+    "privacy.html",
+    "terms.html",
+    "disclosures.html",
+}
 app.secret_key = FLASK_SECRET_KEY
 app.config.update(
     SESSION_COOKIE_NAME=SESSION_COOKIE_NAME,
@@ -160,10 +165,17 @@ def _build_content_security_policy(nonce: str) -> str:
     )
 
 
-def _serve_index_html() -> Response:
+def _serve_frontend_html_file(file_name: str) -> Response:
+    if file_name not in FRONTEND_HTML_PAGES:
+        abort(404)
+
+    html_path = FRONTEND_DIR / file_name
+    if not html_path.is_file():
+        abort(404)
+
     nonce = secrets.token_urlsafe(16)
     g.csp_nonce = nonce
-    html = FRONTEND_INDEX_PATH.read_text(encoding="utf-8").replace(
+    html = html_path.read_text(encoding="utf-8").replace(
         INLINE_SCRIPT_NONCE_TOKEN,
         nonce,
     )
@@ -533,14 +545,36 @@ def health():
 
 
 @app.route("/")
+@app.route("/index.html")
 def index():
-    return _serve_index_html()
+    return _serve_frontend_html_file("index.html")
+
+
+@app.route("/privacy.html")
+@app.route("/privacy")
+@app.route("/privacy-policy")
+def privacy():
+    return _serve_frontend_html_file("privacy.html")
+
+
+@app.route("/terms.html")
+@app.route("/terms")
+@app.route("/terms-of-service")
+def terms():
+    return _serve_frontend_html_file("terms.html")
+
+
+@app.route("/disclosures.html")
+@app.route("/disclosures")
+@app.route("/legal")
+def disclosures():
+    return _serve_frontend_html_file("disclosures.html")
 
 
 @app.route("/<path:path>")
 def serve_static(path: str):
-    if path == "index.html":
-        return _serve_index_html()
+    if path in FRONTEND_HTML_PAGES:
+        return _serve_frontend_html_file(path)
     return send_from_directory(str(FRONTEND_DIR), path)
 
 

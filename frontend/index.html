@@ -631,6 +631,27 @@
       min-height: 20px;
     }
 
+    .auth-legal-note {
+      margin-top: 14px;
+      font-size: 11px;
+      line-height: 1.5;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-family: 'Space Mono', monospace;
+    }
+
+    .inline-legal-link {
+      color: var(--text-primary);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .inline-legal-link:hover,
+    .inline-legal-link:focus-visible {
+      color: #ffffff;
+    }
+
     .onboarding-modal {
       position: fixed;
       inset: 0;
@@ -649,6 +670,10 @@
       display: none;
     }
 
+    .tech-stack-modal {
+      z-index: 12100;
+    }
+
     .onboarding-dialog {
       width: min(1180px, calc(100vw - 48px));
       height: min(820px, calc(100vh - 72px));
@@ -661,6 +686,134 @@
       border-radius: 24px;
       overflow: hidden;
       box-shadow: 0 30px 80px rgba(0, 0, 0, 0.46);
+    }
+
+    .tech-stack-dialog {
+      width: min(980px, calc(100vw - 48px));
+      max-height: min(760px, calc(100vh - 72px));
+      margin: auto;
+      display: grid;
+      grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+      background: rgba(31, 35, 39, 0.98);
+      border: 1px solid rgba(116, 129, 141, 0.34);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.46);
+    }
+
+    .tech-stack-sidebar {
+      min-width: 0;
+      padding: 28px;
+      display: grid;
+      gap: 18px;
+      align-content: start;
+      background:
+        radial-gradient(circle at top left, rgba(230, 38, 0, 0.18), transparent 38%),
+        radial-gradient(circle at bottom right, rgba(72, 156, 212, 0.14), transparent 34%),
+        linear-gradient(180deg, rgba(41, 46, 51, 0.98), rgba(24, 27, 31, 0.98));
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .tech-stack-sidebar h2 {
+      font-size: 28px;
+      line-height: 1.05;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .tech-stack-sidebar p {
+      color: var(--text-secondary);
+    }
+
+    .tech-stack-chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tech-stack-chip {
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-secondary);
+      font-size: 11px;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .tech-stack-main {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      overflow: hidden;
+    }
+
+    .tech-stack-content {
+      min-width: 0;
+      min-height: 0;
+      padding: 32px;
+      display: grid;
+      gap: 18px;
+      overflow-y: auto;
+    }
+
+    .tech-stack-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .tech-stack-card {
+      padding: 18px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: grid;
+      gap: 10px;
+    }
+
+    .tech-stack-card-title {
+      font-size: 12px;
+      color: var(--orange);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .tech-stack-card-copy {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .tech-stack-list {
+      display: grid;
+      gap: 8px;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .tech-stack-list li {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .tech-stack-list strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .tech-stack-actions {
+      padding: 20px 32px 28px;
+      display: flex;
+      justify-content: flex-end;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      background: linear-gradient(180deg, rgba(26, 29, 33, 0.16), rgba(26, 29, 33, 0.42));
     }
 
     .onboarding-sidebar {
@@ -2234,47 +2387,57 @@
     }
 
     .site-footer {
-      margin-top: 18px;
-      padding: 18px 20px 24px;
-      border: 1px solid rgba(116, 129, 141, 0.22);
-      border-radius: 16px;
-      background: rgba(15, 18, 21, 0.72);
-      backdrop-filter: blur(8px);
+      position: fixed;
+      left: 50%;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%);
+      width: min(92vw, 920px);
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
       color: var(--text-muted);
-      position: relative;
-      z-index: 1;
-    }
-
-    .site-footer-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) auto;
-      gap: 14px 18px;
-      align-items: start;
-    }
-
-    .site-footer-title {
-      font-size: 12px;
-      letter-spacing: 1.8px;
+      z-index: 3;
+      text-align: center;
+      pointer-events: auto;
+      font-size: 11px;
+      line-height: 1.4;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
       font-family: 'Space Mono', monospace;
-      color: var(--text-secondary);
-      margin-bottom: 6px;
+      text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
     }
 
-    .site-footer-copy,
-    .site-footer-meta {
-      font-size: 13px;
-      line-height: 1.6;
+    .site-footer-copy {
+      white-space: normal;
     }
 
-    .site-footer-meta {
-      text-align: right;
+    .site-footer-link {
+      pointer-events: auto;
       white-space: nowrap;
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+      opacity: 0.92;
     }
 
-    .site-footer strong {
+    .site-footer-link:hover,
+    .site-footer-link:focus-visible {
+      opacity: 1;
       color: var(--text-primary);
-      font-weight: 600;
+    }
+
+    .site-footer-link:focus-visible {
+      outline: none;
     }
 
     @media (max-width: 640px) {
@@ -2284,7 +2447,8 @@
       }
 
       .auth-layout,
-      .onboarding-dialog {
+      .onboarding-dialog,
+      .tech-stack-dialog {
         grid-template-columns: 1fr;
       }
 
@@ -2312,6 +2476,11 @@
       }
 
       .onboarding-sidebar {
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .tech-stack-sidebar {
         border-right: none;
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       }
@@ -2425,17 +2594,23 @@
         grid-template-columns: 1fr;
       }
 
-      .site-footer {
-        padding: 16px 16px 20px;
+      .tech-stack-content {
+        padding: 24px 20px;
       }
 
-      .site-footer-grid {
+      .tech-stack-actions {
+        padding: 18px 20px 24px;
+      }
+
+      .tech-stack-grid {
         grid-template-columns: 1fr;
       }
 
-      .site-footer-meta {
-        text-align: left;
-        white-space: normal;
+      .site-footer {
+        width: calc(100vw - 24px);
+        bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        font-size: 10px;
+        letter-spacing: 0.05em;
       }
     }
   </style>
@@ -2771,6 +2946,7 @@
               <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Discord webhooks are saved under your own account.</span></li>
               <li class="auth-note-item"><span class="auth-note-bullet"></span><span>The onboarding guide will walk you through ZIP code, products, and your first scan.</span></li>
             </ul>
+            <div class="auth-legal-note">By continuing, you agree to the <a class="inline-legal-link" href="/terms" target="_blank" rel="noopener noreferrer">Terms</a> and acknowledge the <a class="inline-legal-link" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and <a class="inline-legal-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>.</div>
             <div id="auth-status-text" class="auth-status"></div>
           </div>
         </aside>
@@ -2808,6 +2984,58 @@
               <button class="btn btn-secondary" type="button" id="onboarding-jump-btn" data-action="onboarding-jump">Show me</button>
               <button class="btn btn-primary" type="button" id="onboarding-next-btn" data-action="onboarding-next">Next step</button>
             </div>
+          </div>
+        </section>
+      </div>
+    </div>
+    <div id="tech-stack-modal" class="onboarding-modal tech-stack-modal" hidden>
+      <div class="tech-stack-dialog" role="dialog" aria-modal="true" aria-labelledby="tech-stack-title">
+        <aside class="tech-stack-sidebar">
+          <div class="onboarding-kicker">Inside The Build</div>
+          <h2 id="tech-stack-title">What runs this dashboard.</h2>
+          <p>The app is intentionally simple: a static browser UI in front of a small Python service that handles auth, scheduling, persistence, scraping, and Discord notifications.</p>
+          <div class="tech-stack-chip-list" aria-label="Stack summary">
+            <span class="tech-stack-chip">HTML + CSS</span>
+            <span class="tech-stack-chip">Vanilla JS</span>
+            <span class="tech-stack-chip">Python</span>
+            <span class="tech-stack-chip">Flask</span>
+            <span class="tech-stack-chip">SQLite</span>
+            <span class="tech-stack-chip">APScheduler</span>
+            <span class="tech-stack-chip">Discord Webhooks</span>
+          </div>
+        </aside>
+        <section class="tech-stack-main">
+          <div class="tech-stack-content">
+            <div class="onboarding-step-meta">
+              <span>Architecture</span>
+              <span>Hosted Monitor</span>
+            </div>
+            <div class="tech-stack-grid">
+              <article class="tech-stack-card">
+                <div class="tech-stack-card-title">Frontend</div>
+                <div class="tech-stack-card-copy">Single-page dashboard built directly in <strong>HTML, CSS, and vanilla JavaScript</strong>. It also uses <strong>Google Identity Services</strong> for sign-in, <strong>Leaflet</strong> for map pins, and a small <strong>service worker + web manifest</strong> so it behaves like an installable PWA.</div>
+              </article>
+              <article class="tech-stack-card">
+                <div class="tech-stack-card-title">Backend</div>
+                <div class="tech-stack-card-copy">The backend is a small <strong>Python</strong> service powered by <strong>Flask</strong> with <strong>Flask-CORS</strong>. Production serving is set up for <strong>Gunicorn</strong>, and the scheduler work is handled inside Python instead of splitting into separate services.</div>
+              </article>
+              <article class="tech-stack-card">
+                <div class="tech-stack-card-title">Data + Jobs</div>
+                <div class="tech-stack-card-copy"><strong>SQLite</strong> stores users, per-account settings, tracked products, and check history. <strong>APScheduler</strong> runs recurring stock checks in the background for each signed-in account.</div>
+              </article>
+              <article class="tech-stack-card">
+                <div class="tech-stack-card-title">Inventory + Alerts</div>
+                <div class="tech-stack-card-copy">Product resolution and stock lookup use <strong>requests</strong>, <strong>BeautifulSoup</strong>, and <strong>lxml</strong>. When hits are found, the app pushes alerts through <strong>Discord webhooks</strong>.</div>
+              </article>
+            </div>
+            <ul class="tech-stack-list">
+              <li><strong>Auth:</strong> Google OAuth identity token verification on the backend with `google-auth`.</li>
+              <li><strong>API wiring:</strong> Runtime API origin is injected through `runtime-config.js`, so the same frontend can point at different environments.</li>
+              <li><strong>Why this stack:</strong> Lightweight to host, easy to debug, and fast to ship without needing a frontend framework bundle.</li>
+            </ul>
+          </div>
+          <div class="tech-stack-actions">
+            <button class="btn btn-secondary" type="button" data-action="close-tech-stack">Close</button>
           </div>
         </section>
       </div>
@@ -2853,14 +3081,14 @@
               aria-hidden="true"></span>
             Settings
           </button>
-          <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
-            <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
-              <path d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
-            </svg>
-            Install App
-          </button>
-          <button class="btn btn-secondary" id="guide-btn" type="button" data-action="open-onboarding">Guide</button>
-          <button class="btn btn-secondary" id="signout-btn" type="button" data-action="logout">Sign Out</button>
+              <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
+                <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
+                  <path d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
+                </svg>
+                Install App
+              </button>
+              <button class="btn btn-secondary" id="guide-btn" type="button" data-action="open-onboarding">Guide</button>
+              <button class="btn btn-secondary" id="signout-btn" type="button" data-action="logout">Sign Out</button>
         </div>
       </header>
 
@@ -3043,20 +3271,15 @@
       </div>
     </div>
     <footer class="site-footer" aria-label="Site footer">
-      <div class="site-footer-grid">
-        <div>
-          <div class="site-footer-title">Frub's Walgreens Watcher</div>
-          <div class="site-footer-copy">Copyright © <span id="footer-year">2026</span> <strong>Frub's Walgreens Watcher</strong>.</div>
-        </div>
-        <div>
-          <div class="site-footer-title">Disclaimer</div>
-          <div class="site-footer-copy">Independent monitoring dashboard for personal use. Walgreens is a trademark of its respective owner, and this project is not affiliated with or endorsed by Walgreens.</div>
-        </div>
-        <div class="site-footer-meta">
-          <div class="site-footer-title">Notes</div>
-          <div class="site-footer-copy">Hosted alerts, local-time results, and account-specific settings.</div>
-        </div>
-      </div>
+      <span class="site-footer-copy">© <span id="footer-year">2026</span> Frub's Walgreens Watcher • Independent project • Not affiliated with Walgreens</span>
+      <span aria-hidden="true">•</span>
+      <a class="site-footer-link" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>
+      <span aria-hidden="true">•</span>
+      <a class="site-footer-link" href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+      <span aria-hidden="true">•</span>
+      <a class="site-footer-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>
+      <span aria-hidden="true">•</span>
+      <button class="site-footer-link" type="button" data-action="open-tech-stack">Tech Stack</button>
     </footer>
     <script nonce="__CSP_NONCE__">
       let currentTab = 'results';
@@ -3463,6 +3686,16 @@
         setOnboardingFeedback(onboardingFeedback.message, onboardingFeedback.type);
       }
 
+      function syncModalBodyState() {
+        const onboardingModal = document.getElementById('onboarding-modal');
+        const techStackModal = document.getElementById('tech-stack-modal');
+        const hasOpenModal = Boolean(
+          (onboardingModal && !onboardingModal.hidden) ||
+          (techStackModal && !techStackModal.hidden)
+        );
+        document.body.classList.toggle('onboarding-open', hasOpenModal);
+      }
+
       function openOnboarding(reset = false) {
         if (!currentUser) return;
         if (reset) {
@@ -3477,7 +3710,7 @@
         const modal = ensureOnboardingModalRoot();
         if (modal) {
           modal.hidden = false;
-          document.body.classList.add('onboarding-open');
+          syncModalBodyState();
         }
       }
 
@@ -3486,7 +3719,7 @@
         if (modal) {
           modal.hidden = true;
         }
-        document.body.classList.remove('onboarding-open');
+        syncModalBodyState();
         onboardingBusy = false;
         onboardingFeedback = { message: '', type: 'info' };
         if (markComplete) {
@@ -3496,6 +3729,30 @@
 
       function ensureOnboardingModalRoot() {
         const modal = document.getElementById('onboarding-modal');
+        if (modal && modal.parentElement !== document.body) {
+          document.body.appendChild(modal);
+        }
+        return modal;
+      }
+
+      function openTechStackModal() {
+        const modal = ensureTechStackModalRoot();
+        if (modal) {
+          modal.hidden = false;
+          syncModalBodyState();
+        }
+      }
+
+      function closeTechStackModal() {
+        const modal = document.getElementById('tech-stack-modal');
+        if (modal) {
+          modal.hidden = true;
+        }
+        syncModalBodyState();
+      }
+
+      function ensureTechStackModalRoot() {
+        const modal = document.getElementById('tech-stack-modal');
         if (modal && modal.parentElement !== document.body) {
           document.body.appendChild(modal);
         }
@@ -4214,6 +4471,12 @@
           case 'close-onboarding':
             closeOnboarding(actionElement.dataset.markComplete === 'true');
             return;
+          case 'open-tech-stack':
+            openTechStackModal();
+            return;
+          case 'close-tech-stack':
+            closeTechStackModal();
+            return;
           case 'onboarding-back':
             goToOnboardingStep(-1);
             return;
@@ -4593,6 +4856,7 @@
           footerYear.textContent = String(new Date().getFullYear());
         }
         ensureOnboardingModalRoot();
+        ensureTechStackModalRoot();
         renderCachedState();
         initializePokemonBackgroundControls();
         if (window.matchMedia) {
@@ -4625,8 +4889,14 @@
         }
 
         if (event.key !== 'Escape') return;
-        const modal = document.getElementById('onboarding-modal');
-        if (!modal || modal.hidden) return;
+        const techStackModal = document.getElementById('tech-stack-modal');
+        if (techStackModal && !techStackModal.hidden) {
+          closeTechStackModal();
+          return;
+        }
+
+        const onboardingModal = document.getElementById('onboarding-modal');
+        if (!onboardingModal || onboardingModal.hidden) return;
         closeOnboarding(false);
       });
 
@@ -4637,9 +4907,15 @@
           return;
         }
 
-        const modal = document.getElementById('onboarding-modal');
-        if (!modal || modal.hidden) return;
-        if (event.target === modal) {
+        const techStackModal = document.getElementById('tech-stack-modal');
+        if (techStackModal && !techStackModal.hidden && event.target === techStackModal) {
+          closeTechStackModal();
+          return;
+        }
+
+        const onboardingModal = document.getElementById('onboarding-modal');
+        if (!onboardingModal || onboardingModal.hidden) return;
+        if (event.target === onboardingModal) {
           closeOnboarding(false);
         }
       });
