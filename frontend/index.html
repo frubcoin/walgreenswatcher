@@ -416,7 +416,7 @@
         linear-gradient(132deg, rgba(255, 255, 255, 0.05), transparent 36%),
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 34%),
         linear-gradient(180deg, rgba(12, 14, 18, 0.08), rgba(12, 14, 18, 0.26));
-      opacity: 0.26;
+    opacity: 0.15;
       filter: brightness(0) invert(1) contrast(0.9);
       pointer-events: none;
       z-index: 0;
@@ -618,6 +618,7 @@
 
     .onboarding-dialog {
       width: min(1180px, calc(100vw - 48px));
+      height: min(820px, calc(100vh - 72px));
       max-height: min(820px, calc(100vh - 72px));
       margin: auto;
       display: grid;
@@ -2188,6 +2189,7 @@
       }
 
       .onboarding-dialog {
+        height: calc(100vh - 24px);
         max-height: calc(100vh - 24px);
       }
 
