@@ -10,6 +10,10 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="/runtime-config.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     *,
     *::before,
@@ -284,6 +288,105 @@
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
+    }
+
+    .auth-gate {
+      margin-top: 18px;
+      padding: 32px 28px;
+      background: rgba(38, 42, 47, 0.96);
+      border: 1px solid rgba(116, 129, 141, 0.34);
+      border-radius: 18px;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(8px);
+    }
+
+    .auth-gate[hidden] {
+      display: none;
+    }
+
+    .auth-card {
+      max-width: 520px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .auth-eyebrow {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .auth-title {
+      font-size: clamp(26px, 4vw, 38px);
+      font-weight: 700;
+      line-height: 1.1;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .auth-copy {
+      color: var(--text-secondary);
+      max-width: 46ch;
+    }
+
+    .auth-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .auth-status {
+      font-size: 13px;
+      color: var(--text-muted);
+      min-height: 20px;
+    }
+
+    .user-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      min-height: 44px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 13px;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .user-pill[hidden] {
+      display: none;
+    }
+
+    .user-pill img {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .user-pill-text {
+      display: grid;
+      gap: 2px;
+      line-height: 1.1;
+    }
+
+    .user-pill-name {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    .user-pill-email {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      text-transform: none;
     }
 
     .btn {
@@ -743,6 +846,250 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
+    }
+
+    .results-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .results-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.03);
+      flex-wrap: wrap;
+    }
+
+    .results-toolbar-copy {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .results-toolbar-title {
+      font-size: 13px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: var(--text-primary);
+    }
+
+    .results-toolbar-subtitle {
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .results-view-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .results-view-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+
+    .results-view-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .results-view-btn.active {
+      background: var(--accent);
+      color: var(--accent-contrast);
+    }
+
+    .results-view {
+      display: none;
+    }
+
+    .results-view.active {
+      display: block;
+    }
+
+    .results-map-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.95fr);
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .results-map-card,
+    .results-map-sidebar {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .results-map-card {
+      height: 520px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .results-map-canvas {
+      flex: 1;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .results-map-sidebar {
+      display: flex;
+      flex-direction: column;
+      height: 520px;
+    }
+
+    .results-map-sidebar-head {
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .results-map-sidebar-title {
+      font-size: 13px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text-primary);
+    }
+
+    .results-map-sidebar-subtitle {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .results-map-note {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(72, 156, 212, 0.12);
+      border: 1px solid rgba(72, 156, 212, 0.24);
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .results-map-list {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: auto;
+    }
+
+    .results-map-item {
+      width: 100%;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      color: inherit;
+      cursor: pointer;
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .results-map-item:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent-soft-border);
+      transform: translateY(-1px);
+    }
+
+    .results-map-item.is-active {
+      background: var(--accent-soft);
+      border-color: var(--accent-soft-border);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    .results-map-item-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .results-map-item-address {
+      margin-top: 6px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+    }
+
+    .results-map-item-meta,
+    .results-map-item-products {
+      margin-top: 8px;
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+    }
+
+    .leaflet-container {
+      background: #1f2327;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    .leaflet-popup-content-wrapper,
+    .leaflet-popup-tip {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      box-shadow: 0 14px 28px rgba(0, 0, 0, 0.36);
+    }
+
+    .leaflet-popup-content {
+      margin: 14px 16px;
+    }
+
+    .map-popup-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .map-popup-address {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    .map-popup-meta {
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .map-popup-products {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-secondary);
     }
 
     .result-card {
@@ -1242,6 +1589,31 @@
     }
 
     @media (max-width: 640px) {
+      .results-toolbar {
+        align-items: stretch;
+      }
+
+      .results-view-switch {
+        width: 100%;
+        justify-content: stretch;
+      }
+
+      .results-view-btn {
+        flex: 1;
+        text-align: center;
+      }
+
+      .results-map-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .results-map-card,
+      .results-map-sidebar,
+      .results-map-canvas {
+        height: 360px;
+        min-height: 0;
+      }
+
       .product-item {
         align-items: flex-start;
         flex-direction: column;
@@ -1295,202 +1667,6 @@
       }
     }
   </style>
-  <script>
-    const DEFAULT_POKEMON_BACKGROUND_THEME = 'gyra';
-    const DEFAULT_POKEMON_BACKGROUND_ENABLED = false;
-    const DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645;
-    const MIN_POKEMON_BACKGROUND_TILE_SIZE = 200;
-    const MAX_POKEMON_BACKGROUND_TILE_SIZE = 1200;
-    const DEFAULT_THEME_TOKENS = {
-      accent: '#e62600',
-      accentHover: '#c61f00',
-      accentContrast: '#f4f7f9',
-      accentRing: 'rgba(72,156,212,0.16)',
-      accentSoft: 'rgba(72,156,212,0.12)',
-      accentSoftBorder: 'rgba(72,156,212,0.45)',
-      border: 'rgba(72,156,212,0.18)',
-      borderGlow: 'rgba(230,38,0,0.35)'
-    };
-    const POKEMON_BACKGROUNDS = [
-      { value: 'gyra', label: 'Gyarados', file: 'gyra.webp', size: '645px auto', opacity: '1', accent: '#1c98ce' },
-      { value: 'ancient', label: 'Ancient', file: 'ancient.webp', size: '645px auto', opacity: '1', accent: '#d67d39' },
-      { value: 'bee', label: 'Bee', file: 'bee.webp', size: '645px auto', opacity: '1', accent: '#d6bf2c' },
-      { value: 'bulba', label: 'Bulbasaur', file: 'bulba.webp', size: '645px auto', opacity: '1', accent: '#66b88b' },
-      { value: 'charmander', label: 'Charmander', file: 'charmander.webp', size: '645px auto', opacity: '1', accent: '#ec9633' },
-      { value: 'eevee', label: 'Eevee', file: 'eevee.webp', size: '645px auto', opacity: '1', accent: '#cf9140' },
-      { value: 'graveler', label: 'Graveler', file: 'graveler.webp', size: '645px auto', opacity: '1', accent: '#87939b' },
-      { value: 'gx5YNZ3', label: 'GX Pattern', file: 'gx5YNZ3.webp', size: '645px auto', opacity: '1', accent: '#f0d64c' },
-      { value: 'karp', label: 'Magikarp', file: 'karp.webp', size: '645px auto', opacity: '1', accent: '#ee6a3e' },
-      { value: 'pattern1', label: 'Pattern 1', file: 'pattern1.webp', size: '645px auto', opacity: '1', accent: '#f0c74a' },
-      { value: 'pika', label: 'Pikachu', file: 'pika.webp', size: '645px auto', opacity: '1', accent: '#f1dc43' },
-      { value: 'poli', label: 'Poliwhirl', file: 'poli.webp', size: '645px auto', opacity: '1', accent: '#56b2f5' },
-      { value: 'ponyta', label: 'Ponyta', file: 'ponyta.webp', size: '645px auto', opacity: '1', accent: '#ff9508' },
-      { value: 'puff', label: 'Jigglypuff', file: 'puff.webp', size: '645px auto', opacity: '1', accent: '#ff93a8' },
-      { value: 'rat', label: 'Raticate', file: 'rat.webp', size: '645px auto', opacity: '1', accent: '#c98b47' },
-      { value: 'slowpoke', label: 'Slowpoke', file: 'slowpoke.webp', size: '645px auto', opacity: '1', accent: '#e59486' },
-      { value: 'slowpoke2', label: 'Slowbro', file: 'slowbro.webp', size: '645px auto', opacity: '1', accent: '#c18457' },
-      { value: 'squirtle', label: 'Squirtle', file: 'squirtle.webp', size: '645px auto', opacity: '1', accent: '#68b5d3' },
-      { value: 'vulpix', label: 'Vulpix', file: 'vulpix.webp', size: '645px auto', opacity: '1', accent: '#d3b088' },
-      { value: 'western', label: 'Western', file: 'western.webp', size: '645px auto', opacity: '1', accent: '#9a8266' }
-    ];
-
-    function getPokemonBackground(theme = DEFAULT_POKEMON_BACKGROUND_THEME) {
-      return POKEMON_BACKGROUNDS.find(background => background.value === theme) || POKEMON_BACKGROUNDS[0];
-    }
-
-    function getPokemonBackgroundUrl(filename) {
-      return `/${encodeURIComponent('bg')}/${encodeURIComponent(filename)}`;
-    }
-
-    function clampChannel(value) {
-      return Math.max(0, Math.min(255, Math.round(value)));
-    }
-
-    function hexToRgb(hex) {
-      const normalized = hex.replace('#', '');
-      if (normalized.length !== 6) return null;
-      return {
-        r: parseInt(normalized.slice(0, 2), 16),
-        g: parseInt(normalized.slice(2, 4), 16),
-        b: parseInt(normalized.slice(4, 6), 16)
-      };
-    }
-
-    function rgbToHex({ r, g, b }) {
-      return `#${[r, g, b].map(channel => clampChannel(channel).toString(16).padStart(2, '0')).join('')}`;
-    }
-
-    function mixRgb(source, target, amount) {
-      return {
-        r: source.r + ((target.r - source.r) * amount),
-        g: source.g + ((target.g - source.g) * amount),
-        b: source.b + ((target.b - source.b) * amount)
-      };
-    }
-
-    function rgbaString(rgb, alpha) {
-      return `rgba(${clampChannel(rgb.r)},${clampChannel(rgb.g)},${clampChannel(rgb.b)},${alpha})`;
-    }
-
-    function getContrastColor(rgb) {
-      const luminance = ((0.2126 * rgb.r) + (0.7152 * rgb.g) + (0.0722 * rgb.b)) / 255;
-      return luminance > 0.66 ? '#1f252b' : '#f4f7f9';
-    }
-
-    function createBackgroundThemeTokens(accentHex) {
-      const accentRgb = hexToRgb(accentHex);
-      if (!accentRgb) return DEFAULT_THEME_TOKENS;
-
-      return {
-        accent: accentHex,
-        accentHover: rgbToHex(mixRgb(accentRgb, { r: 18, g: 22, b: 27 }, 0.18)),
-        accentContrast: getContrastColor(accentRgb),
-        accentRing: rgbaString(accentRgb, 0.2),
-        accentSoft: rgbaString(accentRgb, 0.12),
-        accentSoftBorder: rgbaString(accentRgb, 0.42),
-        border: rgbaString(accentRgb, 0.2),
-        borderGlow: rgbaString(accentRgb, 0.35)
-      };
-    }
-
-    function applyAccentTheme(tokens = DEFAULT_THEME_TOKENS) {
-      const root = document.documentElement;
-      root.style.setProperty('--accent', tokens.accent);
-      root.style.setProperty('--accent-hover', tokens.accentHover);
-      root.style.setProperty('--accent-contrast', tokens.accentContrast);
-      root.style.setProperty('--accent-ring', tokens.accentRing);
-      root.style.setProperty('--accent-soft', tokens.accentSoft);
-      root.style.setProperty('--accent-soft-border', tokens.accentSoftBorder);
-      root.style.setProperty('--border', tokens.border);
-      root.style.setProperty('--border-glow', tokens.borderGlow);
-    }
-
-    function setPokemonBackgroundSelectState() {
-      const enabledInput = document.getElementById('cfg-pokemon-bg-enabled');
-      const themeInput = document.getElementById('cfg-pokemon-bg-theme');
-      const sizeInput = document.getElementById('cfg-pokemon-bg-size');
-      if (!enabledInput || !themeInput || !sizeInput) return;
-      const disabled = !enabledInput.checked;
-      themeInput.disabled = disabled;
-      sizeInput.disabled = disabled;
-    }
-
-    function normalizePokemonBackgroundTileSize(tileSize = DEFAULT_POKEMON_BACKGROUND_TILE_SIZE) {
-      const parsed = Number(tileSize);
-      if (!Number.isFinite(parsed)) return DEFAULT_POKEMON_BACKGROUND_TILE_SIZE;
-      return Math.max(MIN_POKEMON_BACKGROUND_TILE_SIZE, Math.min(MAX_POKEMON_BACKGROUND_TILE_SIZE, Math.round(parsed)));
-    }
-
-    function updatePokemonBackgroundSizeLabel(tileSize = DEFAULT_POKEMON_BACKGROUND_TILE_SIZE) {
-      const sizeLabel = document.getElementById('cfg-pokemon-bg-size-value');
-      if (sizeLabel) {
-        sizeLabel.textContent = `${normalizePokemonBackgroundTileSize(tileSize)}px`;
-      }
-    }
-
-    function applyPokemonBackgroundSettings({
-      enabled = DEFAULT_POKEMON_BACKGROUND_ENABLED,
-      theme = DEFAULT_POKEMON_BACKGROUND_THEME,
-      tileSize = DEFAULT_POKEMON_BACKGROUND_TILE_SIZE,
-      syncControls = true
-    } = {}) {
-      const background = getPokemonBackground(theme);
-      const enabledInput = document.getElementById('cfg-pokemon-bg-enabled');
-      const themeInput = document.getElementById('cfg-pokemon-bg-theme');
-      const sizeInput = document.getElementById('cfg-pokemon-bg-size');
-      const normalizedTileSize = normalizePokemonBackgroundTileSize(tileSize);
-
-      if (syncControls) {
-        if (enabledInput) enabledInput.checked = Boolean(enabled);
-        if (themeInput) themeInput.value = background.value;
-        if (sizeInput) sizeInput.value = String(normalizedTileSize);
-        updatePokemonBackgroundSizeLabel(normalizedTileSize);
-        setPokemonBackgroundSelectState();
-      }
-
-      document.documentElement.classList.toggle('pokemon-bg-enabled', Boolean(enabled));
-      document.documentElement.style.setProperty('--pokemon-bg-image', `url("${getPokemonBackgroundUrl(background.file)}")`);
-      document.documentElement.style.setProperty('--pokemon-bg-size', `${normalizedTileSize}px auto`);
-      document.documentElement.style.setProperty('--pokemon-bg-opacity', background.opacity || '1');
-      applyAccentTheme(enabled ? createBackgroundThemeTokens(background.accent) : DEFAULT_THEME_TOKENS);
-
-      try {
-        localStorage.setItem('local_theme_prefs', JSON.stringify({
-          enabled: Boolean(enabled),
-          theme: background.value,
-          tileSize: normalizedTileSize
-        }));
-      } catch (e) { }
-    }
-
-    try {
-      let themeToApply = null;
-      try {
-        const localPrefs = JSON.parse(localStorage.getItem('local_theme_prefs'));
-        if (localPrefs && typeof localPrefs.enabled !== 'undefined') {
-          themeToApply = localPrefs;
-        }
-      } catch (e) { }
-
-      if (!themeToApply) {
-        const statusData = JSON.parse(localStorage.getItem('cached_api_status'));
-        if (statusData && statusData.status) {
-          themeToApply = {
-            enabled: statusData.status.pokemon_background_enabled ?? DEFAULT_POKEMON_BACKGROUND_ENABLED,
-            theme: statusData.status.pokemon_background_theme || DEFAULT_POKEMON_BACKGROUND_THEME,
-            tileSize: statusData.status.pokemon_background_tile_size ?? DEFAULT_POKEMON_BACKGROUND_TILE_SIZE
-          };
-        }
-      }
-
-      if (themeToApply) {
-        applyPokemonBackgroundSettings({
-          ...themeToApply,
-          syncControls: false
-        });
-      }
-    } catch (e) { console.error('Failed to pre-load theme cache', e); }
-  </script>
 </head>
 
 <body>
@@ -1723,7 +1899,18 @@
   </script>
   <div id="toast-container"></div>
   <div class="wrapper">
-    <div class="app-window">
+    <div id="auth-gate" class="auth-gate">
+      <div class="auth-card">
+        <div class="auth-eyebrow">Hosted Mode</div>
+        <div class="auth-title">Sign in to your Walgreens watcher</div>
+        <div class="auth-copy">Each Google account gets its own settings, tracked products, scan history, and scheduler state on your VPS.</div>
+        <div class="auth-actions">
+          <div id="google-signin-button"></div>
+        </div>
+        <div id="auth-status-text" class="auth-status"></div>
+      </div>
+    </div>
+    <div class="app-window" id="app-shell" hidden>
       <header>
         <div class="logo">
           <div class="logo-icon">
@@ -1735,6 +1922,13 @@
           </div>
         </div>
         <div class="header-actions">
+          <div class="user-pill" id="user-pill" hidden>
+            <img id="user-pill-avatar" src="/frubgreens.webp" alt="User avatar">
+            <div class="user-pill-text">
+              <span class="user-pill-name" id="user-pill-name">Signed in</span>
+              <span class="user-pill-email" id="user-pill-email"></span>
+            </div>
+          </div>
           <button class="btn btn-secondary start-scheduler-btn" onclick="startScheduler()">
             <span class="btn-icon" style="-webkit-mask-image: url('/power.webp'); mask-image: url('/power.webp');"
               aria-hidden="true"></span>
@@ -1755,6 +1949,7 @@
               aria-hidden="true"></span>
             <span id="check-btn-text">Check Now</span>
           </button>
+          <button class="btn btn-secondary" id="signout-btn" onclick="logoutUser()">Sign Out</button>
         </div>
       </header>
 
@@ -1941,8 +2136,186 @@
       let currentTab = 'results';
       let isStatusRefreshInFlight = false;
       let lastResultsSignature = '';
+      let currentResultsView = 'cards';
+      let latestRenderedResults = null;
+      let resultsMap = null;
+      let resultsMapMarkers = [];
+      let resultsMapMarkersByKey = new Map();
+      let activeResultsMapKey = null;
       let trackedProductsCache = [];
       let editingProductId = null;
+      let currentUser = null;
+      let authState = null;
+      let statusRefreshTimer = null;
+      let googleButtonRendered = false;
+
+      const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
+      const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
+
+      function normalizeApiBase(value) {
+        const normalized = String(value || '').trim();
+        if (!normalized) return '';
+        return normalized.replace(/\/+$/, '');
+      }
+
+      function apiUrl(path) {
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        return `${API_BASE}${normalizedPath}`;
+      }
+
+      function stopStatusPolling() {
+        if (statusRefreshTimer) {
+          clearInterval(statusRefreshTimer);
+          statusRefreshTimer = null;
+        }
+      }
+
+      function startStatusPolling() {
+        stopStatusPolling();
+        statusRefreshTimer = setInterval(() => {
+          if (currentUser) {
+            loadStatus();
+          }
+        }, 5000);
+      }
+
+      function updateAuthStatus(message = '') {
+        const statusNode = document.getElementById('auth-status-text');
+        if (statusNode) {
+          statusNode.textContent = message;
+        }
+      }
+
+      async function waitForGoogleIdentity(maxMs = 10000) {
+        const startedAt = Date.now();
+        while (!window.google?.accounts?.id) {
+          if ((Date.now() - startedAt) >= maxMs) {
+            return false;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return true;
+      }
+
+      function renderGoogleSignInButton(clientId) {
+        const container = document.getElementById('google-signin-button');
+        if (!container) return;
+
+        if (!clientId) {
+          container.innerHTML = '';
+          updateAuthStatus('Add your Google web client ID to the backend before signing in.');
+          return;
+        }
+
+        if (!window.google?.accounts?.id) {
+          updateAuthStatus('Loading Google sign-in...');
+          return;
+        }
+
+        container.innerHTML = '';
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredentialResponse,
+          auto_select: false
+        });
+        window.google.accounts.id.renderButton(container, {
+          theme: 'outline',
+          size: 'large',
+          shape: 'rectangular',
+          text: 'continue_with',
+          width: 280
+        });
+        googleButtonRendered = true;
+        updateAuthStatus('');
+      }
+
+      function setAuthenticatedUi(isAuthenticated) {
+        const authGate = document.getElementById('auth-gate');
+        const appShell = document.getElementById('app-shell');
+        if (authGate) authGate.hidden = isAuthenticated;
+        if (appShell) appShell.hidden = !isAuthenticated;
+      }
+
+      function updateCurrentUserDisplay(user) {
+        const pill = document.getElementById('user-pill');
+        const avatar = document.getElementById('user-pill-avatar');
+        const name = document.getElementById('user-pill-name');
+        const email = document.getElementById('user-pill-email');
+
+        if (!pill || !avatar || !name || !email) return;
+
+        if (!user) {
+          pill.hidden = true;
+          return;
+        }
+
+        pill.hidden = false;
+        avatar.src = user.picture || '/frubgreens.webp';
+        avatar.alt = user.name ? `${user.name} avatar` : 'User avatar';
+        name.textContent = user.name || 'Signed in';
+        email.textContent = user.email || '';
+      }
+
+      async function handleGoogleCredentialResponse(response) {
+        if (!response?.credential) {
+          updateAuthStatus('Google sign-in did not return a credential.');
+          return;
+        }
+
+        updateAuthStatus('Verifying Google sign-in...');
+        const result = await apiCall('/api/auth/google', 'POST', { credential: response.credential }, { allowUnauthorized: true });
+        if (!result || !result.authenticated) {
+          updateAuthStatus('Google sign-in failed. Check your backend Google client ID and allowed origins.');
+          return;
+        }
+
+        await hydrateAuthenticatedSession(result);
+      }
+
+      async function hydrateAuthenticatedSession(sessionPayload = null) {
+        const payload = sessionPayload || await apiCall('/api/auth/session', 'GET', null, { allowUnauthorized: true });
+        authState = payload;
+        currentUser = payload?.user || null;
+        updateCurrentUserDisplay(currentUser);
+
+        if (!currentUser) {
+          stopStatusPolling();
+          setAuthenticatedUi(false);
+          if (payload?.google_client_id) {
+            const googleReady = await waitForGoogleIdentity();
+            if (googleReady) {
+              renderGoogleSignInButton(payload.google_client_id);
+            } else {
+              updateAuthStatus('Google sign-in did not finish loading. Refresh and try again.');
+            }
+          } else {
+            updateAuthStatus('Add your Google client ID to the backend and then refresh this page.');
+          }
+          return false;
+        }
+
+        setAuthenticatedUi(true);
+        updateAuthStatus('');
+        await loadSettings();
+        await loadStatus();
+        startStatusPolling();
+        return true;
+      }
+
+      async function logoutUser() {
+        await apiCall('/api/auth/logout', 'POST', {}, { allowUnauthorized: true, suppressAuthRedirect: true });
+        currentUser = null;
+        authState = null;
+        stopStatusPolling();
+        localStorage.removeItem('cached_api_status');
+        localStorage.removeItem('cached_api_last_check');
+        updateCurrentUserDisplay(null);
+        setAuthenticatedUi(false);
+        const sessionPayload = await apiCall('/api/auth/session', 'GET', null, { allowUnauthorized: true, suppressAuthRedirect: true });
+        authState = sessionPayload;
+        renderGoogleSignInButton(sessionPayload?.google_client_id || '');
+        updateAuthStatus('Signed out.');
+      }
 
       async function persistPokemonBackgroundSettings() {
         const enabledInput = document.getElementById('cfg-pokemon-bg-enabled');
@@ -2172,6 +2545,256 @@
           : 'Distance unavailable';
       }
 
+      function normalizeCoordinate(value) {
+        const coordinate = Number(value);
+        return Number.isFinite(coordinate) ? coordinate : null;
+      }
+
+      function buildResultsMapLocations(products = {}) {
+        const storeMap = new Map();
+        let missingCoordinates = 0;
+
+        Object.values(products || {}).forEach(product => {
+          const productName = String(product.product_name || 'Tracked product').trim();
+          const stores = Array.isArray(product.stores) ? product.stores : [];
+
+          stores.forEach(store => {
+            const latitude = normalizeCoordinate(store.latitude);
+            const longitude = normalizeCoordinate(store.longitude);
+
+            if (latitude === null || longitude === null) {
+              missingCoordinates += 1;
+              return;
+            }
+
+            const storeKey = String(store.store_id || `${latitude},${longitude}`);
+            if (!storeMap.has(storeKey)) {
+              storeMap.set(storeKey, {
+                location_key: storeKey,
+                store_id: store.store_id || '',
+                name: store.name || 'Walgreens',
+                address: store.address || 'Address unavailable',
+                distance: typeof store.distance === 'number' ? store.distance : Number(store.distance),
+                latitude,
+                longitude,
+                total_inventory: 0,
+                products: []
+              });
+            }
+
+            const location = storeMap.get(storeKey);
+            const inventoryCount = Number(store.inventory_count || 0);
+            location.total_inventory += Number.isFinite(inventoryCount) ? inventoryCount : 0;
+            location.products.push({
+              name: productName,
+              inventory_count: Number.isFinite(inventoryCount) ? inventoryCount : 0
+            });
+          });
+        });
+
+        const locations = Array.from(storeMap.values())
+          .map(location => ({
+            ...location,
+            product_count: location.products.length,
+            distance: Number.isFinite(location.distance) ? location.distance : null,
+            products_label: location.products.map(product => product.name).join(', ')
+          }))
+          .sort((a, b) => {
+            if (a.distance === null && b.distance === null) return b.total_inventory - a.total_inventory;
+            if (a.distance === null) return 1;
+            if (b.distance === null) return -1;
+            return a.distance - b.distance;
+          });
+
+        return { locations, missingCoordinates };
+      }
+
+      function destroyResultsMap() {
+        resultsMapMarkers = [];
+        resultsMapMarkersByKey = new Map();
+        activeResultsMapKey = null;
+        if (!resultsMap) return;
+        resultsMap.remove();
+        resultsMap = null;
+      }
+
+      function renderMapPopup(location) {
+        const productsHtml = location.products.map(product => `
+          <div>${escapeHtml(product.name)} <strong>${Number(product.inventory_count || 0)}</strong></div>
+        `).join('');
+
+        return `
+          <div class="map-popup-title">${escapeHtml(location.name)}</div>
+          <div class="map-popup-address">${escapeHtml(location.address)}</div>
+          <div class="map-popup-meta">${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
+          <div class="map-popup-products">${productsHtml}</div>
+        `;
+      }
+
+      function setActiveResultsMapItem(locationKey) {
+        activeResultsMapKey = locationKey || null;
+        document.querySelectorAll('.results-map-item').forEach(item => {
+          item.classList.toggle('is-active', item.dataset.locationKey === activeResultsMapKey);
+        });
+      }
+
+      function focusResultsMapMarker(locationKey) {
+        const marker = resultsMapMarkersByKey.get(locationKey);
+        if (!resultsMap || !marker) return;
+
+        resultsMap.invalidateSize();
+        const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
+        resultsMap.setView(marker.getLatLng(), Math.max(currentZoom, 14), { animate: true });
+        marker.openPopup();
+        setActiveResultsMapItem(locationKey);
+      }
+
+      function focusResultsMapMarkerByElement(element) {
+        const locationKey = element?.dataset?.locationKey;
+        if (!locationKey) return;
+        focusResultsMapMarker(locationKey);
+      }
+
+      function renderResultsMap(locations = []) {
+        const mapElement = document.getElementById('results-map');
+        if (!mapElement || typeof L === 'undefined') return;
+
+        destroyResultsMap();
+
+        resultsMap = L.map(mapElement, {
+          zoomControl: true,
+          scrollWheelZoom: true
+        });
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          subdomains: 'abcd',
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+          maxZoom: 19
+        }).addTo(resultsMap);
+
+        const bounds = [];
+        resultsMapMarkersByKey = new Map();
+        resultsMapMarkers = locations.map(location => {
+          const marker = L.circleMarker([location.latitude, location.longitude], {
+            radius: 9,
+            color: '#f37520',
+            weight: 2,
+            fillColor: '#489cd4',
+            fillOpacity: 0.92
+          }).addTo(resultsMap);
+
+          marker.bindPopup(renderMapPopup(location));
+          marker.on('click', () => setActiveResultsMapItem(location.location_key));
+          marker.on('popupopen', () => setActiveResultsMapItem(location.location_key));
+          bounds.push([location.latitude, location.longitude]);
+          resultsMapMarkersByKey.set(location.location_key, marker);
+          return marker;
+        });
+
+        if (bounds.length === 1) {
+          resultsMap.setView(bounds[0], 13);
+        } else if (bounds.length > 1) {
+          resultsMap.fitBounds(bounds, { padding: [32, 32] });
+        } else {
+          resultsMap.setView([33.4484, -112.0740], 10);
+        }
+
+        setTimeout(() => {
+          if (resultsMap) {
+            resultsMap.invalidateSize();
+            if (locations.length) {
+              setActiveResultsMapItem(activeResultsMapKey || locations[0].location_key);
+            }
+          }
+        }, 0);
+      }
+
+      function renderResultsMapList(locations = []) {
+        if (!locations.length) {
+          return `
+            <div class="empty-state">
+              <div class="empty-title">Map unavailable</div>
+              <div class="empty-text">Run a fresh successful scan to capture mappable store coordinates.</div>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="results-map-list">
+            ${locations.map((location, index) => `
+              <button class="results-map-item ${activeResultsMapKey === location.location_key ? 'is-active' : ''}" type="button" data-location-key="${escapeHtml(location.location_key)}" onclick="focusResultsMapMarkerByElement(this)">
+                <div class="results-map-item-title">${escapeHtml(location.name)}</div>
+                <div class="results-map-item-address">${escapeHtml(location.address)}</div>
+                <div class="results-map-item-meta">${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
+                <div class="results-map-item-products">${escapeHtml(location.products_label)}</div>
+              </button>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      function renderResultsContent(data, configuredZip = '85209') {
+        latestRenderedResults = { data, configuredZip };
+        const checkResult = data.check_result || {};
+        const products = data.products_found || {};
+        const total = checkResult.total_stores_checked || data.total_stores_checked || 0;
+        const timestamp = data.timestamp || checkResult.timestamp;
+        const productCount = Object.keys(products).length;
+        const mapData = buildResultsMapLocations(products);
+
+        if (currentResultsView === 'map' && !mapData.locations.length) {
+          currentResultsView = 'cards';
+        }
+
+        const cardsHtml = Object.entries(products).map(([, product]) => renderResultCard(product, configuredZip)).join('');
+        const formattedDate = timestamp ? new Date(timestamp).toLocaleString() : 'Latest successful scan';
+
+        document.getElementById('results-container').innerHTML = `
+          <div class="results-shell">
+            <div class="results-toolbar">
+              <div class="results-toolbar-copy">
+                <div class="results-toolbar-title">Successful Scan Snapshot</div>
+                <div class="results-toolbar-subtitle">${productCount} product${productCount === 1 ? '' : 's'} hit across ${mapData.locations.length} mapped location${mapData.locations.length === 1 ? '' : 's'} after checking ${total} store${total === 1 ? '' : 's'}${timestamp ? ` on ${formattedDate}` : ''}.</div>
+              </div>
+              <div class="results-view-switch" role="tablist" aria-label="Results view">
+                <button class="results-view-btn ${currentResultsView === 'cards' ? 'active' : ''}" type="button" onclick="setResultsView('cards')">Cards</button>
+                <button class="results-view-btn ${currentResultsView === 'map' ? 'active' : ''}" type="button" onclick="setResultsView('map')" ${mapData.locations.length ? '' : 'disabled title="Run a new successful scan to enable map pins"'}>Map</button>
+              </div>
+            </div>
+            <div class="results-view ${currentResultsView === 'cards' ? 'active' : ''}" id="results-view-cards">
+              <div class="results-stack">${cardsHtml}</div>
+            </div>
+            <div class="results-view ${currentResultsView === 'map' ? 'active' : ''}" id="results-view-map">
+              <div class="results-map-shell">
+                <div class="results-map-card">
+                  <div class="results-map-canvas" id="results-map"></div>
+                </div>
+                <aside class="results-map-sidebar">
+                  <div class="results-map-sidebar-head">
+                    <div class="results-map-sidebar-title">Pinned Store View</div>
+                    <div class="results-map-sidebar-subtitle">Tap a store to jump the map and open its stock summary.</div>
+                    ${mapData.missingCoordinates ? `<div class="results-map-note">${mapData.missingCoordinates} stocked store result${mapData.missingCoordinates === 1 ? '' : 's'} from older cache data could not be pinned yet.</div>` : ''}
+                  </div>
+                  ${renderResultsMapList(mapData.locations)}
+                </aside>
+              </div>
+            </div>
+          </div>
+        `;
+
+        if (currentResultsView === 'map' && mapData.locations.length) {
+          renderResultsMap(mapData.locations);
+        } else {
+          destroyResultsMap();
+        }
+      }
+
+      function setResultsView(view) {
+        currentResultsView = view === 'map' ? 'map' : 'cards';
+        if (!latestRenderedResults) return;
+        renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
+      }
+
       function buildDirectionsUrl(address) {
         const normalizedAddress = String(address || '').trim();
         return normalizedAddress
@@ -2295,13 +2918,7 @@
             const products = checkData.products_found || {};
             if (Object.keys(products).length > 0) {
               const configuredZip = statusData?.status?.current_zipcode || '85209';
-              let html = '<div class="results-stack">';
-              for (const [pid, product] of Object.entries(products)) {
-                html += renderResultCard(product, configuredZip);
-              }
-              html += '</div>';
-              const resultsContainer = document.getElementById('results-container');
-              if (resultsContainer) resultsContainer.innerHTML = html;
+              renderResultsContent(checkData, configuredZip);
               lastResultsSignature = buildResultsSignature(checkData);
             }
           }
@@ -2313,9 +2930,7 @@
       document.addEventListener('DOMContentLoaded', () => {
         renderCachedState();
         initializePokemonBackgroundControls();
-        loadSettings();
-        loadStatus();
-        setInterval(loadStatus, 5000);
+        hydrateAuthenticatedSession();
       });
 
       function openTab(name) {
@@ -2397,15 +3012,49 @@
         document.getElementById('history-container').innerHTML = html;
       }
 
-      async function apiCall(url, method = 'GET', data = null) {
+      async function apiCall(url, method = 'GET', data = null, options = {}) {
         try {
-          const opts = { method, headers: { 'Content-Type': 'application/json' } };
+          const opts = {
+            method,
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+          };
           if (data) opts.body = JSON.stringify(data);
-          const r = await fetch(url, opts);
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const r = await fetch(apiUrl(url), opts);
+          if (r.status === 401) {
+            if (!options.allowUnauthorized && !options.suppressAuthRedirect) {
+              currentUser = null;
+              authState = null;
+              stopStatusPolling();
+              updateCurrentUserDisplay(null);
+              setAuthenticatedUi(false);
+              const sessionPayload = await apiCall('/api/auth/session', 'GET', null, {
+                allowUnauthorized: true,
+                suppressAuthRedirect: true
+              });
+              authState = sessionPayload;
+              if (sessionPayload?.google_client_id) {
+                renderGoogleSignInButton(sessionPayload.google_client_id);
+              }
+              updateAuthStatus('Your session expired. Sign in again to continue.');
+            }
+            return null;
+          }
+          if (!r.ok) {
+            let errorMessage = `HTTP ${r.status}`;
+            try {
+              const errorData = await r.json();
+              errorMessage = errorData.error || errorData.message || errorMessage;
+            } catch (e) {
+            }
+            throw new Error(errorMessage);
+          }
           return await r.json();
         } catch (e) {
           console.error(`API error (${url}):`, e);
+          if (!options.silent) {
+            console.warn(e.message || 'Request failed');
+          }
           return null;
         }
       }
@@ -2494,6 +3143,8 @@
         const data = await apiCall('/api/last-check');
         if (!data) {
           lastResultsSignature = '';
+          latestRenderedResults = null;
+          destroyResultsMap();
           document.getElementById('results-container').innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">?</div>
@@ -2516,6 +3167,8 @@
         const timestamp = data.timestamp || checkResult.timestamp;
 
         if (Object.keys(products).length === 0) {
+          latestRenderedResults = null;
+          destroyResultsMap();
           document.getElementById('results-container').innerHTML = `
       <div class="empty-state">
       <div class="empty-icon"><img src="/out-of-stock.webp" alt="Out of stock"></div>
@@ -2526,12 +3179,7 @@
           return;
         }
 
-        let html = '<div class="results-stack">';
-        for (const [pid, product] of Object.entries(products)) {
-          html += renderResultCard(product, configuredZip);
-        }
-        html += '</div>';
-        document.getElementById('results-container').innerHTML = html;
+        renderResultsContent(data, configuredZip);
         lastResultsSignature = resultsSignature;
       }
 
@@ -2625,6 +3273,7 @@
           let isComplete = false;
           let progressLoops = 0;
           const maxLoops = 1800; // ~4.5 minutes at 150ms per poll
+          let finalProgress = null;
 
           while (!isComplete && progressLoops < maxLoops) {
             await new Promise(r => setTimeout(r, 150));
@@ -2633,6 +3282,7 @@
             const progress = await apiCall('/api/progress');
             if (progress && !progress.in_progress) {
               isComplete = true;
+              finalProgress = progress;
               // Final update
               document.getElementById('progress-bar').style.width = '100%';
               document.getElementById('progress-percent').textContent = '100%';
@@ -2646,7 +3296,16 @@
 
           await new Promise(r => setTimeout(r, 500));
           await loadStatus();
-          showToast('Check complete', 'success');
+
+          const finalMessage = finalProgress?.message || '';
+          const finalPhase = finalProgress?.phase || '';
+          const noStoresFound = finalMessage.startsWith('No Walgreens stores found near ');
+
+          if (finalPhase === 'error' || noStoresFound) {
+            showToast(finalMessage || 'Check failed', 'error');
+          } else {
+            showToast('Check complete', 'success');
+          }
 
           // Hide progress section after 2 seconds
           await new Promise(r => setTimeout(r, 2000));
@@ -2749,6 +3408,8 @@
         setTimeout(() => loader.remove(), 300);
       });
     </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 </body>
 

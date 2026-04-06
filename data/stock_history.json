@@ -1,5 +1,337 @@
 {
   "version": 1,
-  "last_check": null,
-  "check_history": []
+  "last_check": "2026-04-05T19:16:01.509331",
+  "check_history": [
+    {
+      "timestamp": "2026-04-05T19:16:01.509331",
+      "check_result": {
+        "total_stores_checked": 50,
+        "timestamp": "2026-04-05T19:16:01.509331"
+      },
+      "products_found": {
+        "000000000010688014": {
+          "product_name": "Wizards of the Coast, Inc Magic the Gathering Dragon's Maze 15-Card Booster Pack",
+          "image_url": "https://pics.walgreens.com/prodimg/493460/900.jpg",
+          "source_url": "https://www.walgreens.com/store/c/wizards-of-the-coast,-inc-magic-the-gathering-dragon's-maze-15-card-booster-pack/ID=prod6168629-product",
+          "store_ids": [
+            "5701",
+            "5392",
+            "7558",
+            "3728",
+            "2963",
+            "4188",
+            "5799",
+            "3184",
+            "4018",
+            "6062",
+            "7747",
+            "3670",
+            "6440",
+            "3008",
+            "6177",
+            "9460",
+            "21450",
+            "5039",
+            "11182",
+            "6784",
+            "9840",
+            "7723",
+            "2056",
+            "4077",
+            "4793",
+            "6060",
+            "3768",
+            "4138",
+            "4506",
+            "9262",
+            "5890"
+          ],
+          "count": 31,
+          "total_inventory": 136,
+          "stores": [
+            {
+              "store_id": "5701",
+              "name": "Walgreen Drug Store",
+              "address": "1158 S CRISMON RD, MESA, AZ 85208",
+              "distance": 1.07,
+              "inventory_count": 2,
+              "latitude": 33.39386515,
+              "longitude": -111.61608083
+            },
+            {
+              "store_id": "5392",
+              "name": "Walgreen Drug Store",
+              "address": "420 S SOSSAMAN RD, MESA, AZ 85208",
+              "distance": 2.08,
+              "inventory_count": 6,
+              "latitude": 33.40727987,
+              "longitude": -111.66803008
+            },
+            {
+              "store_id": "7558",
+              "name": "Walgreen Drug Store",
+              "address": "9233 E GUADALUPE RD, MESA, AZ 85212",
+              "distance": 2.46,
+              "inventory_count": 1,
+              "latitude": 33.36411589,
+              "longitude": -111.63516053
+            },
+            {
+              "store_id": "3728",
+              "name": "Walgreen Drug Store",
+              "address": "7059 E BASELINE RD, MESA, AZ 85209",
+              "distance": 3.13,
+              "inventory_count": 4,
+              "latitude": 33.37871927,
+              "longitude": -111.68146701
+            },
+            {
+              "store_id": "2963",
+              "name": "Walgreen Drug Store",
+              "address": "11545 E APACHE TRL, APACHE JUNCTION, AZ 85120",
+              "distance": 3.17,
+              "inventory_count": 5,
+              "latitude": 33.41463315,
+              "longitude": -111.58126982
+            },
+            {
+              "store_id": "4188",
+              "name": "Walgreen Drug Store",
+              "address": "55 W APACHE TRL, APACHE JUNCTION, AZ 85120",
+              "distance": 5.06,
+              "inventory_count": 10,
+              "latitude": 33.41253333,
+              "longitude": -111.54696453
+            },
+            {
+              "store_id": "5799",
+              "name": "Walgreen Drug Store",
+              "address": "754 N HIGLEY RD, GILBERT, AZ 85234",
+              "distance": 5.69,
+              "inventory_count": 1,
+              "latitude": 33.36443478,
+              "longitude": -111.72233097
+            },
+            {
+              "store_id": "3184",
+              "name": "Walgreen Drug Store",
+              "address": "1585 E GUADALUPE RD, GILBERT, AZ 85234",
+              "distance": 7.52,
+              "inventory_count": 3,
+              "latitude": 33.3643051,
+              "longitude": -111.75654123
+            },
+            {
+              "store_id": "4018",
+              "name": "Walgreen Drug Store",
+              "address": "2345 E BASELINE RD, GILBERT, AZ 85234",
+              "distance": 8.69,
+              "inventory_count": 2,
+              "latitude": 33.378999,
+              "longitude": -111.781799
+            },
+            {
+              "store_id": "6062",
+              "name": "Walgreen Drug Store",
+              "address": "76 W GUADALUPE RD, GILBERT, AZ 85233",
+              "distance": 9.45,
+              "inventory_count": 1,
+              "latitude": 33.36496396,
+              "longitude": -111.79158966
+            },
+            {
+              "store_id": "7747",
+              "name": "Walgreen Drug Store",
+              "address": "3233 E GERMANN RD, GILBERT, AZ 85297",
+              "distance": 9.83,
+              "inventory_count": 2,
+              "latitude": 33.27718177,
+              "longitude": -111.71965129
+            },
+            {
+              "store_id": "3670",
+              "name": "Walgreen Drug Store",
+              "address": "1159 E SOUTHERN AVE, MESA, AZ 85204",
+              "distance": 10.02,
+              "inventory_count": 2,
+              "latitude": 33.3927916,
+              "longitude": -111.80660911
+            },
+            {
+              "store_id": "6440",
+              "name": "Walgreen Drug Store",
+              "address": "6951 S KINGS RANCH RD, GOLD CANYON, AZ 85118",
+              "distance": 10.69,
+              "inventory_count": 24,
+              "latitude": 33.35180744,
+              "longitude": -111.45719623
+            },
+            {
+              "store_id": "3008",
+              "name": "Walgreen Drug Store",
+              "address": "785 S COOPER RD, GILBERT, AZ 85233",
+              "distance": 10.91,
+              "inventory_count": 3,
+              "latitude": 33.33599778,
+              "longitude": -111.80617688
+            },
+            {
+              "store_id": "6177",
+              "name": "Walgreen Drug Store",
+              "address": "1135 N MESA DR, MESA, AZ 85201",
+              "distance": 11.19,
+              "inventory_count": 4,
+              "latitude": 33.43633353,
+              "longitude": -111.82211208
+            },
+            {
+              "store_id": "9460",
+              "name": "Walgreen Drug Store",
+              "address": "40663 N GANTZEL RD, SAN TAN VALLEY, AZ 85140",
+              "distance": 11.23,
+              "inventory_count": 4,
+              "latitude": 33.24839799,
+              "longitude": -111.56260632
+            },
+            {
+              "store_id": "21450",
+              "name": "Walgreen Drug Store",
+              "address": "4750 S VAL VISTA DR, GILBERT, AZ 85297",
+              "distance": 11.78,
+              "inventory_count": 1,
+              "latitude": 33.2637803,
+              "longitude": -111.75628449
+            },
+            {
+              "store_id": "5039",
+              "name": "Walgreen Drug Store",
+              "address": "746 W UNIVERSITY DR, MESA, AZ 85201",
+              "distance": 12.48,
+              "inventory_count": 16,
+              "latitude": 33.42275419,
+              "longitude": -111.84777883
+            },
+            {
+              "store_id": "11182",
+              "name": "Walgreen Drug Store",
+              "address": "1130 W SOUTHERN AVE, MESA, AZ 85210",
+              "distance": 12.85,
+              "inventory_count": 4,
+              "latitude": 33.39349573,
+              "longitude": -111.85584938
+            },
+            {
+              "store_id": "6784",
+              "name": "Walgreen Drug Store",
+              "address": "2024 W MAIN ST, MESA, AZ 85201",
+              "distance": 14.01,
+              "inventory_count": 4,
+              "latitude": 33.41531019,
+              "longitude": -111.87526537
+            },
+            {
+              "store_id": "9840",
+              "name": "Walgreen Drug Store",
+              "address": "3111 W HUNT HWY, SAN TAN VALLEY, AZ 85144",
+              "distance": 14.61,
+              "inventory_count": 10,
+              "latitude": 33.190184,
+              "longitude": -111.599957
+            },
+            {
+              "store_id": "7723",
+              "name": "Walgreen Drug Store",
+              "address": "975 E OCOTILLO RD, CHANDLER, AZ 85249",
+              "distance": 15.28,
+              "inventory_count": 2,
+              "latitude": 33.24717069,
+              "longitude": -111.82476642
+            },
+            {
+              "store_id": "4077",
+              "name": "Walgreen Drug Store",
+              "address": "3005 E RIGGS RD, CHANDLER, AZ 85249",
+              "distance": 15.4,
+              "inventory_count": 2,
+              "latitude": 33.21853556,
+              "longitude": -111.78847095
+            },
+            {
+              "store_id": "2056",
+              "name": "Walgreen Drug Store",
+              "address": "1925 W CHANDLER BLVD, CHANDLER, AZ 85224",
+              "distance": 15.4,
+              "inventory_count": 1,
+              "latitude": 33.30547768,
+              "longitude": -111.8748667
+            },
+            {
+              "store_id": "4793",
+              "name": "Walgreen Drug Store",
+              "address": "1975 S ALMA SCHOOL RD, CHANDLER, AZ 85286",
+              "distance": 15.5,
+              "inventory_count": 2,
+              "latitude": 33.27709056,
+              "longitude": -111.85790196
+            },
+            {
+              "store_id": "6060",
+              "name": "Walgreen Drug Store",
+              "address": "16415 E PALISADES BLVD, FOUNTAIN HILLS, AZ 85268",
+              "distance": 15.5,
+              "inventory_count": 2,
+              "latitude": 33.61000991,
+              "longitude": -111.72643452
+            },
+            {
+              "store_id": "3768",
+              "name": "Walgreen Drug Store",
+              "address": "6404 S MCCLINTOCK DR, TEMPE, AZ 85283",
+              "distance": 16.28,
+              "inventory_count": 3,
+              "latitude": 33.36335372,
+              "longitude": -111.91192545
+            },
+            {
+              "store_id": "4138",
+              "name": "Walgreen Drug Store",
+              "address": "7939 E MCDOWELL RD, SCOTTSDALE, AZ 85257",
+              "distance": 16.61,
+              "inventory_count": 2,
+              "latitude": 33.46523851,
+              "longitude": -111.91022375
+            },
+            {
+              "store_id": "4506",
+              "name": "Walgreen Drug Store",
+              "address": "8015 E INDIAN SCHOOL RD, SCOTTSDALE, AZ 85251",
+              "distance": 17.14,
+              "inventory_count": 4,
+              "latitude": 33.49367697,
+              "longitude": -111.9082367
+            },
+            {
+              "store_id": "9262",
+              "name": "Walgreen Drug Store",
+              "address": "8469 E MCDONALD DR, SCOTTSDALE, AZ 85250",
+              "distance": 17.51,
+              "inventory_count": 5,
+              "latitude": 33.52344724,
+              "longitude": -111.89819718
+            },
+            {
+              "store_id": "5890",
+              "name": "Walgreen Drug Store",
+              "address": "11250 E VIA LINDA, SCOTTSDALE, AZ 85259",
+              "distance": 17.61,
+              "inventory_count": 4,
+              "latitude": 33.59002981,
+              "longitude": -111.83615923
+            }
+          ]
+        }
+      },
+      "has_stock": true
+    }
+  ]
 }

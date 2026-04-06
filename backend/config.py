@@ -1,10 +1,38 @@
 """Configuration management for Walgreens Stock Watcher."""
 
+from __future__ import annotations
+
 import os
+from typing import List
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_csv(name: str, default: str = "") -> List[str]:
+    value = os.getenv(name, default)
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+# App / Auth Configuration
+FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "change-me-in-production")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "walgreens_watcher_session")
+SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", False)
+SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN", "").strip() or None
+CORS_ALLOWED_ORIGINS = _env_csv(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:5000,http://127.0.0.1:5000,http://localhost:8788,http://127.0.0.1:8788",
+)
 
 # Discord Configuration
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
@@ -44,7 +72,6 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
 ]
 
-# Database
+# Storage
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
-STOCK_HISTORY_FILE = os.path.join(DATA_DIR, "stock_history.json")
-APP_SETTINGS_FILE = os.path.join(DATA_DIR, "app_settings.json")
+APP_DATABASE_FILE = os.path.join(DATA_DIR, "watcher.sqlite3")

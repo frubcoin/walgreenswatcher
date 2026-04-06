@@ -121,6 +121,18 @@ class WalgreensStockChecker:
         address = store_info.get("address", {})
         store_id = str(store.get("storeNumber") or store_info.get("storeNumber") or "")
         distance = store.get("distance")
+        latitude = store.get("latitude")
+        longitude = store.get("longitude")
+
+        try:
+            latitude = float(latitude) if latitude is not None else None
+        except (TypeError, ValueError):
+            latitude = None
+
+        try:
+            longitude = float(longitude) if longitude is not None else None
+        except (TypeError, ValueError):
+            longitude = None
 
         return {
             "store_id": store_id,
@@ -128,6 +140,8 @@ class WalgreensStockChecker:
             "address": self._format_address(address),
             "distance": float(distance) if distance is not None else None,
             "inventory_count": self._inventory_count(store, article_id),
+            "latitude": latitude,
+            "longitude": longitude,
         }
 
     def _product_name(self, product: Dict[str, Any]) -> str:

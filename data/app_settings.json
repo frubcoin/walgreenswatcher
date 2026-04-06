@@ -1,8 +1,8 @@
 {
-  "zipcode": "55555",
   "check_interval_minutes": 60,
+  "current_zipcode": "85208",
   "discord_destinations": [],
   "pokemon_background_enabled": false,
-  "pokemon_background_theme": "pokemon-pattern-1",
+  "pokemon_background_theme": "gyra",
   "pokemon_background_tile_size": 645
 }

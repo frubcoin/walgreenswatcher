@@ -1,22 +1,15 @@
-"""Scheduler for periodic stock checks."""
+"""Per-user scheduler management for the hosted Walgreens watcher."""
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from config import (
-    APP_SETTINGS_FILE,
-    DEFAULT_CHECK_INTERVAL_MINUTES,
-    DEFAULT_TRACKED_PRODUCTS,
-    TARGET_ZIP_CODE,
-)
+from config import DEFAULT_CHECK_INTERVAL_MINUTES, DEFAULT_TRACKED_PRODUCTS, TARGET_ZIP_CODE
 from database import StockDatabase
 from discord_notifier import DiscordNotifier
 from walgreens_scraper import WalgreensStockChecker
@@ -54,24 +47,27 @@ ALLOWED_POKEMON_BACKGROUND_THEMES = {
 
 
 class StockCheckScheduler:
-    """Manages scheduled stock checks."""
+    """One scheduler and one live progress stream for one user."""
 
-    def __init__(self, webhook_url: str = ""):
-        self.scheduler = BackgroundScheduler()
+    def __init__(self, user_id: int, db: StockDatabase):
+        self.user_id = int(user_id)
+        self.db = db
+        self.scheduler: Optional[BackgroundScheduler] = None
+        self.state_lock = threading.RLock()
+
         self.checker = WalgreensStockChecker()
-        self.db = StockDatabase()
+        self.notifier = DiscordNotifier([])
         self.is_running = False
-        self.last_check_time = None
+        self.last_check_time: Optional[datetime] = None
         self.last_products_with_stock: Dict[str, Dict[str, Any]] = {}
+
         self.current_zipcode = TARGET_ZIP_CODE
-        self.settings_file = APP_SETTINGS_FILE
         self.check_interval_minutes = DEFAULT_CHECK_INTERVAL_MINUTES
         self.discord_destinations: List[Dict[str, str]] = []
         self.pokemon_background_enabled = DEFAULT_POKEMON_BACKGROUND_ENABLED
         self.pokemon_background_theme = DEFAULT_POKEMON_BACKGROUND_THEME
         self.pokemon_background_tile_size = DEFAULT_POKEMON_BACKGROUND_TILE_SIZE
-
-        self.checker.current_zip_code = self.current_zipcode
+        self.tracked_products: Dict[str, Dict[str, str]] = {}
 
         self.check_in_progress = False
         self.current_store = None
@@ -86,157 +82,60 @@ class StockCheckScheduler:
         self.progress_completed_units = 0.0
         self.progress_total_units = 0.0
 
-        self.products_data_file = os.path.join(
-            os.path.dirname(__file__), "..", "data", "tracked_products.json"
-        )
-        os.makedirs(os.path.dirname(self.products_data_file), exist_ok=True)
-        self._load_settings()
+        self.refresh_from_db()
+        self._load_last_check_snapshot()
+
+    def _load_last_check_snapshot(self) -> None:
+        last_check = self.db.get_last_check(self.user_id)
+        if not last_check:
+            return
+
+        timestamp = last_check.get("timestamp")
+        if timestamp:
+            try:
+                self.last_check_time = datetime.fromisoformat(timestamp)
+            except ValueError:
+                self.last_check_time = None
+        self.last_products_with_stock = dict(last_check.get("products_found") or {})
+
+    def refresh_from_db(self) -> None:
+        settings = self.db.get_user_settings(self.user_id)
+        products = self.db.list_tracked_products(self.user_id)
+
+        if not products:
+            for article_id, product in DEFAULT_TRACKED_PRODUCTS.items():
+                self.db.add_tracked_product(
+                    self.user_id,
+                    article_id,
+                    product["name"],
+                    product["planogram"],
+                    image_url=product.get("image_url", ""),
+                    source_url=product.get("source_url", ""),
+                    product_id=product.get("product_id", ""),
+                )
+            products = self.db.list_tracked_products(self.user_id)
+
+        self.current_zipcode = settings["current_zipcode"]
+        self.check_interval_minutes = settings["check_interval_minutes"]
+        self.discord_destinations = list(settings["discord_destinations"])
+        self.pokemon_background_enabled = settings["pokemon_background_enabled"]
+        self.pokemon_background_theme = settings["pokemon_background_theme"]
+        self.pokemon_background_tile_size = settings["pokemon_background_tile_size"]
+        self.notifier = DiscordNotifier(self.discord_destinations or None)
+        self.tracked_products = {
+            product["id"]: {
+                "name": product["name"],
+                "planogram": product["planogram"],
+                "image_url": product.get("image_url", ""),
+                "source_url": product.get("source_url", ""),
+                "product_id": product.get("product_id", ""),
+            }
+            for product in products
+        }
         self.checker.current_zip_code = self.current_zipcode
-        initial_webhook_config = webhook_url if webhook_url else (self.discord_destinations or None)
-        self.notifier = DiscordNotifier(initial_webhook_config)
-        self.discord_destinations = list(self.notifier.destinations)
-        self.tracked_products = self._load_products()
-
-        if not self.tracked_products:
-            self.tracked_products = self._normalize_products(DEFAULT_TRACKED_PRODUCTS)
-            self._save_products()
-
-    def _normalize_products(self, raw_products: Any) -> Dict[str, Dict[str, str]]:
-        """Normalize product storage to article_id -> tracked metadata."""
-        normalized: Dict[str, Dict[str, str]] = {}
-
-        if not isinstance(raw_products, dict):
-            return normalized
-
-        for article_id, value in raw_products.items():
-            article_id = str(article_id).strip()
-            if not article_id:
-                continue
-
-            if isinstance(value, str):
-                logger.warning(
-                    "Skipping legacy product %s because it has no planogram metadata",
-                    article_id,
-                )
-                continue
-
-            if not isinstance(value, dict):
-                logger.warning("Skipping product %s with unsupported format", article_id)
-                continue
-
-            name = str(value.get("name", "")).strip()
-            planogram = str(value.get("planogram", "")).strip()
-            if not name or not planogram:
-                logger.warning(
-                    "Skipping product %s because name or planogram is missing",
-                    article_id,
-                )
-                continue
-
-            normalized_product = {"name": name, "planogram": planogram}
-
-            image_url = str(value.get("image_url", "")).strip()
-            source_url = str(value.get("source_url", "")).strip()
-            product_id = str(value.get("product_id", "")).strip()
-            if image_url:
-                normalized_product["image_url"] = image_url
-            if source_url:
-                normalized_product["source_url"] = source_url
-            if product_id:
-                normalized_product["product_id"] = product_id
-
-            normalized[article_id] = normalized_product
-
-        return normalized
-
-    def _load_products(self) -> Dict[str, Dict[str, str]]:
-        """Load tracked products from file."""
-        try:
-            if os.path.exists(self.products_data_file):
-                with open(self.products_data_file, "r", encoding="utf-8") as handle:
-                    return self._normalize_products(json.load(handle))
-        except Exception as exc:
-            logger.error("Error loading products: %s", exc)
-        return {}
-
-    def _load_settings(self) -> None:
-        """Load persisted app settings."""
-        try:
-            if not os.path.exists(self.settings_file):
-                return
-
-            with open(self.settings_file, "r", encoding="utf-8") as handle:
-                data = json.load(handle)
-
-            interval_minutes = data.get("check_interval_minutes")
-            if interval_minutes is not None:
-                self.check_interval_minutes = self._validate_interval_minutes(interval_minutes)
-
-            configured_zipcode = data.get("current_zipcode")
-            if configured_zipcode is not None:
-                self.current_zipcode = str(configured_zipcode).strip() or TARGET_ZIP_CODE
-
-            destinations = data.get("discord_destinations")
-            if isinstance(destinations, list):
-                self.discord_destinations = [
-                    destination
-                    for destination in DiscordNotifier._normalize_destinations(destinations)
-                ]
-
-            background_enabled = data.get("pokemon_background_enabled")
-            if background_enabled is not None:
-                self.pokemon_background_enabled = self._validate_boolean_setting(
-                    background_enabled,
-                    "Pokemon background setting",
-                )
-
-            background_theme = data.get("pokemon_background_theme")
-            if background_theme is not None:
-                self.pokemon_background_theme = self._validate_pokemon_background_theme(
-                    background_theme
-                )
-
-            background_tile_size = data.get("pokemon_background_tile_size")
-            if background_tile_size is not None:
-                self.pokemon_background_tile_size = self._validate_pokemon_background_tile_size(
-                    background_tile_size
-                )
-        except Exception as exc:
-            logger.error("Error loading app settings: %s", exc)
-
-    def _save_products(self) -> None:
-        """Save tracked products to file."""
-        try:
-            os.makedirs(os.path.dirname(self.products_data_file), exist_ok=True)
-            with open(self.products_data_file, "w", encoding="utf-8") as handle:
-                json.dump(self.tracked_products, handle, indent=2, ensure_ascii=False)
-        except Exception as exc:
-            logger.error("Error saving products: %s", exc)
-
-    def _save_settings(self) -> None:
-        """Persist app settings to disk."""
-        try:
-            os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
-            with open(self.settings_file, "w", encoding="utf-8") as handle:
-                json.dump(
-                    {
-                        "check_interval_minutes": self.check_interval_minutes,
-                        "current_zipcode": self.current_zipcode,
-                        "discord_destinations": self.discord_destinations,
-                        "pokemon_background_enabled": self.pokemon_background_enabled,
-                        "pokemon_background_theme": self.pokemon_background_theme,
-                        "pokemon_background_tile_size": self.pokemon_background_tile_size,
-                    },
-                    handle,
-                    indent=2,
-                    ensure_ascii=False,
-                )
-        except Exception as exc:
-            logger.error("Error saving app settings: %s", exc)
 
     @staticmethod
     def _validate_interval_minutes(interval_minutes: Any) -> int:
-        """Validate and normalize a scheduler interval in minutes."""
         try:
             value = int(interval_minutes)
         except (TypeError, ValueError) as exc:
@@ -250,7 +149,6 @@ class StockCheckScheduler:
 
     @staticmethod
     def _validate_boolean_setting(value: Any, label: str) -> bool:
-        """Normalize a persisted boolean-like setting."""
         if isinstance(value, bool):
             return value
 
@@ -268,7 +166,6 @@ class StockCheckScheduler:
 
     @staticmethod
     def _validate_pokemon_background_theme(theme: Any) -> str:
-        """Validate a Pokemon background theme key."""
         normalized = str(theme or "").strip()
         if normalized in ALLOWED_POKEMON_BACKGROUND_THEMES:
             return normalized
@@ -276,7 +173,6 @@ class StockCheckScheduler:
 
     @staticmethod
     def _validate_pokemon_background_tile_size(tile_size: Any) -> int:
-        """Validate the Pokemon background tile size in pixels."""
         try:
             value = int(tile_size)
         except (TypeError, ValueError) as exc:
@@ -292,6 +188,10 @@ class StockCheckScheduler:
             )
         return value
 
+    def _update_setting(self, **updates: Any) -> None:
+        self.db.update_user_settings(self.user_id, updates)
+        self.refresh_from_db()
+
     def add_product(
         self,
         article_id: str,
@@ -301,124 +201,72 @@ class StockCheckScheduler:
         source_url: str = "",
         product_id: str = "",
     ) -> bool:
-        """Add a new product to track."""
-        article_id = article_id.strip()
-        product_name = product_name.strip()
-        planogram = planogram.strip()
-        image_url = image_url.strip()
-        source_url = source_url.strip()
-        product_id = product_id.strip()
-
-        if article_id in self.tracked_products:
-            logger.warning("Product %s already tracked", article_id)
-            return False
-
-        tracked_product = {"name": product_name, "planogram": planogram}
-        if image_url:
-            tracked_product["image_url"] = image_url
-        if source_url:
-            tracked_product["source_url"] = source_url
-        if product_id:
-            tracked_product["product_id"] = product_id
-
-        self.tracked_products[article_id] = tracked_product
-        self._save_products()
-        logger.info("Added product: %s (%s / %s)", product_name, article_id, planogram)
-        return True
+        success = self.db.add_tracked_product(
+            self.user_id,
+            article_id.strip(),
+            product_name.strip(),
+            planogram.strip(),
+            image_url=image_url.strip(),
+            source_url=source_url.strip(),
+            product_id=product_id.strip(),
+        )
+        if success:
+            self.refresh_from_db()
+        return success
 
     def remove_product(self, product_id: str) -> bool:
-        """Remove a product from tracking."""
-        if product_id not in self.tracked_products:
-            logger.warning("Product %s not found", product_id)
-            return False
-
-        name = self.tracked_products.pop(product_id)["name"]
-        self._save_products()
-        logger.info("Removed product: %s (%s)", name, product_id)
-        return True
+        success = self.db.remove_tracked_product(self.user_id, product_id)
+        if success:
+            self.refresh_from_db()
+        return success
 
     def update_product_name(self, product_id: str, product_name: str) -> bool:
-        """Update the display name for a tracked product."""
-        product_id = str(product_id).strip()
         product_name = str(product_name).strip()
-
-        if not product_id or product_id not in self.tracked_products:
-            logger.warning("Product %s not found for rename", product_id)
-            return False
-
         if not product_name:
             raise ValueError("Product name cannot be empty")
 
-        self.tracked_products[product_id]["name"] = product_name
-        self._save_products()
-        logger.info("Renamed product %s to %s", product_id, product_name)
-        return True
+        success = self.db.update_tracked_product_name(self.user_id, product_id, product_name)
+        if success:
+            self.refresh_from_db()
+        return success
 
     def set_zipcode(self, zipcode: str) -> None:
-        """Update the search ZIP code."""
         normalized_zipcode = str(zipcode).strip() or TARGET_ZIP_CODE
-        self.current_zipcode = normalized_zipcode
-        self.checker.current_zip_code = normalized_zipcode
-        self._save_settings()
-        logger.info("ZIP code updated to %s", normalized_zipcode)
+        self._update_setting(current_zipcode=normalized_zipcode)
 
     def set_check_interval_minutes(self, interval_minutes: Any) -> int:
-        """Update the recurring scheduler interval and reschedule if needed."""
         validated = self._validate_interval_minutes(interval_minutes)
-        self.check_interval_minutes = validated
-        self._save_settings()
+        self._update_setting(check_interval_minutes=validated)
 
-        if self.is_running:
+        if self.is_running and self.scheduler is not None:
             self.scheduler.reschedule_job(
-                "stock_check",
+                self._job_id,
                 trigger="interval",
                 minutes=self.check_interval_minutes,
             )
-            logger.info(
-                "Scheduler interval updated while running: every %s minute(s)",
-                self.check_interval_minutes,
-            )
-        else:
-            logger.info(
-                "Scheduler interval updated: every %s minute(s)",
-                self.check_interval_minutes,
-            )
-
         return self.check_interval_minutes
 
-    def set_discord_destinations(
-        self, destinations: Optional[Union[str, List[Union[str, Dict[str, Any]]]]]
-    ) -> List[Dict[str, str]]:
-        """Replace configured Discord webhook destinations and persist them."""
-        self.notifier.set_webhook_urls(destinations)
-        self.discord_destinations = list(self.notifier.destinations)
-        self._save_settings()
-        logger.info("Discord destinations updated: %s webhook(s)", len(self.discord_destinations))
-        return self.discord_destinations
+    def set_discord_destinations(self, destinations: Optional[List[Dict[str, Any]]]) -> List[Dict[str, str]]:
+        normalized = DiscordNotifier._normalize_destinations(destinations)
+        self._update_setting(discord_destinations=normalized)
+        return list(self.discord_destinations)
 
     def set_pokemon_background_enabled(self, enabled: Any) -> bool:
-        """Update whether the themed background is enabled."""
-        self.pokemon_background_enabled = self._validate_boolean_setting(
-            enabled,
-            "Pokemon background setting",
-        )
-        self._save_settings()
+        value = self._validate_boolean_setting(enabled, "Pokemon background setting")
+        self._update_setting(pokemon_background_enabled=value)
         return self.pokemon_background_enabled
 
     def set_pokemon_background_theme(self, theme: Any) -> str:
-        """Update the selected Pokemon background theme."""
-        self.pokemon_background_theme = self._validate_pokemon_background_theme(theme)
-        self._save_settings()
+        value = self._validate_pokemon_background_theme(theme)
+        self._update_setting(pokemon_background_theme=value)
         return self.pokemon_background_theme
 
     def set_pokemon_background_tile_size(self, tile_size: Any) -> int:
-        """Update the selected Pokemon background tile size."""
-        self.pokemon_background_tile_size = self._validate_pokemon_background_tile_size(tile_size)
-        self._save_settings()
+        value = self._validate_pokemon_background_tile_size(tile_size)
+        self._update_setting(pokemon_background_tile_size=value)
         return self.pokemon_background_tile_size
 
     def _product_specs(self) -> List[Dict[str, str]]:
-        """Build normalized product specs for the scraper."""
         return [
             {
                 "article_id": article_id,
@@ -432,7 +280,6 @@ class StockCheckScheduler:
         ]
 
     def _reset_progress(self) -> None:
-        """Reset the live progress tracker to its idle state."""
         self.current_store = None
         self.current_product = None
         self.stores_checked = 0
@@ -446,18 +293,23 @@ class StockCheckScheduler:
         self.progress_total_units = 0.0
 
     def _set_progress(self, **kwargs: Any) -> None:
-        """Update one or more live progress fields."""
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    def _check_stock(self) -> None:
-        """Internal method to check stock and notify."""
-        try:
-            self.check_in_progress = True
-            self._reset_progress()
+    @property
+    def _job_id(self) -> str:
+        return f"stock_check_user_{self.user_id}"
 
-            logger.info("[%s] Running scheduled stock check...", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            logger.info("Checking %s products...", len(self.tracked_products))
+    def _check_stock(self) -> None:
+        try:
+            with self.state_lock:
+                if self.check_in_progress:
+                    logger.info("User %s requested a check while one is already running", self.user_id)
+                    return
+                self.check_in_progress = True
+                self._reset_progress()
+
+            self.refresh_from_db()
 
             product_specs = self._product_specs()
             progress_total_units = float(max(2, (len(product_specs) * 2) + 2))
@@ -469,7 +321,6 @@ class StockCheckScheduler:
             )
 
             if not product_specs:
-                logger.warning("No tracked products configured")
                 self._set_progress(
                     current_phase="complete",
                     progress_message="No tracked products configured",
@@ -520,7 +371,8 @@ class StockCheckScheduler:
                 )
                 if should_log:
                     logger.info(
-                        "[%s] %s | %s | %s/%s stores processed",
+                        "[user=%s][%s] %s | %s | %s/%s stores processed",
+                        self.user_id,
                         current_phase,
                         current_product or "No product",
                         self.progress_message,
@@ -534,7 +386,6 @@ class StockCheckScheduler:
             self.checker.progress_callback = update_progress
             self.checker.current_zip_code = self.current_zipcode
 
-            logger.info("Searching for stores near %s...", self.current_zipcode)
             self._set_progress(
                 current_phase="locating_stores",
                 progress_message=f"Finding Walgreens stores near {self.current_zipcode}...",
@@ -544,9 +395,8 @@ class StockCheckScheduler:
             )
             stores = self.checker._fetch_stores_near_zip(self.current_zipcode)
             if not stores:
-                logger.warning("No stores found near ZIP code")
                 self._set_progress(
-                    current_phase="complete",
+                    current_phase="error",
                     progress_message=f"No Walgreens stores found near {self.current_zipcode}",
                     current_store="Store locator",
                     progress_completed_units=progress_total_units,
@@ -561,14 +411,14 @@ class StockCheckScheduler:
                 progress_completed_units=1.0,
                 progress_total_units=progress_total_units,
             )
-            logger.info("Found %s stores. Starting checks...", self.total_stores)
 
             self.checker.custom_product_names = {
                 product["article_id"]: product["name"] for product in product_specs
             }
-
             check_results = self.checker.check_products_at_stores(product_specs, stores)
             products_with_stock = self.checker.get_stores_with_stock(check_results)
+
+            timestamp = datetime.utcnow().isoformat()
             self._set_progress(
                 current_phase="finalizing",
                 progress_message="Saving check results...",
@@ -578,20 +428,17 @@ class StockCheckScheduler:
                 progress_completed_units=max(progress_total_units - 1, 0),
                 progress_total_units=progress_total_units,
             )
-
             self.db.add_check_result(
-                {
-                    "total_stores_checked": len(stores),
-                    "timestamp": datetime.now().isoformat(),
-                },
-                products_with_stock,
+                self.user_id,
+                total_stores_checked=len(stores),
+                products_with_stock=products_with_stock,
+                timestamp=timestamp,
             )
 
-            self.last_check_time = datetime.now()
+            self.last_check_time = datetime.fromisoformat(timestamp)
             self.last_products_with_stock = products_with_stock
 
             if products_with_stock:
-                logger.info("Stock found in %s product(s)", len(products_with_stock))
                 self._set_progress(
                     current_phase="notifying",
                     progress_message=f"Sending Discord alerts for {len(products_with_stock)} product(s)...",
@@ -600,8 +447,6 @@ class StockCheckScheduler:
                     progress_total_units=progress_total_units,
                 )
                 self.notifier.notify_stock_found(products_with_stock, self.current_zipcode)
-            else:
-                logger.info("Check completed. No stock found.")
 
             self._set_progress(
                 current_phase="complete",
@@ -611,7 +456,7 @@ class StockCheckScheduler:
                 progress_total_units=progress_total_units,
             )
         except Exception as exc:
-            logger.error("Error during scheduled check: %s", exc, exc_info=True)
+            logger.error("Error during stock check for user %s: %s", self.user_id, exc, exc_info=True)
             self._set_progress(
                 current_phase="error",
                 progress_message=str(exc),
@@ -622,62 +467,49 @@ class StockCheckScheduler:
         finally:
             self.check_in_progress = False
 
-    def start(self) -> bool:
-        """Start the scheduler."""
-        try:
-            if self.is_running:
-                logger.warning("Scheduler is already running")
-                return False
-
-            self.scheduler.add_job(
-                self._check_stock,
-                "interval",
-                minutes=self.check_interval_minutes,
-                id="stock_check",
-                name="Walgreens Stock Check",
-                replace_existing=True,
-            )
-
-            self.scheduler.start()
-            self.is_running = True
-            logger.info(
-                "Scheduler started. Will check every %s minute(s)",
-                self.check_interval_minutes,
-            )
-
-            self._check_stock()
-            return True
-        except Exception as exc:
-            logger.error("Error starting scheduler: %s", exc)
+    def start(self, *, run_immediately: bool = True) -> bool:
+        if self.is_running:
             return False
+
+        self.refresh_from_db()
+        self.scheduler = BackgroundScheduler()
+        self.scheduler.add_job(
+            self._check_stock,
+            "interval",
+            minutes=self.check_interval_minutes,
+            id=self._job_id,
+            name=f"Walgreens Stock Check (user {self.user_id})",
+            replace_existing=True,
+        )
+        self.scheduler.start()
+        self.is_running = True
+        self.db.update_user_settings(self.user_id, {"scheduler_enabled": True})
+
+        if run_immediately:
+            thread = threading.Thread(target=self._check_stock, daemon=True)
+            thread.start()
+        return True
 
     def stop(self) -> bool:
-        """Stop the scheduler."""
-        try:
-            if not self.is_running:
-                logger.warning("Scheduler is not running")
-                return False
-
-            self.scheduler.shutdown()
-            self.is_running = False
-            logger.info("Scheduler stopped")
-            return True
-        except Exception as exc:
-            logger.error("Error stopping scheduler: %s", exc)
+        if not self.is_running:
             return False
 
+        if self.scheduler is not None:
+            self.scheduler.shutdown(wait=False)
+            self.scheduler = None
+        self.is_running = False
+        self.db.update_user_settings(self.user_id, {"scheduler_enabled": False})
+        return True
+
     def manual_check(self) -> Dict[str, Any]:
-        """Perform a manual stock check in a background thread."""
         if self.check_in_progress:
             return {"success": False, "error": "Check already in progress"}
 
-        logger.info("Manual stock check requested - starting in background")
         thread = threading.Thread(target=self._check_stock, daemon=True)
         thread.start()
         return {"success": True, "message": "Check started in background"}
 
     def get_progress(self) -> Dict[str, Any]:
-        """Get current check progress."""
         if not self.check_in_progress:
             return {
                 "in_progress": False,
@@ -721,7 +553,6 @@ class StockCheckScheduler:
         }
 
     def get_status(self) -> Dict[str, Any]:
-        """Get scheduler status."""
         products_list = [
             {
                 "id": article_id,
@@ -748,3 +579,29 @@ class StockCheckScheduler:
             "pokemon_background_tile_size": self.pokemon_background_tile_size,
             "tracked_products": products_list,
         }
+
+
+class SchedulerManager:
+    """Cache and resume per-user schedulers."""
+
+    def __init__(self, db: StockDatabase):
+        self.db = db
+        self.schedulers: Dict[int, StockCheckScheduler] = {}
+        self.lock = threading.RLock()
+
+    def get_or_create(self, user_id: int) -> StockCheckScheduler:
+        normalized_user_id = int(user_id)
+        with self.lock:
+            scheduler = self.schedulers.get(normalized_user_id)
+            if scheduler is None:
+                scheduler = StockCheckScheduler(normalized_user_id, self.db)
+                self.schedulers[normalized_user_id] = scheduler
+            else:
+                scheduler.refresh_from_db()
+            return scheduler
+
+    def start_enabled_schedulers(self) -> None:
+        for user in self.db.list_users_with_enabled_schedulers():
+            scheduler = self.get_or_create(int(user["id"]))
+            if not scheduler.is_running:
+                scheduler.start(run_immediately=False)
