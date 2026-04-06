@@ -520,71 +520,80 @@
 
     .auth-eyebrow {
       font-size: 12px;
-      color: var(--text-muted);
+      color: rgba(198, 206, 212, 0.52);
       font-family: 'Space Mono', monospace;
       text-transform: uppercase;
       letter-spacing: 2px;
       display: inline-block;
+      position: relative;
     }
 
     @supports ((-webkit-background-clip: text) or (background-clip: text)) {
       .auth-eyebrow.shimmer-text {
-        display: inline-block;
+        isolation: isolate;
+      }
+
+      .auth-eyebrow.shimmer-text::after {
+        content: attr(data-text);
+        position: absolute;
+        inset: 0;
         color: transparent;
-        background: #acacac -webkit-gradient(
-          linear,
-          100% 0,
-          0 0,
-          from(#acacac),
-          color-stop(0.5, #ffffff),
-          to(#acacac)
+        background: linear-gradient(
+          100deg,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(255, 255, 255, 0) 34%,
+          rgba(255, 255, 255, 0.34) 44%,
+          rgba(255, 255, 255, 1) 50%,
+          rgba(243, 117, 32, 0.92) 53%,
+          rgba(255, 255, 255, 0.46) 60%,
+          rgba(255, 255, 255, 0) 72%,
+          rgba(255, 255, 255, 0) 100%
         );
-        background-position: -4rem top;
+        background-position: -8rem top;
         background-repeat: no-repeat;
+        background-size: 8rem 100%;
         -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
         background-clip: text;
-        -webkit-animation-name: auth-eyebrow-shimmer;
-        -webkit-animation-duration: 2.2s;
-        -webkit-animation-iteration-count: infinite;
-        -webkit-background-size: 4rem 100%;
-        animation: auth-eyebrow-shimmer 2.2s infinite;
-        background-size: 4rem 100%;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.28)) drop-shadow(0 0 10px rgba(243, 117, 32, 0.2));
+        pointer-events: none;
+        will-change: background-position;
+        animation: auth-eyebrow-shimmer 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
       }
     }
 
     @-webkit-keyframes auth-eyebrow-shimmer {
       0% {
-        background-position: -4rem top;
+        background-position: -8rem top;
       }
 
-      70% {
-        background-position: 12.5rem top;
+      58% {
+        background-position: 14rem top;
       }
 
       100% {
-        background-position: 12.5rem top;
+        background-position: 14rem top;
       }
     }
 
     @keyframes auth-eyebrow-shimmer {
       0% {
-        background-position: -4rem top;
+        background-position: -8rem top;
       }
 
-      70% {
-        background-position: 12.5rem top;
+      58% {
+        background-position: 14rem top;
       }
 
       100% {
-        background-position: 12.5rem top;
+        background-position: 14rem top;
       }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .auth-eyebrow.shimmer-text {
-        animation: none;
-        background-position: 50% 50%;
+      .auth-eyebrow.shimmer-text::after {
+        animation-duration: 3.6s;
+        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.18));
       }
     }
 
@@ -2900,6 +2909,11 @@
     }
 
     @media (max-width: 640px) {
+      body:not(.auth-gate-active) {
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
       .onboarding-modal {
         clip-path: none;
         padding: 12px;
@@ -2980,6 +2994,11 @@
         font-size: 10px;
       }
 
+      body:not(.auth-gate-active) .wrapper {
+        min-height: auto;
+        padding: 0 0 calc(24px + env(safe-area-inset-bottom, 0px));
+      }
+
       .auth-metrics,
       .onboarding-form-grid {
         grid-template-columns: 1fr;
@@ -3034,6 +3053,19 @@
         font-size: 17px;
       }
 
+      body:not(.auth-gate-active) .logo {
+        align-items: flex-start;
+      }
+
+      body:not(.auth-gate-active) .logo-icon {
+        width: 44px;
+        height: 44px;
+      }
+
+      body:not(.auth-gate-active) .logo-text span {
+        letter-spacing: 1.2px;
+      }
+
       .stat-value {
         font-size: 20px;
       }
@@ -3042,24 +3074,9 @@
         border-radius: 14px;
       }
 
-      .status-bar {
-        grid-template-columns: 1fr;
-      }
-
       header {
         flex-direction: column;
         align-items: flex-start;
-      }
-
-      .header-primary-actions {
-        grid-template-columns: 1fr;
-      }
-
-      .header-actions .btn,
-      .header-actions .user-pill,
-      .header-primary-actions .btn {
-        width: 100%;
-        justify-content: center;
       }
 
       .tabs {
@@ -3095,6 +3112,151 @@
 
       .tech-stack-grid {
         grid-template-columns: 1fr;
+      }
+
+      body:not(.auth-gate-active) .app-window {
+        margin-top: 0;
+        min-height: 100dvh;
+        max-height: none;
+        overflow: visible;
+        padding: calc(14px + env(safe-area-inset-top, 0px)) 14px calc(24px + env(safe-area-inset-bottom, 0px));
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        backdrop-filter: none;
+        background:
+          linear-gradient(180deg, rgba(47, 51, 55, 0.98), rgba(34, 37, 41, 0.96)),
+          radial-gradient(circle at top right, rgba(72, 156, 212, 0.12), transparent 30%);
+      }
+
+      body:not(.auth-gate-active) header {
+        gap: 14px;
+        padding: 0 0 16px;
+      }
+
+      body:not(.auth-gate-active) .header-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        width: 100%;
+      }
+
+      body:not(.auth-gate-active) .header-primary-actions {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      body:not(.auth-gate-active) .header-actions .btn,
+      body:not(.auth-gate-active) .header-actions .user-pill,
+      body:not(.auth-gate-active) .header-primary-actions .btn {
+        width: 100%;
+        min-width: 0;
+        justify-content: center;
+      }
+
+      body:not(.auth-gate-active) #settings-btn,
+      body:not(.auth-gate-active) #check-btn {
+        min-width: 0;
+      }
+
+      body:not(.auth-gate-active) .header-actions .user-pill {
+        grid-column: 1 / -1;
+      }
+
+      body:not(.auth-gate-active) .user-pill-text {
+        min-width: 0;
+      }
+
+      body:not(.auth-gate-active) .user-pill-email {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      body:not(.auth-gate-active) #signout-btn {
+        grid-column: 1 / -1;
+      }
+
+      body:not(.auth-gate-active) .status-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin: 16px 0 18px;
+      }
+
+      body:not(.auth-gate-active) .stat-card {
+        padding: 14px;
+      }
+
+      body:not(.auth-gate-active) .stat-value {
+        font-size: 18px;
+      }
+
+      body:not(.auth-gate-active) .stat-label,
+      body:not(.auth-gate-active) .stat-sub {
+        line-height: 1.4;
+      }
+
+      body:not(.auth-gate-active) .tabs {
+        margin: 0 -14px 18px;
+        padding: 0 14px 2px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+      }
+
+      body:not(.auth-gate-active) .tabs::-webkit-scrollbar {
+        display: none;
+      }
+
+      body:not(.auth-gate-active) .tab {
+        flex: 1 0 104px;
+        min-width: 104px;
+      }
+
+      body:not(.auth-gate-active) #progress-section {
+        margin-bottom: 16px !important;
+        padding: 16px !important;
+      }
+
+      body:not(.auth-gate-active) .empty-state {
+        padding: 40px 12px;
+      }
+
+      body:not(.auth-gate-active) .results-toolbar {
+        padding: 12px 14px;
+      }
+
+      body:not(.auth-gate-active) .results-map-card,
+      body:not(.auth-gate-active) .results-map-sidebar,
+      body:not(.auth-gate-active) .results-map-canvas {
+        height: 300px;
+      }
+
+      body:not(.auth-gate-active) .product-item {
+        padding: 14px;
+      }
+
+      body:not(.auth-gate-active) .site-footer {
+        position: static;
+        left: auto;
+        right: auto;
+        top: auto;
+        bottom: auto;
+        width: auto;
+        margin: 20px 14px 0;
+        padding: 14px 0 0;
+        transform: none;
+        justify-content: flex-start;
+        gap: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: left;
+        font-size: 10px;
+        letter-spacing: 0.05em;
+      }
+
+      body:not(.auth-gate-active) .site-footer>span[aria-hidden="true"] {
+        display: none;
       }
 
       .site-footer {
@@ -3428,7 +3590,7 @@
       <div class="auth-layout">
         <section class="auth-showcase">
           <div class="auth-card">
-            <div class="auth-eyebrow shimmer-text">Early Access</div>
+            <div class="auth-eyebrow shimmer-text" data-text="Early Access">Early Access</div>
             <div class="auth-title">Run private Walgreens alerts from a hosted dashboard. Never miss a restock at your Walgreens again.</div>
             <div class="auth-copy">Sign in once, keep your own ZIP code, Discord destinations, tracked products, and automation settings isolated from every other user on the service.</div>
             <div class="auth-metrics">
@@ -3474,7 +3636,7 @@
         <aside class="auth-panel">
           <div class="auth-panel-card">
             <div class="auth-panel-title">Sign in with Google</div>
-            <div class="auth-panel-copy">First-time users will get a short setup guide after login.</div>
+            <div class="auth-panel-copy">First-time users will get a short setup guide after login. (app installation optional)</div>
             <div class="auth-actions">
               <div id="google-signin-button"></div>
               <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
