@@ -2689,7 +2689,7 @@
         <div class="settings-grid">
           <div class="form-group">
             <label class="form-label">ZIP Code</label>
-            <input type="text" class="form-input" id="cfg-zip" maxlength="10" placeholder="85209">
+            <input type="text" class="form-input" id="cfg-zip" maxlength="10" placeholder="Enter ZIP code">
             <span class="form-hint">Search location</span>
           </div>
           <div class="form-group">
@@ -2766,7 +2766,7 @@
           <div style="margin-top:16px;">
             <div class="form-group">
               <input type="url" class="form-input" id="new-product-url"
-                placeholder="Walgreens product link (e.g., https://www.walgreens.com/store/c/.../ID=300454138-product)">
+                placeholder="Paste a Walgreens product link">
             </div>
             <div class="form-group" style="margin-top:10px;">
               <input type="text" class="form-input" id="new-product-name"
@@ -3003,7 +3003,7 @@
               <div class="onboarding-form-grid">
                 <div class="form-group">
                   <label class="form-label" for="onboarding-zip">ZIP Code</label>
-                  <input type="text" class="form-input" id="onboarding-zip" maxlength="10" placeholder="85209" value="${escapeHtml(draft.zipcode)}">
+                  <input type="text" class="form-input" id="onboarding-zip" maxlength="10" placeholder="Enter ZIP code" value="${escapeHtml(draft.zipcode)}">
                   <span class="form-hint">Walgreens store search area.</span>
                 </div>
                 <div class="form-group">
@@ -3049,7 +3049,7 @@
                 <div class="onboarding-form-card-title">First tracked product</div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-url">Walgreens Product URL</label>
-                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="https://www.walgreens.com/store/c/.../ID=300454138-product" value="${escapeHtml(draft.productUrl)}">
+                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a Walgreens product link" value="${escapeHtml(draft.productUrl)}">
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-name">Custom Name</label>
@@ -3371,7 +3371,7 @@
         const looksLikeFirstRun = (
           (stats.total_checks || 0) === 0 &&
           (status.discord_webhook_count || 0) === 0 &&
-          (status.current_zipcode || '55555') === '55555' &&
+          !(status.current_zipcode || '').trim() &&
           ((status.tracked_products || []).length <= 1)
         );
 
@@ -3931,7 +3931,7 @@
         `;
       }
 
-      function renderResultsContent(data, configuredZip = '85209') {
+      function renderResultsContent(data, configuredZip = '') {
         latestRenderedResults = { data, configuredZip };
         const checkResult = data.check_result || {};
         const products = data.products_found || {};
@@ -4115,7 +4115,7 @@
           if (checkData) {
             const products = checkData.products_found || {};
             if (Object.keys(products).length > 0) {
-              const configuredZip = statusData?.status?.current_zipcode || '85209';
+              const configuredZip = statusData?.status?.current_zipcode || '';
               renderResultsContent(checkData, configuredZip);
               lastResultsSignature = buildResultsSignature(checkData);
             }
@@ -4359,7 +4359,7 @@
           }
 
           if (currentTab === 'results') {
-            await loadResults(status.current_zipcode || document.getElementById('cfg-zip')?.value || '85209');
+            await loadResults(status.current_zipcode || document.getElementById('cfg-zip')?.value || '');
           }
           return data;
         } finally {
@@ -4367,7 +4367,7 @@
         }
       }
 
-      async function loadResults(configuredZip = '85209') {
+      async function loadResults(configuredZip = '') {
         const data = await apiCall('/api/last-check');
         if (!data) {
           lastResultsSignature = '';
@@ -4415,7 +4415,7 @@
         const data = await apiCall('/api/status');
         if (!data) return;
         const status = data.status || {};
-        document.getElementById('cfg-zip').value = status.current_zipcode || '85209';
+        document.getElementById('cfg-zip').value = status.current_zipcode || '';
         document.getElementById('cfg-interval').value = status.check_interval_minutes || 60;
         applyPokemonBackgroundSettings({
           enabled: status.pokemon_background_enabled ?? DEFAULT_POKEMON_BACKGROUND_ENABLED,

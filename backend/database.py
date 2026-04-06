@@ -59,7 +59,7 @@ class StockDatabase:
 
                 CREATE TABLE IF NOT EXISTS user_settings (
                     user_id INTEGER PRIMARY KEY,
-                    current_zipcode TEXT NOT NULL DEFAULT '55555',
+                    current_zipcode TEXT NOT NULL DEFAULT '',
                     check_interval_minutes INTEGER NOT NULL DEFAULT 60,
                     discord_destinations TEXT NOT NULL DEFAULT '[]',
                     pokemon_background_enabled INTEGER NOT NULL DEFAULT 0,
