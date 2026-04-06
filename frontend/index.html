@@ -566,6 +566,14 @@
       gap: 14px;
     }
 
+    .auth-install-copy {
+      width: 100%;
+      margin-top: -4px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
     .auth-note-list {
       display: grid;
       gap: 10px;
@@ -2638,6 +2646,7 @@
                 </svg>
                 Install App
               </button>
+              <div class="auth-install-copy install-app-copy" hidden>Optional: install it for faster access from your desktop or home screen.</div>
             </div>
             <ul class="auth-note-list">
               <li class="auth-note-item"><span class="auth-note-bullet"></span><span>No shared settings between users.</span></li>
@@ -2938,6 +2947,7 @@
       let onboardingFeedback = { message: '', type: 'info' };
       let onboardingBusy = false;
       let deferredInstallPrompt = null;
+      let installDisplayModeQuery = null;
 
       const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
       const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
@@ -2980,6 +2990,19 @@
         document.querySelectorAll('.install-app-btn').forEach(button => {
           button.hidden = !visible;
         });
+        document.querySelectorAll('.install-app-copy').forEach(copy => {
+          copy.hidden = !visible;
+        });
+      }
+
+      function isAppInstalled() {
+        const isStandaloneDisplayMode = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+        const isIosStandalone = window.navigator && window.navigator.standalone === true;
+        return isStandaloneDisplayMode || isIosStandalone;
+      }
+
+      function refreshInstallButtons() {
+        setInstallButtonsVisible(Boolean(deferredInstallPrompt) && !isAppInstalled());
       }
 
       async function promptInstallApp() {
@@ -2990,7 +3013,7 @@
         } catch (e) {
         }
         deferredInstallPrompt = null;
-        setInstallButtonsVisible(false);
+        refreshInstallButtons();
       }
 
       async function registerServiceWorker() {
@@ -4274,6 +4297,15 @@
         ensureOnboardingModalRoot();
         renderCachedState();
         initializePokemonBackgroundControls();
+        if (window.matchMedia) {
+          installDisplayModeQuery = window.matchMedia('(display-mode: standalone)');
+          if (typeof installDisplayModeQuery.addEventListener === 'function') {
+            installDisplayModeQuery.addEventListener('change', refreshInstallButtons);
+          } else if (typeof installDisplayModeQuery.addListener === 'function') {
+            installDisplayModeQuery.addListener(refreshInstallButtons);
+          }
+        }
+        refreshInstallButtons();
         registerServiceWorker();
         hydrateAuthenticatedSession();
       });
@@ -4296,12 +4328,12 @@
       window.addEventListener('beforeinstallprompt', event => {
         event.preventDefault();
         deferredInstallPrompt = event;
-        setInstallButtonsVisible(true);
+        refreshInstallButtons();
       });
 
       window.addEventListener('appinstalled', () => {
         deferredInstallPrompt = null;
-        setInstallButtonsVisible(false);
+        refreshInstallButtons();
         showToast('App installed', 'success');
       });
 
