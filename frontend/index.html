@@ -528,7 +528,7 @@
 
     .onboarding-modal {
       position: fixed;
-      inset: 12px;
+      inset: 0;
       z-index: 12000;
       display: flex;
       align-items: center;
@@ -536,8 +536,9 @@
       padding: 24px;
       background: rgba(9, 11, 15, 0.72);
       backdrop-filter: blur(12px);
-      border-radius: 24px;
-      overflow: hidden;
+      clip-path: inset(12px round 24px);
+      overflow-y: auto;
+      scrollbar-gutter: stable both-edges;
     }
 
     .onboarding-modal[hidden] {
@@ -546,6 +547,8 @@
 
     .onboarding-dialog {
       width: min(960px, 100%);
+      max-height: calc(100vh - 72px);
+      margin: auto;
       display: grid;
       grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr);
       background: rgba(31, 35, 39, 0.98);
@@ -559,6 +562,8 @@
       padding: 28px;
       display: grid;
       gap: 18px;
+      align-content: start;
+      overflow-y: auto;
       background:
         radial-gradient(circle at top left, rgba(72, 156, 212, 0.18), transparent 42%),
         linear-gradient(180deg, rgba(44, 49, 54, 0.98), rgba(28, 31, 35, 0.98));
@@ -634,6 +639,7 @@
       display: grid;
       gap: 22px;
       align-content: start;
+      overflow-y: auto;
     }
 
     .onboarding-step-meta {
@@ -2074,8 +2080,8 @@
 
     @media (max-width: 640px) {
       .onboarding-modal {
-        inset: 0;
-        border-radius: 0;
+        clip-path: none;
+        padding: 12px;
       }
 
       .auth-layout,
@@ -2088,6 +2094,10 @@
       .onboarding-sidebar,
       .onboarding-content {
         padding: 24px 20px;
+      }
+
+      .onboarding-dialog {
+        max-height: calc(100vh - 24px);
       }
 
       .auth-showcase {
