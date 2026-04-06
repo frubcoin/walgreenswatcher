@@ -290,6 +290,32 @@ def remove_product():
     else:
         return jsonify({'error': 'Product not found'}), 404
 
+@app.route('/api/products/update', methods=['POST'])
+def update_product():
+    """Update a tracked product"""
+    if scheduler is None:
+        init_scheduler()
+
+    data = request.json or {}
+    product_id = data.get('id', '').strip()
+    product_name = data.get('name', '').strip()
+
+    if not product_id:
+        return jsonify({'error': 'Product ID required'}), 400
+
+    if not product_name:
+        return jsonify({'error': 'Product name required'}), 400
+
+    try:
+        success = scheduler.update_product_name(product_id, product_name)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    if success:
+        return jsonify({'message': 'Product updated', 'id': product_id, 'name': product_name})
+    else:
+        return jsonify({'error': 'Product not found'}), 404
+
 # ==================== Static Files ====================
 
 @app.route('/')

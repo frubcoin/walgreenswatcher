@@ -337,6 +337,23 @@ class StockCheckScheduler:
         logger.info("Removed product: %s (%s)", name, product_id)
         return True
 
+    def update_product_name(self, product_id: str, product_name: str) -> bool:
+        """Update the display name for a tracked product."""
+        product_id = str(product_id).strip()
+        product_name = str(product_name).strip()
+
+        if not product_id or product_id not in self.tracked_products:
+            logger.warning("Product %s not found for rename", product_id)
+            return False
+
+        if not product_name:
+            raise ValueError("Product name cannot be empty")
+
+        self.tracked_products[product_id]["name"] = product_name
+        self._save_products()
+        logger.info("Renamed product %s to %s", product_id, product_name)
+        return True
+
     def set_zipcode(self, zipcode: str) -> None:
         """Update the search ZIP code."""
         normalized_zipcode = str(zipcode).strip() or TARGET_ZIP_CODE

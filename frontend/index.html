@@ -1194,15 +1194,30 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
     }
 
     .product-info {
       flex: 1;
+      min-width: 0;
     }
 
     .product-name {
       font-weight: 600;
       font-size: 14px;
+      word-break: break-word;
+    }
+
+    .product-name-input {
+      margin-bottom: 8px;
+    }
+
+    .product-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .product-id {
@@ -1227,6 +1242,16 @@
     }
 
     @media (max-width: 640px) {
+      .product-item {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .product-actions {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
       .logo-text h1 {
         font-size: 17px;
       }
@@ -1916,6 +1941,8 @@
       let currentTab = 'results';
       let isStatusRefreshInFlight = false;
       let lastResultsSignature = '';
+      let trackedProductsCache = [];
+      let editingProductId = null;
 
       async function persistPokemonBackgroundSettings() {
         const enabledInput = document.getElementById('cfg-pokemon-bg-enabled');
@@ -2048,6 +2075,95 @@
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
+      }
+
+      function renderTrackedProducts(products = trackedProductsCache) {
+        trackedProductsCache = Array.isArray(products) ? products : [];
+        const list = document.getElementById('products-list');
+        if (!list) return;
+
+        list.innerHTML = trackedProductsCache.map(p => {
+          const isEditing = editingProductId === p.id;
+          const safeName = escapeHtml(p.name || 'Unnamed product');
+          const safePlanogram = escapeHtml(p.planogram || 'missing-planogram');
+          const safeId = escapeHtml(p.id || '');
+
+          return `
+            <div class="product-item">
+              <div class="product-info">
+                ${isEditing
+                  ? `<input type="text" class="form-input product-name-input" id="edit-product-name-${safeId}" value="${safeName}" maxlength="160" placeholder="Product name" onkeydown="handleProductNameKeydown(event, '${safeId}')">`
+                  : `<div class="product-name">${safeName}</div>`
+                }
+                <div class="product-id">${safeId} | ${safePlanogram}</div>
+              </div>
+              <div class="product-actions">
+                ${isEditing
+                  ? `
+                    <button class="btn btn-secondary btn-sm" type="button" onclick="cancelProductNameEdit()">Cancel</button>
+                    <button class="btn btn-primary btn-sm" type="button" onclick="saveProductName('${safeId}')">Save</button>
+                  `
+                  : `
+                    <button class="btn btn-secondary btn-sm" type="button" onclick="startProductNameEdit('${safeId}')">Edit</button>
+                    <button class="btn btn-danger-icon" type="button" onclick="removeProduct('${safeId}')" title="Remove">
+                      <span class="btn-icon" style="-webkit-mask-image: url('/trash.webp'); mask-image: url('/trash.webp'); width: 20px; height: 20px;" aria-hidden="true"></span>
+                    </button>
+                  `
+                }
+              </div>
+            </div>`;
+        }).join('');
+
+        if (editingProductId) {
+          const input = document.getElementById(`edit-product-name-${editingProductId}`);
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        }
+      }
+
+      function startProductNameEdit(productId) {
+        editingProductId = productId;
+        renderTrackedProducts();
+      }
+
+      function cancelProductNameEdit() {
+        editingProductId = null;
+        renderTrackedProducts();
+      }
+
+      function handleProductNameKeydown(event, productId) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          saveProductName(productId);
+          return;
+        }
+
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          cancelProductNameEdit();
+        }
+      }
+
+      async function saveProductName(productId) {
+        const input = document.getElementById(`edit-product-name-${productId}`);
+        const nextName = input ? input.value.trim() : '';
+
+        if (!nextName) {
+          showToast('Product name cannot be empty', 'error');
+          if (input) input.focus();
+          return;
+        }
+
+        const result = await apiCall('/api/products/update', 'POST', { id: productId, name: nextName });
+        if (result) {
+          editingProductId = null;
+          showToast('Product name updated', 'success');
+          await loadSettings();
+        } else {
+          showToast('Failed to update product name', 'error');
+        }
       }
 
       function formatDistance(distance) {
@@ -2433,17 +2549,7 @@
         renderDiscordDestinationRows(status.discord_destinations || []);
 
         const products = status.tracked_products || [];
-        const list = document.getElementById('products-list');
-        list.innerHTML = products.map(p => `
-    <div class="product-item">
-      <div class="product-info">
-        <div class="product-name">${p.name}</div>
-        <div class="product-id">${p.id} | ${p.planogram || 'missing-planogram'}</div>
-      </div>
-      <button class="btn btn-danger-icon" onclick="removeProduct('${p.id}')" title="Remove">
-        <span class="btn-icon" style="-webkit-mask-image: url('/trash.webp'); mask-image: url('/trash.webp'); width: 20px; height: 20px;" aria-hidden="true"></span>
-      </button>
-    </div>`).join('');
+        renderTrackedProducts(products);
       }
 
       async function saveSettings() {
