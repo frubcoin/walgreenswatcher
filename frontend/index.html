@@ -72,6 +72,10 @@
       position: relative;
     }
 
+    body.onboarding-open {
+      overflow: hidden;
+    }
+
     body::before {
       content: '';
       position: fixed;
@@ -546,11 +550,11 @@
     }
 
     .onboarding-dialog {
-      width: min(960px, 100%);
-      max-height: calc(100vh - 72px);
+      width: min(1180px, calc(100vw - 48px));
+      max-height: min(820px, calc(100vh - 72px));
       margin: auto;
       display: grid;
-      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr);
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
       background: rgba(31, 35, 39, 0.98);
       border: 1px solid rgba(116, 129, 141, 0.34);
       border-radius: 24px;
@@ -559,6 +563,7 @@
     }
 
     .onboarding-sidebar {
+      min-width: 0;
       padding: 28px;
       display: grid;
       gap: 18px;
@@ -635,6 +640,7 @@
     }
 
     .onboarding-content {
+      min-width: 0;
       padding: 32px;
       display: grid;
       gap: 22px;
@@ -664,7 +670,7 @@
     .onboarding-step-copy {
       font-size: 16px;
       color: var(--text-secondary);
-      max-width: 54ch;
+      max-width: 64ch;
     }
 
     .onboarding-callout {
@@ -725,6 +731,7 @@
     }
 
     .onboarding-form-card {
+      min-width: 0;
       padding: 18px;
       border-radius: 16px;
       background: rgba(255, 255, 255, 0.04);
@@ -3171,9 +3178,10 @@
         }
         onboardingAutoPrompted = true;
         renderOnboarding();
-        const modal = document.getElementById('onboarding-modal');
+        const modal = ensureOnboardingModalRoot();
         if (modal) {
           modal.hidden = false;
+          document.body.classList.add('onboarding-open');
         }
       }
 
@@ -3182,11 +3190,20 @@
         if (modal) {
           modal.hidden = true;
         }
+        document.body.classList.remove('onboarding-open');
         onboardingBusy = false;
         onboardingFeedback = { message: '', type: 'info' };
         if (markComplete) {
           markOnboardingCompleted();
         }
+      }
+
+      function ensureOnboardingModalRoot() {
+        const modal = document.getElementById('onboarding-modal');
+        if (modal && modal.parentElement !== document.body) {
+          document.body.appendChild(modal);
+        }
+        return modal;
       }
 
       function goToOnboardingStep(direction) {
@@ -4126,6 +4143,7 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
+        ensureOnboardingModalRoot();
         renderCachedState();
         initializePokemonBackgroundControls();
         registerServiceWorker();
