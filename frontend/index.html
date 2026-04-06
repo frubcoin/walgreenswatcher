@@ -62,11 +62,12 @@
       --accent-soft: rgba(72, 156, 212, 0.12);
       --accent-soft-border: rgba(72, 156, 212, 0.45);
       --scrollbar-track: rgba(255, 255, 255, 0.035);
-      --scrollbar-thumb-start: rgba(72, 156, 212, 0.78);
-      --scrollbar-thumb-end: rgba(230, 38, 0, 0.74);
-      --scrollbar-thumb-hover-start: rgba(98, 178, 228, 0.9);
-      --scrollbar-thumb-hover-end: rgba(243, 117, 32, 0.84);
+      --scrollbar-thumb-start: rgba(230, 38, 0, 0.86);
+      --scrollbar-thumb-end: rgba(154, 18, 0, 0.82);
+      --scrollbar-thumb-hover-start: rgba(243, 117, 32, 0.92);
+      --scrollbar-thumb-hover-end: rgba(198, 31, 0, 0.9);
       --scrollbar-thumb-border: rgba(31, 35, 39, 0.94);
+      --shell-footer-gap: 92px;
       --radius: 10px;
       --radius-sm: 6px;
       --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
@@ -432,12 +433,12 @@
 
     body.auth-gate-active .wrapper {
       min-height: 100dvh;
-      padding-bottom: 92px;
+      padding-bottom: var(--shell-footer-gap);
     }
 
     body:not(.auth-gate-active) .wrapper {
       min-height: 100dvh;
-      padding-bottom: 92px;
+      padding-bottom: var(--shell-footer-gap);
     }
 
     body.auth-gate-active .auth-gate {
@@ -2628,6 +2629,12 @@
       text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
     }
 
+    body:not(.auth-gate-active) .site-footer {
+      top: calc(100dvh - (var(--shell-footer-gap) / 2));
+      bottom: auto;
+      transform: translate(-50%, -50%);
+    }
+
     .site-footer-copy {
       white-space: normal;
     }
@@ -2941,10 +2948,10 @@
       border: 'rgba(72,156,212,0.18)',
       borderGlow: 'rgba(230,38,0,0.35)',
       scrollbarTrack: 'rgba(255,255,255,0.035)',
-      scrollbarThumbStart: 'rgba(72,156,212,0.78)',
-      scrollbarThumbEnd: 'rgba(230,38,0,0.74)',
-      scrollbarThumbHoverStart: 'rgba(98,178,228,0.9)',
-      scrollbarThumbHoverEnd: 'rgba(243,117,32,0.84)',
+      scrollbarThumbStart: 'rgba(230,38,0,0.86)',
+      scrollbarThumbEnd: 'rgba(154,18,0,0.82)',
+      scrollbarThumbHoverStart: 'rgba(243,117,32,0.92)',
+      scrollbarThumbHoverEnd: 'rgba(198,31,0,0.9)',
       scrollbarThumbBorder: 'rgba(31,35,39,0.94)'
     };
     const RESULTS_MAP_THEME_STORAGE_KEY = 'walgreens_results_map_theme';
