@@ -77,22 +77,16 @@ def _is_allowed_walgreens_host(hostname: str) -> bool:
     return bool(normalized) and (normalized == "walgreens.com" or normalized.endswith(".walgreens.com"))
 
 
-def _is_allowed_bestbuy_host(hostname: str) -> bool:
-    normalized = str(hostname or "").strip().lower()
-    return bool(normalized) and (normalized == "bestbuy.com" or normalized.endswith(".bestbuy.com"))
+
 
 
 def _is_allowed_product_source_host(hostname: str) -> bool:
-    return _is_allowed_walgreens_host(hostname) or _is_allowed_bestbuy_host(hostname)
+    return _is_allowed_walgreens_host(hostname)
 
 
 def _is_allowed_product_image_host(hostname: str) -> bool:
     normalized = str(hostname or "").strip().lower()
-    return (
-        _is_allowed_product_source_host(normalized)
-        or normalized.endswith(".bbystatic.com")
-        or normalized == "pisces.bbystatic.com"
-    )
+    return _is_allowed_product_source_host(normalized)
 
 
 def _normalize_external_url(

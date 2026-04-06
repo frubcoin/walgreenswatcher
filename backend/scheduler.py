@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import DEFAULT_CHECK_INTERVAL_MINUTES, DEFAULT_TRACKED_PRODUCTS, TARGET_ZIP_CODE
-from bestbuy_scraper import BestBuyStockChecker
+
 from database import StockDatabase
 from discord_notifier import DiscordNotifier
 from walgreens_scraper import WalgreensStockChecker
@@ -57,7 +57,7 @@ class StockCheckScheduler:
         self.state_lock = threading.RLock()
 
         self.walgreens_checker = WalgreensStockChecker()
-        self.bestbuy_checker = BestBuyStockChecker()
+
         self.notifier = DiscordNotifier([])
         self.is_running = False
         self.last_check_time: Optional[datetime] = None
@@ -137,7 +137,7 @@ class StockCheckScheduler:
             for product in products
         }
         self.walgreens_checker.current_zip_code = self.current_zipcode
-        self.bestbuy_checker.current_zip_code = self.current_zipcode
+
 
     @staticmethod
     def _validate_interval_minutes(interval_minutes: Any) -> int:
@@ -425,8 +425,7 @@ class StockCheckScheduler:
 
             self.walgreens_checker.progress_callback = update_progress
             self.walgreens_checker.current_zip_code = self.current_zipcode
-            self.bestbuy_checker.progress_callback = update_progress
-            self.bestbuy_checker.current_zip_code = self.current_zipcode
+
 
             walgreens_products = [
                 product for product in product_specs if product.get("retailer", "walgreens") == "walgreens"
@@ -486,18 +485,7 @@ class StockCheckScheduler:
                         product_index=index,
                         product_total=len(product_specs),
                     )
-                elif retailer == "bestbuy":
-                    product_result = self.bestbuy_checker.check_product_availability(
-                        product,
-                        self.current_zipcode,
-                        product_index=index,
-                        product_total=len(product_specs),
-                    )
-                    scanned_store_keys.update(
-                        f"bestbuy:{location_id}"
-                        for location_id in product_result.get("location_ids", [])
-                        if location_id
-                    )
+
                 else:
                     raise ValueError(f"Unsupported retailer: {retailer}")
 

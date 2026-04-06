@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -5153,7 +5153,7 @@
             setOnboardingFeedback('You already have a tracked product, so we can move on.', 'success');
             return true;
           }
-          setOnboardingFeedback('Paste a Walgreens or Best Buy product link before continuing.', 'error');
+          setOnboardingFeedback('Paste a Walgreens product link before continuing.', 'error');
           return false;
         }
 
@@ -5508,18 +5508,13 @@
         return Boolean(normalized) && (normalized === 'walgreens.com' || normalized.endsWith('.walgreens.com'));
       }
 
-      function isAllowedBestBuyHost(hostname) {
-        const normalized = String(hostname || '').trim().toLowerCase();
-        return Boolean(normalized) && (normalized === 'bestbuy.com' || normalized.endsWith('.bestbuy.com'));
-      }
-
       function isAllowedProductSourceHost(hostname) {
-        return isAllowedWalgreensHost(hostname) || isAllowedBestBuyHost(hostname);
+        return isAllowedWalgreensHost(hostname);
       }
 
       function isAllowedProductImageHost(hostname) {
         const normalized = String(hostname || '').trim().toLowerCase();
-        return isAllowedProductSourceHost(normalized) || normalized.endsWith('.bbystatic.com');
+        return isAllowedProductSourceHost(normalized);
       }
 
       function sanitizeHttpUrl(value, { hostValidator = null } = {}) {
@@ -5545,15 +5540,15 @@
       }
 
       function retailerKey(retailer) {
-        return String(retailer || 'walgreens').trim().toLowerCase() === 'bestbuy' ? 'bestbuy' : 'walgreens';
+        return 'walgreens';
       }
 
       function retailerLabel(retailer) {
-        return retailerKey(retailer) === 'bestbuy' ? 'Best Buy Beta' : 'Walgreens';
+        return 'Walgreens';
       }
 
       function retailerIconPath(retailer) {
-        return retailerKey(retailer) === 'bestbuy' ? '/icons/bestbuy.png' : '/icons/walgreens.png';
+        return '/icons/walgreens.png';
       }
 
       function renderTrackedProducts(products = trackedProductsCache) {
