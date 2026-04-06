@@ -1079,7 +1079,7 @@
     .shell-scrollbar {
       position: fixed;
       z-index: 7;
-      width: 10px;
+      width: 8px;
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.18s ease;
@@ -1110,7 +1110,7 @@
     .shell-scrollbar-thumb {
       position: absolute;
       left: 1px;
-      width: 8px;
+      width: 6px;
       min-height: 36px;
       border: 1px solid var(--scrollbar-thumb-border);
       background: linear-gradient(180deg, var(--scrollbar-thumb-start), var(--scrollbar-thumb-end));
@@ -3784,10 +3784,10 @@
           return;
         }
 
-        const inset = 8;
+        const inset = 10;
         const barHeight = Math.max(48, rect.height - (inset * 2));
         const barTop = rect.top + inset;
-        const barLeft = rect.right - 12;
+        const barLeft = rect.right - 11;
         const thumbHeight = Math.max(36, Math.min(barHeight, (scroller.clientHeight / scroller.scrollHeight) * barHeight));
         const thumbTravel = Math.max(0, barHeight - thumbHeight);
         const scrollRatio = maxScroll > 0 ? (scroller.scrollTop / maxScroll) : 0;
