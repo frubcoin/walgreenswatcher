@@ -3500,12 +3500,6 @@
               aria-hidden="true"></span>
             Settings
           </button>
-              <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
-                <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
-                  <path d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
-                </svg>
-                Install App
-              </button>
               <button class="btn btn-secondary" id="guide-btn" type="button" data-action="open-onboarding">Guide</button>
               <button class="btn btn-secondary" id="signout-btn" type="button" data-action="logout">Sign Out</button>
         </div>
@@ -3621,6 +3615,16 @@
             <input type="range" class="form-input" id="cfg-pokemon-bg-size" min="200" max="1200" step="5" value="645">
             <span class="form-hint">Adjust how large each repeating tile appears. <span
                 id="cfg-pokemon-bg-size-value">645px</span></span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Install App</label>
+            <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
+              <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
+                <path d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
+              </svg>
+              Install App
+            </button>
+            <span class="form-hint install-app-copy" hidden>Install the dashboard for faster access from your desktop or home screen.</span>
           </div>
         </div>
 
@@ -4044,6 +4048,15 @@
         return Boolean(window.matchMedia && window.matchMedia(`(display-mode: ${mode})`).matches);
       }
 
+      function isWindowsPlatform() {
+        const platformValue =
+          (navigator.userAgentData && navigator.userAgentData.platform)
+          || navigator.platform
+          || navigator.userAgent
+          || '';
+        return /windows/i.test(String(platformValue));
+      }
+
       function isAppInstalled() {
         const isInstalledDisplayMode =
           matchesDisplayMode('standalone')
@@ -4058,11 +4071,11 @@
       function refreshInstallButtons() {
         const installed = isAppInstalled();
         document.body.classList.toggle('app-installed', installed);
-        setInstallButtonsVisible(Boolean(deferredInstallPrompt) && !installed);
+        setInstallButtonsVisible(Boolean(deferredInstallPrompt) && !installed && isWindowsPlatform());
       }
 
       async function promptInstallApp() {
-        if (!deferredInstallPrompt) return;
+        if (!deferredInstallPrompt || !isWindowsPlatform()) return;
         deferredInstallPrompt.prompt();
         try {
           await deferredInstallPrompt.userChoice;
