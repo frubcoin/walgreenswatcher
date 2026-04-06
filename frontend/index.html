@@ -3092,10 +3092,13 @@
         bottom: 0;
         display: grid;
         gap: 8px;
-        left: 50%;
-        width: 100vw;
-        margin-left: calc(50% - 50vw);
-        padding: 10px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+        left: 0;
+        width: 100%;
+        margin-left: 0;
+        padding-top: 10px;
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
         background: linear-gradient(180deg, rgba(27, 30, 34, 0.82), rgba(20, 23, 27, 0.98));
         backdrop-filter: blur(16px);
         box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.18);
@@ -3104,9 +3107,10 @@
 
       .onboarding-actions-group {
         display: grid;
-        grid-template-columns: repeat(2, minmax(136px, 160px));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
-        width: min(calc(100vw - 32px), 328px);
+        width: 100%;
+        max-width: 328px;
         justify-content: center;
         justify-items: center;
         justify-self: center;
