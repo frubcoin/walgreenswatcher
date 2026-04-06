@@ -336,7 +336,6 @@
       max-height: calc(100dvh - 110px);
       overflow-y: auto;
       overscroll-behavior: contain;
-      scrollbar-gutter: stable both-edges;
     }
 
     header {
@@ -740,7 +739,6 @@
       background: rgba(9, 11, 15, 0.72);
       backdrop-filter: blur(12px);
       overflow-y: auto;
-      scrollbar-gutter: stable both-edges;
     }
 
     .onboarding-modal[hidden] {
@@ -988,34 +986,55 @@
       overflow-y: auto;
     }
 
+    .auth-gate,
+    .app-window,
+    .onboarding-modal,
     .onboarding-sidebar,
-    .onboarding-content {
+    .onboarding-content,
+    .tech-stack-content {
       scrollbar-width: thin;
-      scrollbar-color: rgba(72, 156, 212, 0.8) rgba(255, 255, 255, 0.05);
+      scrollbar-color: rgba(72, 156, 212, 0.78) rgba(255, 255, 255, 0.04);
     }
 
+    .auth-gate::-webkit-scrollbar,
+    .app-window::-webkit-scrollbar,
+    .onboarding-modal::-webkit-scrollbar,
     .onboarding-sidebar::-webkit-scrollbar,
-    .onboarding-content::-webkit-scrollbar {
-      width: 12px;
+    .onboarding-content::-webkit-scrollbar,
+    .tech-stack-content::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
     }
 
+    .auth-gate::-webkit-scrollbar-track,
+    .app-window::-webkit-scrollbar-track,
+    .onboarding-modal::-webkit-scrollbar-track,
     .onboarding-sidebar::-webkit-scrollbar-track,
-    .onboarding-content::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.04);
+    .onboarding-content::-webkit-scrollbar-track,
+    .tech-stack-content::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.035);
       border-radius: 999px;
     }
 
+    .auth-gate::-webkit-scrollbar-thumb,
+    .app-window::-webkit-scrollbar-thumb,
+    .onboarding-modal::-webkit-scrollbar-thumb,
     .onboarding-sidebar::-webkit-scrollbar-thumb,
-    .onboarding-content::-webkit-scrollbar-thumb {
+    .onboarding-content::-webkit-scrollbar-thumb,
+    .tech-stack-content::-webkit-scrollbar-thumb {
       border-radius: 999px;
-      border: 3px solid rgba(31, 35, 39, 0.96);
-      background: linear-gradient(180deg, rgba(72, 156, 212, 0.92), rgba(230, 38, 0, 0.88));
+      border: 2px solid rgba(31, 35, 39, 0.94);
+      background: linear-gradient(180deg, rgba(72, 156, 212, 0.78), rgba(230, 38, 0, 0.74));
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
     }
 
+    .auth-gate::-webkit-scrollbar-thumb:hover,
+    .app-window::-webkit-scrollbar-thumb:hover,
+    .onboarding-modal::-webkit-scrollbar-thumb:hover,
     .onboarding-sidebar::-webkit-scrollbar-thumb:hover,
-    .onboarding-content::-webkit-scrollbar-thumb:hover {
-      background: linear-gradient(180deg, rgba(98, 178, 228, 0.96), rgba(243, 117, 32, 0.92));
+    .onboarding-content::-webkit-scrollbar-thumb:hover,
+    .tech-stack-content::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, rgba(98, 178, 228, 0.9), rgba(243, 117, 32, 0.84));
     }
 
     .onboarding-step-meta {
