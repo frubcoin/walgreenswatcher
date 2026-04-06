@@ -833,6 +833,19 @@
       overflow: hidden;
     }
 
+    .auth-gate,
+    .app-window {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .auth-gate::-webkit-scrollbar,
+    .app-window::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      display: none;
+    }
+
     .tech-stack-content {
       min-width: 0;
       min-height: 0;
@@ -993,8 +1006,6 @@
       overflow-y: auto;
     }
 
-    .auth-gate,
-    .app-window,
     .onboarding-modal,
     .onboarding-sidebar,
     .onboarding-content,
@@ -1003,8 +1014,6 @@
       scrollbar-color: var(--scrollbar-thumb-start) var(--scrollbar-track);
     }
 
-    .auth-gate::-webkit-scrollbar,
-    .app-window::-webkit-scrollbar,
     .onboarding-modal::-webkit-scrollbar,
     .onboarding-sidebar::-webkit-scrollbar,
     .onboarding-content::-webkit-scrollbar,
@@ -1013,8 +1022,6 @@
       height: 10px;
     }
 
-    .auth-gate::-webkit-scrollbar-button,
-    .app-window::-webkit-scrollbar-button,
     .onboarding-modal::-webkit-scrollbar-button,
     .onboarding-sidebar::-webkit-scrollbar-button,
     .onboarding-content::-webkit-scrollbar-button,
@@ -1025,20 +1032,14 @@
       background: transparent;
     }
 
-    .auth-gate::-webkit-scrollbar-button:single-button,
-    .app-window::-webkit-scrollbar-button:single-button,
     .onboarding-modal::-webkit-scrollbar-button:single-button,
     .onboarding-sidebar::-webkit-scrollbar-button:single-button,
     .onboarding-content::-webkit-scrollbar-button:single-button,
     .tech-stack-content::-webkit-scrollbar-button:single-button,
-    .auth-gate::-webkit-scrollbar-button:start:decrement,
-    .app-window::-webkit-scrollbar-button:start:decrement,
     .onboarding-modal::-webkit-scrollbar-button:start:decrement,
     .onboarding-sidebar::-webkit-scrollbar-button:start:decrement,
     .onboarding-content::-webkit-scrollbar-button:start:decrement,
     .tech-stack-content::-webkit-scrollbar-button:start:decrement,
-    .auth-gate::-webkit-scrollbar-button:end:increment,
-    .app-window::-webkit-scrollbar-button:end:increment,
     .onboarding-modal::-webkit-scrollbar-button:end:increment,
     .onboarding-sidebar::-webkit-scrollbar-button:end:increment,
     .onboarding-content::-webkit-scrollbar-button:end:increment,
@@ -1050,8 +1051,6 @@
       border: none;
     }
 
-    .auth-gate::-webkit-scrollbar-track,
-    .app-window::-webkit-scrollbar-track,
     .onboarding-modal::-webkit-scrollbar-track,
     .onboarding-sidebar::-webkit-scrollbar-track,
     .onboarding-content::-webkit-scrollbar-track,
@@ -1060,8 +1059,6 @@
       border-radius: 999px;
     }
 
-    .auth-gate::-webkit-scrollbar-thumb,
-    .app-window::-webkit-scrollbar-thumb,
     .onboarding-modal::-webkit-scrollbar-thumb,
     .onboarding-sidebar::-webkit-scrollbar-thumb,
     .onboarding-content::-webkit-scrollbar-thumb,
@@ -1072,12 +1069,59 @@
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
     }
 
-    .auth-gate::-webkit-scrollbar-thumb:hover,
-    .app-window::-webkit-scrollbar-thumb:hover,
     .onboarding-modal::-webkit-scrollbar-thumb:hover,
     .onboarding-sidebar::-webkit-scrollbar-thumb:hover,
     .onboarding-content::-webkit-scrollbar-thumb:hover,
     .tech-stack-content::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, var(--scrollbar-thumb-hover-start), var(--scrollbar-thumb-hover-end));
+    }
+
+    .shell-scrollbar {
+      position: fixed;
+      z-index: 7;
+      width: 10px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+    }
+
+    .shell-scrollbar.is-visible {
+      opacity: 1;
+    }
+
+    .shell-scrollbar.is-hidden {
+      opacity: 0;
+    }
+
+    .shell-scrollbar-track,
+    .shell-scrollbar-thumb {
+      border-radius: 999px;
+    }
+
+    .shell-scrollbar-track {
+      position: absolute;
+      inset: 0;
+      background: var(--scrollbar-track);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .shell-scrollbar-thumb {
+      position: absolute;
+      left: 1px;
+      width: 8px;
+      min-height: 36px;
+      border: 1px solid var(--scrollbar-thumb-border);
+      background: linear-gradient(180deg, var(--scrollbar-thumb-start), var(--scrollbar-thumb-end));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 10px rgba(0, 0, 0, 0.28);
+      pointer-events: auto;
+      cursor: pointer;
+      touch-action: none;
+    }
+
+    .shell-scrollbar-thumb:hover,
+    .shell-scrollbar.is-dragging .shell-scrollbar-thumb {
       background: linear-gradient(180deg, var(--scrollbar-thumb-hover-start), var(--scrollbar-thumb-hover-end));
     }
 
@@ -3643,6 +3687,10 @@
       <span aria-hidden="true">•</span>
       <button class="site-footer-link" type="button" data-action="open-tech-stack">Tech Stack</button>
     </footer>
+    <div id="shell-scrollbar" class="shell-scrollbar is-hidden" aria-hidden="true">
+      <div class="shell-scrollbar-track"></div>
+      <div class="shell-scrollbar-thumb"></div>
+    </div>
     <script nonce="__CSP_NONCE__">
       let currentTab = 'results';
       let isStatusRefreshInFlight = false;
@@ -3669,6 +3717,10 @@
       let onboardingBusy = false;
       let deferredInstallPrompt = null;
       let installDisplayModeQueries = [];
+      let shellScrollbarFrame = 0;
+      let shellScrollbarDrag = null;
+      let shellScrollbarMutationObserver = null;
+      let shellScrollbarResizeObserver = null;
 
       const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
       const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
@@ -3682,6 +3734,165 @@
       function apiUrl(path) {
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
         return `${API_BASE}${normalizedPath}`;
+      }
+
+      function getShellScrollbarElements() {
+        return {
+          root: document.getElementById('shell-scrollbar'),
+          track: document.querySelector('#shell-scrollbar .shell-scrollbar-track'),
+          thumb: document.querySelector('#shell-scrollbar .shell-scrollbar-thumb')
+        };
+      }
+
+      function getActiveShellScroller() {
+        const appShell = document.getElementById('app-shell');
+        if (appShell && !appShell.hidden) return appShell;
+
+        const authGate = document.getElementById('auth-gate');
+        if (authGate && !authGate.hidden) return authGate;
+
+        return null;
+      }
+
+      function hideShellScrollbar() {
+        const { root } = getShellScrollbarElements();
+        if (!root) return;
+        root.classList.add('is-hidden');
+        root.classList.remove('is-visible', 'is-dragging');
+      }
+
+      function queueShellScrollbarUpdate() {
+        if (shellScrollbarFrame) return;
+        shellScrollbarFrame = window.requestAnimationFrame(() => {
+          shellScrollbarFrame = 0;
+          updateShellScrollbar();
+        });
+      }
+
+      function updateShellScrollbar() {
+        const { root, thumb } = getShellScrollbarElements();
+        const scroller = getActiveShellScroller();
+        if (!root || !thumb || !scroller) {
+          hideShellScrollbar();
+          return;
+        }
+
+        const rect = scroller.getBoundingClientRect();
+        const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+        if (rect.height <= 0 || rect.width <= 0 || maxScroll <= 1) {
+          hideShellScrollbar();
+          return;
+        }
+
+        const inset = 8;
+        const barHeight = Math.max(48, rect.height - (inset * 2));
+        const barTop = rect.top + inset;
+        const barLeft = rect.right - 12;
+        const thumbHeight = Math.max(36, Math.min(barHeight, (scroller.clientHeight / scroller.scrollHeight) * barHeight));
+        const thumbTravel = Math.max(0, barHeight - thumbHeight);
+        const scrollRatio = maxScroll > 0 ? (scroller.scrollTop / maxScroll) : 0;
+        const thumbTop = thumbTravel * scrollRatio;
+
+        root.style.top = `${Math.round(barTop)}px`;
+        root.style.left = `${Math.round(barLeft)}px`;
+        root.style.height = `${Math.round(barHeight)}px`;
+
+        thumb.style.height = `${Math.round(thumbHeight)}px`;
+        thumb.style.transform = `translateY(${Math.round(thumbTop)}px)`;
+
+        root.classList.remove('is-hidden');
+        root.classList.add('is-visible');
+      }
+
+      function endShellScrollbarDrag() {
+        if (!shellScrollbarDrag) return;
+        const { root } = getShellScrollbarElements();
+        if (root) root.classList.remove('is-dragging');
+        shellScrollbarDrag = null;
+        window.removeEventListener('pointermove', handleShellScrollbarDrag);
+        window.removeEventListener('pointerup', endShellScrollbarDrag);
+        window.removeEventListener('pointercancel', endShellScrollbarDrag);
+      }
+
+      function handleShellScrollbarDrag(event) {
+        if (!shellScrollbarDrag) return;
+        const { scroller, startY, startScrollTop, maxScroll, thumbTravel } = shellScrollbarDrag;
+        if (!scroller || thumbTravel <= 0 || maxScroll <= 0) return;
+
+        const deltaY = event.clientY - startY;
+        const scrollDelta = (deltaY / thumbTravel) * maxScroll;
+        scroller.scrollTop = startScrollTop + scrollDelta;
+      }
+
+      function beginShellScrollbarDrag(event) {
+        const { root, thumb } = getShellScrollbarElements();
+        const scroller = getActiveShellScroller();
+        if (!root || !thumb || !scroller) return;
+
+        const rootRect = root.getBoundingClientRect();
+        const thumbRect = thumb.getBoundingClientRect();
+        const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+        const thumbTravel = Math.max(0, rootRect.height - thumbRect.height);
+        if (maxScroll <= 0 || thumbTravel <= 0) return;
+
+        event.preventDefault();
+        shellScrollbarDrag = {
+          scroller,
+          startY: event.clientY,
+          startScrollTop: scroller.scrollTop,
+          maxScroll,
+          thumbTravel
+        };
+
+        root.classList.add('is-dragging');
+        window.addEventListener('pointermove', handleShellScrollbarDrag);
+        window.addEventListener('pointerup', endShellScrollbarDrag);
+        window.addEventListener('pointercancel', endShellScrollbarDrag);
+      }
+
+      function handleShellScrollbarTrackPointerDown(event) {
+        const { root, thumb } = getShellScrollbarElements();
+        const scroller = getActiveShellScroller();
+        if (!root || !thumb || !scroller) return;
+        if (event.target === thumb) return;
+
+        const rootRect = root.getBoundingClientRect();
+        const thumbRect = thumb.getBoundingClientRect();
+        const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+        const thumbTravel = Math.max(0, rootRect.height - thumbRect.height);
+        if (maxScroll <= 0 || thumbTravel <= 0) return;
+
+        event.preventDefault();
+        const nextThumbTop = Math.max(0, Math.min(thumbTravel, event.clientY - rootRect.top - (thumbRect.height / 2)));
+        scroller.scrollTop = (nextThumbTop / thumbTravel) * maxScroll;
+        queueShellScrollbarUpdate();
+      }
+
+      function initializeShellScrollbar() {
+        const { root, track, thumb } = getShellScrollbarElements();
+        const authGate = document.getElementById('auth-gate');
+        const appShell = document.getElementById('app-shell');
+        if (!root || !track || !thumb || !authGate || !appShell) return;
+
+        thumb.addEventListener('pointerdown', beginShellScrollbarDrag);
+        track.addEventListener('pointerdown', handleShellScrollbarTrackPointerDown);
+        authGate.addEventListener('scroll', queueShellScrollbarUpdate, { passive: true });
+        appShell.addEventListener('scroll', queueShellScrollbarUpdate, { passive: true });
+        window.addEventListener('resize', queueShellScrollbarUpdate, { passive: true });
+
+        if (typeof MutationObserver === 'function') {
+          shellScrollbarMutationObserver = new MutationObserver(() => queueShellScrollbarUpdate());
+          shellScrollbarMutationObserver.observe(authGate, { attributes: true, childList: true, subtree: true, characterData: true });
+          shellScrollbarMutationObserver.observe(appShell, { attributes: true, childList: true, subtree: true, characterData: true });
+        }
+
+        if (typeof ResizeObserver === 'function') {
+          shellScrollbarResizeObserver = new ResizeObserver(() => queueShellScrollbarUpdate());
+          shellScrollbarResizeObserver.observe(authGate);
+          shellScrollbarResizeObserver.observe(appShell);
+        }
+
+        queueShellScrollbarUpdate();
       }
 
       function normalizeResultsMapTheme(theme) {
@@ -4457,6 +4668,7 @@
         if (appShell) appShell.hidden = !isAuthenticated;
         document.body.classList.toggle('auth-gate-active', !isAuthenticated);
         document.body.classList.toggle('app-active', isAuthenticated);
+        queueShellScrollbarUpdate();
       }
 
       function updateCurrentUserDisplay(user) {
@@ -5313,6 +5525,7 @@
         if (footerYear) {
           footerYear.textContent = String(new Date().getFullYear());
         }
+        initializeShellScrollbar();
         ensureOnboardingModalRoot();
         ensureTechStackModalRoot();
         renderCachedState();
@@ -5407,6 +5620,7 @@
         if (name === 'history') {
           loadHistory();
         }
+        queueShellScrollbarUpdate();
       }
 
       function toggleHistoryItem(element) {
