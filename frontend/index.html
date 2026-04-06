@@ -2956,8 +2956,8 @@
       }
 
       .onboarding-sidebar {
-        gap: 14px;
-        padding: calc(18px + env(safe-area-inset-top, 0px)) 18px 16px;
+        gap: 10px;
+        padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 12px;
         background:
           radial-gradient(circle at top left, rgba(72, 156, 212, 0.22), transparent 38%),
           radial-gradient(circle at top right, rgba(230, 38, 0, 0.12), transparent 30%),
@@ -2965,24 +2965,27 @@
       }
 
       .onboarding-kicker {
+        font-size: 11px;
         letter-spacing: 1.4px;
       }
 
       .onboarding-sidebar h2 {
-        font-size: clamp(24px, 8vw, 30px);
-        line-height: 1.04;
+        font-size: clamp(18px, 6.8vw, 24px);
+        line-height: 1.08;
+        letter-spacing: 0.6px;
       }
 
       .onboarding-sidebar p {
-        font-size: 14px;
-        line-height: 1.55;
+        font-size: 13px;
+        line-height: 1.45;
+        color: rgba(214, 220, 225, 0.88);
       }
 
       .onboarding-progress {
         display: flex;
-        gap: 8px;
+        gap: 7px;
         overflow-x: auto;
-        padding-bottom: 4px;
+        padding-bottom: 2px;
         margin: 2px -2px 0;
         scroll-snap-type: x proximity;
         scrollbar-width: none;
@@ -2995,35 +2998,44 @@
       .onboarding-progress-item {
         flex: 0 0 auto;
         min-width: max-content;
-        padding: 10px 12px;
-        gap: 10px;
+        padding: 8px 10px;
+        gap: 8px;
+        border-radius: 12px;
         scroll-snap-align: start;
       }
 
+      .onboarding-progress-index {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+      }
+
       .onboarding-progress-text {
+        font-size: 13px;
         white-space: nowrap;
       }
 
       .onboarding-content {
-        gap: 18px;
-        padding: 18px 18px 28px;
+        gap: 14px;
+        padding: 14px 16px 22px;
       }
 
       .onboarding-step-meta {
-        gap: 8px;
+        gap: 6px;
         flex-wrap: wrap;
-        font-size: 11px;
-        letter-spacing: 1.1px;
+        font-size: 10px;
+        letter-spacing: 1px;
       }
 
       .onboarding-step-title {
-        font-size: clamp(22px, 8vw, 28px);
-        line-height: 1.08;
+        font-size: clamp(18px, 6.6vw, 24px);
+        line-height: 1.12;
+        letter-spacing: 0.6px;
       }
 
       .onboarding-step-copy {
-        font-size: 15px;
-        line-height: 1.55;
+        font-size: 13px;
+        line-height: 1.5;
       }
 
       .onboarding-callout,
@@ -3036,29 +3048,29 @@
       .onboarding-callout,
       .onboarding-form-card,
       .onboarding-summary {
-        padding: 16px;
+        padding: 14px;
       }
 
       .onboarding-step-list {
-        gap: 12px;
+        gap: 10px;
       }
 
       .onboarding-step-list li {
         gap: 10px;
-        font-size: 14px;
-        line-height: 1.5;
+        font-size: 13px;
+        line-height: 1.45;
       }
 
       .onboarding-step-list li::before {
-        margin-top: 6px;
+        margin-top: 5px;
       }
 
       .onboarding-step-form {
-        gap: 14px;
+        gap: 12px;
       }
 
       .onboarding-choice {
-        padding: 14px;
+        padding: 12px 13px;
       }
 
       .onboarding-choice input {
@@ -3079,21 +3091,26 @@
         position: sticky;
         bottom: 0;
         display: grid;
-        gap: 10px;
-        padding: 14px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+        gap: 8px;
+        padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
         background: linear-gradient(180deg, rgba(27, 30, 34, 0.82), rgba(20, 23, 27, 0.98));
         backdrop-filter: blur(16px);
-        box-shadow: 0 -14px 30px rgba(0, 0, 0, 0.22);
+        box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.18);
       }
 
       .onboarding-actions-group {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
+        gap: 8px;
       }
 
-      .onboarding-actions-group:last-child {
-        grid-template-columns: 1fr;
+      .onboarding-actions .btn {
+        min-height: 44px;
+        height: auto;
+        padding: 10px 12px;
+        font-size: 13px;
+        line-height: 1.15;
+        white-space: normal;
       }
 
       body.auth-gate-active {
