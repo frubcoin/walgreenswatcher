@@ -3784,10 +3784,15 @@
           return;
         }
 
-        const inset = 10;
-        const barHeight = Math.max(48, rect.height - (inset * 2));
-        const barTop = rect.top + inset;
-        const barLeft = rect.right - 11;
+        const computedStyle = window.getComputedStyle(scroller);
+        const topRightRadius = parseFloat(computedStyle.borderTopRightRadius) || 18;
+        const bottomRightRadius = parseFloat(computedStyle.borderBottomRightRadius) || topRightRadius;
+        const verticalInsetTop = Math.max(12, topRightRadius - 2);
+        const verticalInsetBottom = Math.max(12, bottomRightRadius - 2);
+        const horizontalInset = Math.max(8, Math.round(topRightRadius * 0.45));
+        const barHeight = Math.max(48, rect.height - verticalInsetTop - verticalInsetBottom);
+        const barTop = rect.top + verticalInsetTop;
+        const barLeft = rect.right - horizontalInset - 8;
         const thumbHeight = Math.max(36, Math.min(barHeight, (scroller.clientHeight / scroller.scrollHeight) * barHeight));
         const thumbTravel = Math.max(0, barHeight - thumbHeight);
         const scrollRatio = maxScroll > 0 ? (scroller.scrollTop / maxScroll) : 0;
