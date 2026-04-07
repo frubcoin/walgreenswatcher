@@ -82,6 +82,7 @@
       --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
       --page-bg: #0a0a0b;
       --default-grain-image: none;
+      --auth-panel-grain-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PGZpbHRlciBpZD0iZz48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMS4xNSIgbnVtT2N0YXZlcz0iMiIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjxmZUNvbG9yTWF0cml4IHR5cGU9InNhdHVyYXRlIiB2YWx1ZXM9IjAiLz48ZmVDb21wb25lbnRUcmFuc2Zlcj48ZmVGdW5jQSB0eXBlPSJ0YWJsZSIgdGFibGVWYWx1ZXM9IjAgMCAwLjA4IDAiLz48L2ZlQ29tcG9uZW50VHJhbnNmZXI+PC9maWx0ZXI+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiBmaWx0ZXI9InVybCgjZykiIG9wYWNpdHk9IjEiLz48L3N2Zz4=');
       --pokemon-bg-image: url("/bg/gyra.webp");
       --pokemon-bg-size: 645px auto;
       --pokemon-bg-opacity: 1;
@@ -516,6 +517,7 @@
       position: absolute;
       inset: 0;
       background:
+        var(--auth-panel-grain-image) 0 0 / 120px 120px repeat,
         linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 48%);
       pointer-events: none;
@@ -717,6 +719,7 @@
       position: absolute;
       inset: 0;
       background:
+        var(--auth-panel-grain-image) 0 0 / 120px 120px repeat,
         linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 40%),
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 46%);
       pointer-events: none;
@@ -760,10 +763,12 @@
     #google-signin-button {
       position: relative;
       width: min(100%, 320px);
-      min-height: 56px;
+      height: 60px;
+      min-height: 60px;
       max-width: 320px;
       flex: 1 1 320px;
-      display: block;
+      display: flex;
+      align-items: center;
       line-height: 0;
     }
 
@@ -772,6 +777,7 @@
       display: block;
       width: 100%;
       height: 56px;
+      margin: 2px 0;
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       background:
@@ -788,12 +794,14 @@
       max-width: 100%;
       display: block;
       margin: 0 !important;
+      align-self: center;
     }
 
     #google-signin-button iframe,
     #google-signin-button div[role="button"] {
       display: block !important;
       margin: 0 !important;
+      min-height: 56px;
     }
 
     .auth-status {
