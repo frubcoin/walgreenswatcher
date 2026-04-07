@@ -116,6 +116,17 @@
       overflow: hidden;
     }
 
+    body.app-booting {
+      overflow: hidden;
+    }
+
+    body.app-booting .wrapper,
+    body.app-booting .site-footer,
+    body.app-booting .shell-scrollbar {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
     body::before {
       content: '';
       position: fixed;
@@ -1095,7 +1106,8 @@
     .onboarding-modal,
     .onboarding-sidebar,
     .onboarding-content,
-    .tech-stack-content {
+    .tech-stack-content,
+    .results-map-list {
       scrollbar-width: thin;
       scrollbar-color: var(--scrollbar-thumb-start) var(--scrollbar-track);
     }
@@ -1103,7 +1115,8 @@
     .onboarding-modal::-webkit-scrollbar,
     .onboarding-sidebar::-webkit-scrollbar,
     .onboarding-content::-webkit-scrollbar,
-    .tech-stack-content::-webkit-scrollbar {
+    .tech-stack-content::-webkit-scrollbar,
+    .results-map-list::-webkit-scrollbar {
       width: 10px;
       height: 10px;
     }
@@ -1111,7 +1124,8 @@
     .onboarding-modal::-webkit-scrollbar-button,
     .onboarding-sidebar::-webkit-scrollbar-button,
     .onboarding-content::-webkit-scrollbar-button,
-    .tech-stack-content::-webkit-scrollbar-button {
+    .tech-stack-content::-webkit-scrollbar-button,
+    .results-map-list::-webkit-scrollbar-button {
       display: none;
       width: 0;
       height: 0;
@@ -1122,14 +1136,17 @@
     .onboarding-sidebar::-webkit-scrollbar-button:single-button,
     .onboarding-content::-webkit-scrollbar-button:single-button,
     .tech-stack-content::-webkit-scrollbar-button:single-button,
+    .results-map-list::-webkit-scrollbar-button:single-button,
     .onboarding-modal::-webkit-scrollbar-button:start:decrement,
     .onboarding-sidebar::-webkit-scrollbar-button:start:decrement,
     .onboarding-content::-webkit-scrollbar-button:start:decrement,
     .tech-stack-content::-webkit-scrollbar-button:start:decrement,
+    .results-map-list::-webkit-scrollbar-button:start:decrement,
     .onboarding-modal::-webkit-scrollbar-button:end:increment,
     .onboarding-sidebar::-webkit-scrollbar-button:end:increment,
     .onboarding-content::-webkit-scrollbar-button:end:increment,
-    .tech-stack-content::-webkit-scrollbar-button:end:increment {
+    .tech-stack-content::-webkit-scrollbar-button:end:increment,
+    .results-map-list::-webkit-scrollbar-button:end:increment {
       display: none;
       width: 0;
       height: 0;
@@ -1140,7 +1157,8 @@
     .onboarding-modal::-webkit-scrollbar-track,
     .onboarding-sidebar::-webkit-scrollbar-track,
     .onboarding-content::-webkit-scrollbar-track,
-    .tech-stack-content::-webkit-scrollbar-track {
+    .tech-stack-content::-webkit-scrollbar-track,
+    .results-map-list::-webkit-scrollbar-track {
       background: var(--scrollbar-track);
       border-radius: 999px;
     }
@@ -1148,7 +1166,8 @@
     .onboarding-modal::-webkit-scrollbar-thumb,
     .onboarding-sidebar::-webkit-scrollbar-thumb,
     .onboarding-content::-webkit-scrollbar-thumb,
-    .tech-stack-content::-webkit-scrollbar-thumb {
+    .tech-stack-content::-webkit-scrollbar-thumb,
+    .results-map-list::-webkit-scrollbar-thumb {
       border-radius: 999px;
       border: 2px solid var(--scrollbar-thumb-border);
       background: linear-gradient(180deg, var(--scrollbar-thumb-start), var(--scrollbar-thumb-end));
@@ -1158,7 +1177,8 @@
     .onboarding-modal::-webkit-scrollbar-thumb:hover,
     .onboarding-sidebar::-webkit-scrollbar-thumb:hover,
     .onboarding-content::-webkit-scrollbar-thumb:hover,
-    .tech-stack-content::-webkit-scrollbar-thumb:hover {
+    .tech-stack-content::-webkit-scrollbar-thumb:hover,
+    .results-map-list::-webkit-scrollbar-thumb:hover {
       background: linear-gradient(180deg, var(--scrollbar-thumb-hover-start), var(--scrollbar-thumb-hover-end));
     }
 
@@ -3525,7 +3545,7 @@
   </style>
 </head>
 
-<body class="auth-gate-active">
+<body class="auth-gate-active app-booting">
 
   <div id="page-loader">
     <div class="lds-spinner">
@@ -3831,11 +3851,6 @@
       }
     } catch (e) { console.error('Failed to pre-load theme cache', e); }
 
-    if (sessionStorage.getItem('assetsLoaded')) {
-      const loader = document.getElementById('page-loader');
-      loader.classList.add('page-loader-hidden');
-      loader.style.transition = 'none';
-    }
   </script>
   <div id="toast-container"></div>
   <div class="wrapper">
@@ -4324,6 +4339,8 @@
     let shellScrollbarDrag = null;
     let shellScrollbarMutationObserver = null;
     let shellScrollbarResizeObserver = null;
+    let hasWindowLoaded = document.readyState === 'complete';
+    let hasInitialSessionResolved = false;
 
     const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
     const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
@@ -4398,6 +4415,18 @@
       if (!root) return;
       root.classList.add('is-hidden');
       root.classList.remove('is-visible', 'is-dragging');
+    }
+
+    function finalizeInitialReveal() {
+      const loader = document.getElementById('page-loader');
+      if (!hasWindowLoaded || !hasInitialSessionResolved) return;
+
+      document.body.classList.remove('app-booting');
+
+      if (!loader || loader.dataset.dismissed === 'true') return;
+      loader.dataset.dismissed = 'true';
+      loader.classList.add('page-loader-hidden');
+      window.setTimeout(() => loader.remove(), 300);
     }
 
     function queueShellScrollbarUpdate() {
@@ -6229,7 +6258,10 @@
       refreshPublicStatsForLogin();
       refreshInstallButtons();
       registerServiceWorker();
-      hydrateAuthenticatedSession();
+      hydrateAuthenticatedSession().finally(() => {
+        hasInitialSessionResolved = true;
+        finalizeInitialReveal();
+      });
     });
 
     document.addEventListener('keydown', event => {
@@ -6768,11 +6800,9 @@
     }
 
     window.addEventListener('load', () => {
+      hasWindowLoaded = true;
       sessionStorage.setItem('assetsLoaded', 'true');
-      const loader = document.getElementById('page-loader');
-      if (!loader) return;
-      loader.classList.add('page-loader-hidden');
-      setTimeout(() => loader.remove(), 300);
+      finalizeInitialReveal();
     });
   </script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
