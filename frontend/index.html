@@ -751,7 +751,7 @@
     .auth-actions {
       display: flex;
       flex-wrap: wrap;
-      align-items: center;
+      align-items: flex-start;
       gap: 14px;
     }
 
@@ -798,18 +798,31 @@
       }
     }
 
+    .auth-install-slot {
+      width: min(100%, 320px);
+      min-height: 86px;
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      flex: 1 1 320px;
+      justify-items: start;
+    }
+
+    .auth-install-slot .install-app-btn,
+    .auth-install-slot .install-app-copy {
+      width: 100%;
+    }
+
+    .auth-install-slot .install-app-btn {
+      width: auto;
+      min-width: 156px;
+    }
+
     .auth-install-copy {
       width: 100%;
-      margin-top: -4px;
       font-size: 12px;
       color: var(--text-muted);
       line-height: 1.5;
-    }
-
-    /* Use the browser's native install prompt to avoid auth-panel reflow/pop-in. */
-    .install-app-btn,
-    .install-app-copy {
-      display: none !important;
     }
 
     body.app-installed .install-app-btn,
@@ -3960,15 +3973,17 @@
               optional)</div>
             <div class="auth-actions">
               <div id="google-signin-button" aria-live="polite"></div>
-              <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
-                <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
-                  <path
-                    d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
-                </svg>
-                Install App
-              </button>
-              <div class="auth-install-copy install-app-copy" hidden>Optional: install it for faster access from your
-                desktop or home screen.</div>
+              <div class="auth-install-slot">
+                <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
+                  <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
+                    <path
+                      d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
+                  </svg>
+                  Install App
+                </button>
+                <div class="auth-install-copy install-app-copy" hidden>Optional: install it for faster access from your
+                  desktop or home screen.</div>
+              </div>
             </div>
             <ul class="auth-note-list">
               <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Product info auto resolved from
@@ -4770,7 +4785,7 @@
     function refreshInstallButtons() {
       const installed = isAppInstalled();
       document.body.classList.toggle('app-installed', installed);
-      setInstallButtonsVisible(false);
+      setInstallButtonsVisible(Boolean(deferredInstallPrompt) && !installed && isWindowsPlatform());
     }
 
     async function promptInstallApp() {
