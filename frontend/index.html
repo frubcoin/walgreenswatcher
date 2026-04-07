@@ -4419,6 +4419,7 @@
     let shellScrollbarResizeObserver = null;
     let hasWindowLoaded = document.readyState === 'complete';
     let hasInitialSessionResolved = false;
+    let hasInitialFontsResolved = !document.fonts || document.fonts.status === 'loaded';
 
     const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
     const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
@@ -4495,9 +4496,24 @@
       root.classList.remove('is-visible', 'is-dragging');
     }
 
+    function waitForInitialFonts(maxMs = 1200) {
+      if (!document.fonts?.ready) {
+        hasInitialFontsResolved = true;
+        return Promise.resolve();
+      }
+
+      return Promise.race([
+        document.fonts.ready.catch(() => undefined),
+        new Promise(resolve => window.setTimeout(resolve, maxMs))
+      ]).finally(() => {
+        hasInitialFontsResolved = true;
+        finalizeInitialReveal();
+      });
+    }
+
     function finalizeInitialReveal() {
       const loader = document.getElementById('page-loader');
-      if (!hasWindowLoaded || !hasInitialSessionResolved) return;
+      if (!hasWindowLoaded || !hasInitialSessionResolved || !hasInitialFontsResolved) return;
 
       document.body.classList.remove('app-booting');
 
@@ -6336,6 +6352,7 @@
       refreshPublicStatsForLogin();
       refreshInstallButtons();
       registerServiceWorker();
+      waitForInitialFonts();
       hydrateAuthenticatedSession().finally(() => {
         hasInitialSessionResolved = true;
         finalizeInitialReveal();
