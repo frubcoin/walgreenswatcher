@@ -755,6 +755,49 @@
       gap: 14px;
     }
 
+    #google-signin-button {
+      position: relative;
+      width: min(100%, 320px);
+      min-height: 40px;
+      max-width: 320px;
+      flex: 1 1 320px;
+    }
+
+    #google-signin-button:empty::before {
+      content: '';
+      display: block;
+      width: 100%;
+      height: 40px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        linear-gradient(90deg,
+          rgba(255, 255, 255, 0.08) 0%,
+          rgba(255, 255, 255, 0.14) 48%,
+          rgba(255, 255, 255, 0.08) 100%);
+      background-size: 220% 100%;
+      animation: google-button-placeholder 1.2s ease-in-out infinite;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    #google-signin-button>* {
+      max-width: 100%;
+    }
+
+    .auth-status {
+      min-height: 20px;
+    }
+
+    @keyframes google-button-placeholder {
+      0% {
+        background-position: 100% 0;
+      }
+
+      100% {
+        background-position: -100% 0;
+      }
+    }
+
     .auth-install-copy {
       width: 100%;
       margin-top: -4px;
@@ -3910,7 +3953,7 @@
             <div class="auth-panel-copy">First-time users will get a short setup guide after login. (app installation
               optional)</div>
             <div class="auth-actions">
-              <div id="google-signin-button"></div>
+              <div id="google-signin-button" aria-live="polite"></div>
               <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
                 <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
                   <path
