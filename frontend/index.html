@@ -806,6 +806,12 @@
       line-height: 1.5;
     }
 
+    /* Use the browser's native install prompt to avoid auth-panel reflow/pop-in. */
+    .install-app-btn,
+    .install-app-copy {
+      display: none !important;
+    }
+
     body.app-installed .install-app-btn,
     body.app-installed .install-app-copy {
       display: none !important;
@@ -4764,7 +4770,7 @@
     function refreshInstallButtons() {
       const installed = isAppInstalled();
       document.body.classList.toggle('app-installed', installed);
-      setInstallButtonsVisible(Boolean(deferredInstallPrompt) && !installed && isWindowsPlatform());
+      setInstallButtonsVisible(false);
     }
 
     async function promptInstallApp() {
