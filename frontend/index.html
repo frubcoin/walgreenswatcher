@@ -30,8 +30,10 @@
   <meta name="apple-mobile-web-app-title" content="Walgreens Watcher">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
   <link
-    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=optional"
+    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -801,10 +803,9 @@
 
     .auth-install-slot {
       width: min(100%, 320px);
-      min-height: 52px;
       display: grid;
       align-content: start;
-      gap: 6px;
+      gap: 10px;
       flex: 1 1 320px;
       justify-items: start;
     }
@@ -817,6 +818,18 @@
     .auth-install-slot .install-app-btn {
       width: auto;
       min-width: 156px;
+    }
+
+    .auth-install-slot .install-app-btn[hidden] {
+      display: inline-flex !important;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .auth-install-slot .install-app-copy[hidden] {
+      display: block !important;
+      visibility: hidden;
+      pointer-events: none;
     }
 
     .auth-install-copy {
