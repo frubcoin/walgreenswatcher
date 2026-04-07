@@ -4515,12 +4515,18 @@
       const loader = document.getElementById('page-loader');
       if (!hasWindowLoaded || !hasInitialSessionResolved || !hasInitialFontsResolved) return;
 
-      document.body.classList.remove('app-booting');
+      if (!loader) {
+        document.body.classList.remove('app-booting');
+        return;
+      }
 
-      if (!loader || loader.dataset.dismissed === 'true') return;
+      if (loader.dataset.dismissed === 'true') return;
       loader.dataset.dismissed = 'true';
       loader.classList.add('page-loader-hidden');
-      window.setTimeout(() => loader.remove(), 300);
+      window.setTimeout(() => {
+        loader.remove();
+        document.body.classList.remove('app-booting');
+      }, 300);
     }
 
     function queueShellScrollbarUpdate() {
