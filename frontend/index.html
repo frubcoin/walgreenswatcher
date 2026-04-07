@@ -772,12 +772,16 @@
       line-height: 0;
     }
 
-    #google-signin-button:empty::before {
+    #google-signin-button:empty::before,
+    #google-signin-button.is-pending::before {
       content: '';
       display: block;
-      width: 100%;
+      width: calc(100% - 2px);
       height: 56px;
       margin: 2px 0;
+      position: absolute;
+      left: 1px;
+      top: 2px;
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       background:
@@ -795,6 +799,11 @@
       display: block;
       margin: 0 !important;
       align-self: center;
+      transition: opacity 0.18s ease;
+    }
+
+    #google-signin-button.is-pending>* {
+      opacity: 0;
     }
 
     #google-signin-button iframe,
@@ -4541,6 +4550,7 @@
     let hasInitialSessionResolved = false;
     let hasInitialFontsResolved = !document.fonts || document.fonts.status === 'loaded';
     let authNoteTypewriterTimers = [];
+    let googleButtonRevealTimer = 0;
 
     const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
     const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
@@ -5620,19 +5630,26 @@
     function renderGoogleSignInButton(clientId) {
       const container = document.getElementById('google-signin-button');
       if (!container) return;
+      if (googleButtonRevealTimer) {
+        window.clearTimeout(googleButtonRevealTimer);
+        googleButtonRevealTimer = 0;
+      }
 
       if (!clientId) {
         container.innerHTML = '';
+        container.classList.remove('is-pending');
         updateAuthStatus('');
         return;
       }
 
       if (!window.google?.accounts?.id) {
+        container.classList.add('is-pending');
         updateAuthStatus('Loading Google sign-in...');
         return;
       }
 
       container.innerHTML = '';
+      container.classList.add('is-pending');
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: handleGoogleCredentialResponse,
@@ -5645,6 +5662,10 @@
         text: 'continue_with',
         width: 320
       });
+      googleButtonRevealTimer = window.setTimeout(() => {
+        container.classList.remove('is-pending');
+        googleButtonRevealTimer = 0;
+      }, 700);
       googleButtonRendered = true;
       updateAuthStatus('');
     }
