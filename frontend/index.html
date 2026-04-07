@@ -759,19 +759,20 @@
     }
 
     .auth-actions {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: minmax(0, 320px);
+      grid-template-rows: var(--google-signin-slot-height) minmax(var(--install-button-height), auto);
+      align-content: start;
+      justify-items: start;
       gap: var(--auth-actions-gap);
       min-height: calc(var(--google-signin-slot-height) + var(--auth-actions-gap) + var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
     }
 
     #google-signin-button {
       position: relative;
-      width: min(100%, 320px);
+      width: 100%;
       min-height: var(--google-signin-slot-height);
       max-width: 320px;
-      flex: 0 1 320px;
       display: inline-flex;
       align-items: center;
       line-height: 0;
@@ -833,13 +834,13 @@
     }
 
     .auth-install-slot {
-      width: min(100%, 320px);
+      width: 100%;
       display: grid;
       align-content: start;
       gap: var(--install-slot-gap);
-      flex: 1 1 320px;
       justify-items: start;
       min-height: calc(var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
+      max-width: 320px;
     }
 
     .auth-install-slot .install-app-btn,
@@ -4692,7 +4693,8 @@
         return;
       }
 
-      nodes.forEach((node, index) => {
+      let timelineOffset = 220;
+      nodes.forEach(node => {
         const item = node.closest('.auth-note-item');
         const fullText = normalizeAuthNoteText(node.dataset.fullText || node.textContent);
         node.dataset.fullText = fullText;
@@ -4701,8 +4703,9 @@
         node.textContent = '';
         node.classList.add('is-typing');
 
-        const startDelay = 220 + (index * 260);
+        const startDelay = timelineOffset;
         const stepDelay = fullText.length > 40 ? 13 : 18;
+        const typingDuration = Math.max(fullText.length, 1) * stepDelay;
         const startTimer = window.setTimeout(() => {
           if (item) item.classList.add('is-revealing');
         }, startDelay - 90);
@@ -4722,6 +4725,8 @@
           }, startDelay + (charIndex * stepDelay));
           authNoteTypewriterTimers.push(timer);
         });
+
+        timelineOffset += typingDuration + 240;
       });
     }
 
