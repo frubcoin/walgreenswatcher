@@ -6349,6 +6349,13 @@
     });
 
     window.addEventListener('beforeinstallprompt', event => {
+      const shouldUseCustomInstallButton = isWindowsPlatform() && !isAppInstalled();
+      if (!shouldUseCustomInstallButton) {
+        deferredInstallPrompt = null;
+        refreshInstallButtons();
+        return;
+      }
+
       event.preventDefault();
       deferredInstallPrompt = event;
       refreshInstallButtons();
