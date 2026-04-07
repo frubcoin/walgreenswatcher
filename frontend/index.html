@@ -5016,7 +5016,9 @@
 
     function refreshInstallButtons() {
       const installed = isAppInstalled();
+      const shouldReserveInstallSlot = !installed && isWindowsPlatform();
       document.body.classList.toggle('app-installed', installed);
+      document.body.classList.toggle('install-slot-active', shouldReserveInstallSlot);
       setInstallButtonsVisible(Boolean(deferredInstallPrompt) && !installed && isWindowsPlatform());
     }
 
