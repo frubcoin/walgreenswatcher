@@ -77,6 +77,11 @@
       --footer-text-hover: #f4f7f9;
       --footer-text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
       --shell-footer-gap: 92px;
+      --google-signin-slot-height: 40px;
+      --auth-actions-gap: 14px;
+      --install-slot-gap: 10px;
+      --install-button-height: 44px;
+      --install-copy-height: 18px;
       --radius: 10px;
       --radius-sm: 6px;
       --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
@@ -757,13 +762,14 @@
       display: flex;
       flex-wrap: wrap;
       align-items: flex-start;
-      gap: 14px;
+      gap: var(--auth-actions-gap);
+      min-height: calc(var(--google-signin-slot-height) + var(--auth-actions-gap) + var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
     }
 
     #google-signin-button {
       position: relative;
       width: min(100%, 320px);
-      min-height: 40px;
+      min-height: var(--google-signin-slot-height);
       max-width: 320px;
       flex: 0 1 320px;
       display: inline-flex;
@@ -776,7 +782,7 @@
       content: '';
       display: block;
       width: 100%;
-      height: 40px;
+      height: var(--google-signin-slot-height);
       box-sizing: border-box;
       position: absolute;
       left: 0;
@@ -809,7 +815,7 @@
     #google-signin-button div[role="button"] {
       display: block !important;
       margin: 0 !important;
-      min-height: 40px;
+      min-height: var(--google-signin-slot-height);
     }
 
     .auth-status {
@@ -830,9 +836,10 @@
       width: min(100%, 320px);
       display: grid;
       align-content: start;
-      gap: 10px;
+      gap: var(--install-slot-gap);
       flex: 1 1 320px;
       justify-items: start;
+      min-height: calc(var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
     }
 
     .auth-install-slot .install-app-btn,
@@ -870,6 +877,7 @@
 
     .auth-install-copy {
       width: 100%;
+      min-height: var(--install-copy-height);
       font-size: 12px;
       color: var(--text-muted);
       line-height: 1.5;
