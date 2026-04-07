@@ -782,20 +782,19 @@
       grid-template-columns: minmax(0, 320px);
       grid-template-rows: var(--google-signin-slot-height) minmax(var(--install-button-height), auto);
       align-content: start;
-      justify-items: stretch;
+      justify-items: start;
       gap: var(--auth-actions-gap);
       min-height: calc(var(--google-signin-slot-height) + var(--auth-actions-gap) + var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
     }
 
     #google-signin-button {
       position: relative;
-      width: 320px;
+      width: 100%;
       min-height: var(--google-signin-slot-height);
+      max-width: 320px;
       display: flex;
-      justify-content: center;
       align-items: center;
       line-height: 0;
-      overflow: hidden;
     }
 
     #google-signin-button:empty::before,
@@ -854,12 +853,13 @@
     }
 
     .auth-install-slot {
-      width: 320px;
+      width: 100%;
       display: grid;
       align-content: start;
       gap: var(--install-slot-gap);
-      justify-items: stretch;
+      justify-items: start;
       min-height: calc(var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
+      max-width: 320px;
     }
 
     .auth-install-slot .install-app-btn,
@@ -868,8 +868,8 @@
     }
 
     .auth-install-slot .install-app-btn {
-      width: 320px !important;
-      min-width: 320px !important;
+      width: 100%;
+      min-width: 0;
       height: var(--install-button-height);
       justify-content: flex-start;
       padding: 8px 16px;
