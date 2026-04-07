@@ -93,6 +93,12 @@
       --pokemon-bg-image: url("/bg/gyra.webp");
       --pokemon-bg-size: 645px auto;
       --pokemon-bg-opacity: 1;
+
+      /* Aurora Background Tokens */
+      --aurora-1: rgba(251, 1, 28, 0.14);
+      --aurora-2: rgba(72, 156, 212, 0.12);
+      --aurora-3: rgba(243, 117, 32, 0.08);
+      --aurora-dark: #070809;
     }
 
     html {
@@ -100,18 +106,13 @@
     }
 
     body {
-      background:
-        radial-gradient(circle at 20% 12%, rgba(230, 38, 0, 0.18), transparent 24%),
-        radial-gradient(circle at 78% 14%, rgba(72, 156, 212, 0.16), transparent 26%),
-        radial-gradient(circle at 50% 78%, rgba(230, 38, 0, 0.08), transparent 28%),
-        radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.03), transparent 34%),
-        linear-gradient(115deg,
-          rgba(230, 38, 0, 0.06) 0%,
-          rgba(230, 38, 0, 0.025) 30%,
-          rgba(72, 156, 212, 0.025) 68%,
-          rgba(72, 156, 212, 0.08) 100%),
-        linear-gradient(180deg, #070809 0%, #0d1013 48%, #090a0b 100%);
-      background-color: var(--page-bg);
+      background-color: var(--aurora-dark);
+      background-image:
+        radial-gradient(circle at 0% 0%, rgba(251, 1, 28, 0.08) 0%, transparent 45%),
+        radial-gradient(circle at 100% 0%, rgba(72, 156, 212, 0.08) 0%, transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(251, 1, 28, 0.05) 0%, transparent 45%),
+        radial-gradient(circle at 0% 100%, rgba(72, 156, 212, 0.05) 0%, transparent 45%),
+        linear-gradient(180deg, #070809 0%, #0c0e11 50%, #08090a 100%);
       color: var(--text-primary);
       font-family: 'Rajdhani', sans-serif;
       font-size: 16px;
@@ -147,19 +148,28 @@
     body::before {
       content: '';
       position: fixed;
-      inset: 0;
+      inset: -50%;
       background:
-        radial-gradient(circle at 50% 100%, rgba(0, 0, 0, 0.34), transparent 42%),
-        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.025), transparent 58%),
-        var(--default-grain-image);
-      background-position: center, center, center 120%, 0 0;
-      background-repeat: no-repeat, no-repeat, no-repeat, repeat;
-      background-size: auto, auto, 1300px auto, 180px 180px;
-      opacity: 0.12;
-      filter: brightness(0) invert(1) contrast(0.82);
-      visibility: visible;
+        radial-gradient(circle at 40% 40%, var(--aurora-1) 0%, transparent 40%),
+        radial-gradient(circle at 70% 60%, var(--aurora-2) 0%, transparent 40%),
+        radial-gradient(circle at 30% 80%, var(--aurora-3) 0%, transparent 35%);
+      opacity: 0.6;
+      filter: blur(80px);
       pointer-events: none;
       z-index: 0;
+      animation: aurora-float 24s ease-in-out infinite alternate;
+      will-change: transform;
+    }
+
+    /* Grain Overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9Im4iPgogICAgICA8ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC43OCIgbnVtT2N0YXZlcz0iMyIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPgogICAgPC9maWx0ZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNuKSIgb3BhY2l0eT0iMC4wNSIvPgo8L3N2Zz4=');
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 1;
     }
 
     body::after {
@@ -181,49 +191,21 @@
       opacity: var(--pokemon-bg-opacity);
     }
 
-    @keyframes grained {
+    @keyframes aurora-float {
       0% {
-        transform: translate(-10%, 10%);
+        transform: translate(0, 0) scale(1) rotate(0deg);
       }
 
-      10% {
-        transform: translate(-25%, 0%);
+      33% {
+        transform: translate(2%, 4%) scale(1.05) rotate(2deg);
       }
 
-      20% {
-        transform: translate(-30%, 10%);
-      }
-
-      30% {
-        transform: translate(-30%, 30%);
-      }
-
-      40% {
-        transform: translate(0%, 0%);
-      }
-
-      50% {
-        transform: translate(-15%, 10%);
-      }
-
-      60% {
-        transform: translate(-20%, 20%);
-      }
-
-      70% {
-        transform: translate(-5%, 20%);
-      }
-
-      80% {
-        transform: translate(-25%, 5%);
-      }
-
-      90% {
-        transform: translate(-30%, 25%);
+      66% {
+        transform: translate(-3%, 2%) scale(0.95) rotate(-1deg);
       }
 
       100% {
-        transform: translate(-10%, 10%);
+        transform: translate(0, 0) scale(1) rotate(0deg);
       }
     }
 
@@ -858,6 +840,7 @@
       align-content: start;
       gap: var(--install-slot-gap);
       justify-items: start;
+      padding-left: 1px;
       min-height: calc(var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
       max-width: 320px;
     }
