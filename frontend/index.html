@@ -760,16 +760,20 @@
     #google-signin-button {
       position: relative;
       width: min(100%, 320px);
-      min-height: 40px;
+      height: 44px;
+      min-height: 44px;
       max-width: 320px;
       flex: 1 1 320px;
+      display: block;
+      line-height: 0;
+      overflow: hidden;
     }
 
     #google-signin-button:empty::before {
       content: '';
       display: block;
       width: 100%;
-      height: 40px;
+      height: 44px;
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       background:
@@ -784,6 +788,14 @@
 
     #google-signin-button>* {
       max-width: 100%;
+      display: block;
+      margin: 0 !important;
+    }
+
+    #google-signin-button iframe,
+    #google-signin-button div[role="button"] {
+      display: block !important;
+      margin: 0 !important;
     }
 
     .auth-status {
@@ -3730,6 +3742,18 @@
     </div>
   </div>
   <script nonce="__CSP_NONCE__">
+    const AUTH_BOOT_LOADER_STORAGE_KEY = 'walgreens_auth_boot_loader';
+
+    try {
+      if (localStorage.getItem(AUTH_BOOT_LOADER_STORAGE_KEY) !== '1') {
+        document.body.classList.remove('app-booting');
+        document.getElementById('page-loader')?.remove();
+      }
+    } catch (error) {
+      document.body.classList.remove('app-booting');
+      document.getElementById('page-loader')?.remove();
+    }
+
     const DEFAULT_POKEMON_BACKGROUND_THEME = 'gyra';
     const DEFAULT_POKEMON_BACKGROUND_ENABLED = false;
     const DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645;
@@ -4519,6 +4543,17 @@
       const normalized = String(value || '').trim();
       if (!normalized) return '';
       return normalized.replace(/\/+$/, '');
+    }
+
+    function setBootLoaderPreference(shouldUseLoader) {
+      try {
+        if (shouldUseLoader) {
+          localStorage.setItem(AUTH_BOOT_LOADER_STORAGE_KEY, '1');
+        } else {
+          localStorage.removeItem(AUTH_BOOT_LOADER_STORAGE_KEY);
+        }
+      } catch (error) {
+      }
     }
 
     function apiUrl(path) {
@@ -5665,6 +5700,7 @@
       updateCurrentUserDisplay(currentUser);
 
       if (!currentUser) {
+        setBootLoaderPreference(false);
         stopStatusPolling();
         setAuthenticatedUi(false);
         refreshPublicStatsForLogin();
@@ -5681,6 +5717,7 @@
         return false;
       }
 
+      setBootLoaderPreference(true);
       setAuthenticatedUi(true);
       updateAuthStatus('');
       await loadSettings();
@@ -5695,6 +5732,7 @@
       currentUser = null;
       authState = null;
       latestStatusSnapshot = null;
+      setBootLoaderPreference(false);
       stopStatusPolling();
       closeOnboarding(false);
       resetOnboardingSessionState();
