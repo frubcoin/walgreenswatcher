@@ -6384,8 +6384,9 @@
     });
 
     window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
       deferredInstallPrompt = event;
-      setInstallButtonsVisible(false);
+      refreshInstallButtons();
     });
 
     window.addEventListener('appinstalled', () => {
