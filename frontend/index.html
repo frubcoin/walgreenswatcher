@@ -868,6 +868,41 @@
       align-items: flex-start;
       color: var(--text-secondary);
       font-size: 14px;
+      opacity: 0.68;
+      transform: translateY(6px);
+      transition: opacity 0.32s ease, transform 0.32s ease, color 0.32s ease;
+    }
+
+    .auth-note-item.is-revealing,
+    .auth-note-item.is-complete {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .auth-note-item.is-revealing {
+      color: rgba(244, 247, 249, 0.96);
+    }
+
+    .auth-note-item.is-complete {
+      color: var(--text-secondary);
+    }
+
+    .auth-note-copy {
+      position: relative;
+      display: inline-block;
+    }
+
+    .auth-note-copy.is-typing::after {
+      content: '';
+      display: inline-block;
+      width: 1px;
+      height: 1em;
+      margin-left: 3px;
+      vertical-align: -0.14em;
+      background: rgba(243, 117, 32, 0.92);
+      box-shadow: 0 0 10px rgba(243, 117, 32, 0.26);
+      opacity: 0.92;
+      animation: auth-note-caret 0.8s steps(1, end) infinite;
     }
 
     .auth-note-bullet {
@@ -878,12 +913,51 @@
       margin-top: 6px;
       flex-shrink: 0;
       box-shadow: 0 0 0 4px rgba(243, 117, 32, 0.12);
+      transition: transform 0.32s ease, box-shadow 0.32s ease, filter 0.32s ease;
+    }
+
+    .auth-note-item.is-revealing .auth-note-bullet {
+      transform: scale(1.08);
+      filter: saturate(1.08);
+      box-shadow: 0 0 0 5px rgba(243, 117, 32, 0.16), 0 0 18px rgba(230, 38, 0, 0.22);
+      animation: auth-note-bullet-pulse 1.2s ease-out infinite;
+    }
+
+    .auth-note-item.is-complete .auth-note-bullet {
+      transform: scale(1);
+      filter: none;
     }
 
     .auth-status {
       font-size: 13px;
       color: var(--text-muted);
       min-height: 20px;
+    }
+
+    @keyframes auth-note-caret {
+      0%,
+      49% {
+        opacity: 0;
+      }
+
+      50%,
+      100% {
+        opacity: 0.85;
+      }
+    }
+
+    @keyframes auth-note-bullet-pulse {
+      0% {
+        box-shadow: 0 0 0 4px rgba(243, 117, 32, 0.16), 0 0 10px rgba(230, 38, 0, 0.16);
+      }
+
+      70% {
+        box-shadow: 0 0 0 7px rgba(243, 117, 32, 0.05), 0 0 22px rgba(230, 38, 0, 0.26);
+      }
+
+      100% {
+        box-shadow: 0 0 0 4px rgba(243, 117, 32, 0.16), 0 0 10px rgba(230, 38, 0, 0.16);
+      }
     }
 
     .auth-legal-note {
@@ -905,6 +979,23 @@
     .inline-legal-link:hover,
     .inline-legal-link:focus-visible {
       color: #ffffff;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .auth-note-copy.is-typing::after {
+        animation: none;
+      }
+
+      .auth-note-item,
+      .auth-note-item.is-revealing,
+      .auth-note-item.is-complete {
+        opacity: 1;
+        transform: none;
+      }
+
+      .auth-note-item.is-revealing .auth-note-bullet {
+        animation: none;
+      }
     }
 
     .onboarding-modal {
@@ -3999,11 +4090,11 @@
               </div>
             </div>
             <ul class="auth-note-list">
-              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Product info auto resolved from
+              <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Product info auto resolved from
                   links.</span></li>
-              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Discord webhooks with configurable
+              <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Discord webhooks with configurable
                   role notifications.</span></li>
-              <li class="auth-note-item"><span class="auth-note-bullet"></span><span>Beat everyone else to the
+              <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Beat everyone else to the
                   product.</span></li>
             </ul>
             <div class="auth-legal-note">By continuing, you agree to the <a class="inline-legal-link" href="/terms"
@@ -4419,6 +4510,7 @@
     let hasWindowLoaded = document.readyState === 'complete';
     let hasInitialSessionResolved = false;
     let hasInitialFontsResolved = !document.fonts || document.fonts.status === 'loaded';
+    let authNoteTypewriterTimers = [];
 
     const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
     const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
@@ -4495,6 +4587,75 @@
       root.classList.remove('is-visible', 'is-dragging');
     }
 
+    function normalizeAuthNoteText(value) {
+      return String(value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function resetAuthNoteTypewriter() {
+      authNoteTypewriterTimers.forEach(timer => window.clearTimeout(timer));
+      authNoteTypewriterTimers = [];
+
+      document.querySelectorAll('.auth-note-copy').forEach(node => {
+        const item = node.closest('.auth-note-item');
+        const fullText = normalizeAuthNoteText(node.dataset.fullText || node.textContent);
+        node.dataset.fullText = fullText;
+        node.textContent = fullText;
+        node.style.minHeight = '';
+        node.classList.remove('is-typing');
+        if (item) {
+          item.classList.remove('is-revealing', 'is-complete');
+        }
+      });
+    }
+
+    function startAuthNoteTypewriter() {
+      const nodes = Array.from(document.querySelectorAll('.auth-note-copy'));
+      if (!nodes.length) return;
+
+      resetAuthNoteTypewriter();
+
+      const prefersReducedMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      if (prefersReducedMotion) {
+        nodes.forEach(node => {
+          const item = node.closest('.auth-note-item');
+          if (item) item.classList.add('is-complete');
+        });
+        return;
+      }
+
+      nodes.forEach((node, index) => {
+        const item = node.closest('.auth-note-item');
+        const fullText = normalizeAuthNoteText(node.dataset.fullText || node.textContent);
+        node.dataset.fullText = fullText;
+        node.textContent = fullText;
+        node.style.minHeight = `${node.offsetHeight}px`;
+        node.textContent = '';
+        node.classList.add('is-typing');
+
+        const startDelay = 220 + (index * 260);
+        const stepDelay = fullText.length > 40 ? 13 : 18;
+        const startTimer = window.setTimeout(() => {
+          if (item) item.classList.add('is-revealing');
+        }, startDelay - 90);
+        authNoteTypewriterTimers.push(startTimer);
+
+        Array.from(fullText).forEach((_, charIndex) => {
+          const timer = window.setTimeout(() => {
+            node.textContent = fullText.slice(0, charIndex + 1);
+            if (charIndex === fullText.length - 1) {
+              node.classList.remove('is-typing');
+              node.style.minHeight = '';
+              if (item) {
+                item.classList.remove('is-revealing');
+                item.classList.add('is-complete');
+              }
+            }
+          }, startDelay + (charIndex * stepDelay));
+          authNoteTypewriterTimers.push(timer);
+        });
+      });
+    }
+
     function waitForInitialFonts(maxMs = 1200) {
       if (!document.fonts?.ready) {
         hasInitialFontsResolved = true;
@@ -4516,6 +4677,9 @@
 
       if (!loader) {
         document.body.classList.remove('app-booting');
+        if (document.body.classList.contains('auth-gate-active')) {
+          startAuthNoteTypewriter();
+        }
         return;
       }
 
@@ -4523,6 +4687,9 @@
       loader.dataset.dismissed = 'true';
       loader.remove();
       document.body.classList.remove('app-booting');
+      if (document.body.classList.contains('auth-gate-active')) {
+        startAuthNoteTypewriter();
+      }
     }
 
     function queueShellScrollbarUpdate() {
@@ -5446,6 +5613,11 @@
       if (appShell) appShell.hidden = !isAuthenticated;
       document.body.classList.toggle('auth-gate-active', !isAuthenticated);
       document.body.classList.toggle('app-active', isAuthenticated);
+      if (isAuthenticated) {
+        resetAuthNoteTypewriter();
+      } else if (!document.body.classList.contains('app-booting')) {
+        startAuthNoteTypewriter();
+      }
       queueShellScrollbarUpdate();
     }
 
