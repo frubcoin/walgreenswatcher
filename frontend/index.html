@@ -238,7 +238,6 @@
       justify-content: center;
       background: #35393d;
       color: white;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
     }
 
     #page-loader.page-loader-hidden {
@@ -4522,11 +4521,8 @@
 
       if (loader.dataset.dismissed === 'true') return;
       loader.dataset.dismissed = 'true';
-      loader.classList.add('page-loader-hidden');
-      window.setTimeout(() => {
-        loader.remove();
-        document.body.classList.remove('app-booting');
-      }, 300);
+      loader.remove();
+      document.body.classList.remove('app-booting');
     }
 
     function queueShellScrollbarUpdate() {
