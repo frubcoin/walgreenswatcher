@@ -845,6 +845,17 @@
       min-width: 156px;
     }
 
+    .install-app-btn {
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.24s ease, transform 0.24s ease;
+    }
+
+    .install-app-btn.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
     body.install-slot-active .auth-install-slot .install-app-btn[hidden] {
       display: inline-flex !important;
       visibility: hidden;
@@ -5001,6 +5012,16 @@
     function setInstallButtonsVisible(visible) {
       document.querySelectorAll('.install-app-btn').forEach(button => {
         button.hidden = !visible;
+        button.classList.remove('is-visible');
+        if (visible) {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              if (!button.hidden) {
+                button.classList.add('is-visible');
+              }
+            });
+          });
+        }
       });
       document.querySelectorAll('.install-app-copy').forEach(copy => {
         copy.hidden = !visible;
