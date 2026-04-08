@@ -9481,9 +9481,32 @@
           return;
         case 'toggle-results-map-product-filter':
           resultsMapProductFilterOpen = !resultsMapProductFilterOpen;
+          if (!resultsMapProductFilterOpen) {
+            resultsMapProductMenuOpen = false;
+          }
           if (latestRenderedResults && currentTab === 'results' && currentResultsView === 'map') {
             const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
             syncResultsMapSidebar(mapData);
+          }
+          return;
+        case 'toggle-results-map-product-menu':
+          resultsMapProductMenuOpen = !resultsMapProductMenuOpen;
+          if (latestRenderedResults && currentTab === 'results' && currentResultsView === 'map') {
+            const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
+            syncResultsMapSidebar(mapData);
+          }
+          return;
+        case 'set-results-map-product-filter':
+          currentResultsMapProductFilter = String(actionElement.dataset.productFilterValue || '').trim();
+          resultsMapProductMenuOpen = false;
+          if (latestRenderedResults && currentTab === 'results') {
+            const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
+            const filteredLocations = getFilteredResultsMapLocations(mapData.locations);
+            syncResultsMapSidebar(mapData);
+
+            if (currentResultsView === 'map') {
+              rerenderResultsMapForFilteredLocations(filteredLocations);
+            }
           }
           return;
         case 'set-results-view':
