@@ -804,6 +804,10 @@
       margin-top: 10px;
       gap: var(--auth-actions-gap);
       width: 100%;
+      min-height: var(--google-signin-slot-height);
+    }
+
+    body.install-slot-active .auth-actions {
       min-height: calc(var(--google-signin-slot-height) + var(--auth-actions-gap) + var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
     }
 
@@ -925,6 +929,10 @@
       flex-direction: column;
       align-items: center;
       gap: var(--install-slot-gap);
+      min-height: 0;
+    }
+
+    body.install-slot-active .auth-install-slot {
       min-height: calc(var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
     }
 
@@ -7152,10 +7160,10 @@
 
     function refreshInstallButtons() {
       const installed = isAppInstalled();
-      const shouldReserveInstallSlot = !installed && isWindowsPlatform();
+      const showInstallUi = Boolean(deferredInstallPrompt) && !installed && isWindowsPlatform();
       document.body.classList.toggle('app-installed', installed);
-      document.body.classList.toggle('install-slot-active', shouldReserveInstallSlot);
-      setInstallButtonsVisible(Boolean(deferredInstallPrompt) && !installed && isWindowsPlatform());
+      document.body.classList.toggle('install-slot-active', showInstallUi);
+      setInstallButtonsVisible(showInstallUi);
     }
 
     async function promptInstallApp() {
