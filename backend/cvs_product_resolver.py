@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import random
 import re
 from html import unescape
@@ -17,6 +18,8 @@ except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
 
 from config import USER_AGENTS
+
+logger = logging.getLogger(__name__)
 
 CVS_PRODUCT_ID_PATTERN = re.compile(r"-prodid-(?P<product_id>\d+)(?:[/?#]|$)", re.IGNORECASE)
 CVS_TITLE_SUFFIX_PATTERN = re.compile(r"\s*-\s*CVS Pharmacy\s*$", re.IGNORECASE)
@@ -104,11 +107,17 @@ class CvsProductResolver:
                             if bootstrap_url == "https://www.cvs.com/"
                             else CVS_PRODUCT_TIMEOUT,
                         )
-                        response.raise_for_status()
+                        if response.status_code >= 400:
+                            last_error = ValueError(f"HTTP {response.status_code} for {bootstrap_url}")
+                            logger.warning("CVS resolver bootstrap blocked for %s with HTTP %s", bootstrap_url, response.status_code)
+                            if bootstrap_url == product_link:
+                                break
+                            continue
                         if bootstrap_url == product_link and "html" in response.headers.get("content-type", "").lower():
                             return response.text
-                    except requests.RequestException as exc:
+                    except Exception as exc:
                         last_error = exc
+                        logger.warning("CVS resolver bootstrap request failed for %s: %s", bootstrap_url, exc)
                         if bootstrap_url == product_link:
                             break
             finally:

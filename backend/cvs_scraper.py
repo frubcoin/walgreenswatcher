@@ -86,10 +86,15 @@ class CvsStockChecker:
                     headers=self._request_headers(referer=referer),
                     timeout=30,
                 )
-                response.raise_for_status()
+                if response.status_code >= 400:
+                    logger.warning("CVS bootstrap blocked for %s with HTTP %s", url, response.status_code)
+                    continue
                 if not api_key and "html" in response.headers.get("content-type", "").lower():
                     api_key = self._extract_api_key(response.text)
-            except requests.RequestException:
+                    if api_key:
+                        logger.info("CVS bootstrap extracted API key from %s", url)
+            except Exception as exc:
+                logger.warning("CVS bootstrap request failed for %s: %s", url, exc)
                 continue
         return referer, api_key
 
@@ -184,6 +189,7 @@ class CvsStockChecker:
                         )
                     except requests.RequestException as exc:
                         failures.append(f"{inventory_url} {type(exc).__name__}: {exc}")
+                        logger.warning("CVS inventory request exception for %s: %s", inventory_url, exc)
                         continue
 
                     try:
@@ -191,15 +197,29 @@ class CvsStockChecker:
                     except ValueError:
                         snippet = response.text[:200].replace("\n", " ")
                         failures.append(f"{inventory_url} HTTP {response.status_code}: {snippet}")
+                        logger.warning(
+                            "CVS inventory non-JSON response from %s: HTTP %s %s",
+                            inventory_url,
+                            response.status_code,
+                            snippet,
+                        )
                         continue
 
                     if self._looks_like_inventory_response(data):
+                        logger.info("CVS inventory response accepted from %s", inventory_url)
                         return data
 
                     header = ((data.get("response") or {}).get("header") or {}) if isinstance(data, dict) else {}
                     failures.append(
                         f"{inventory_url} HTTP {response.status_code}: "
                         f"{header.get('statusCode') or 'unknown'} {header.get('statusDesc') or 'unexpected payload'}"
+                    )
+                    logger.warning(
+                        "CVS inventory unexpected payload from %s: HTTP %s statusCode=%s statusDesc=%s",
+                        inventory_url,
+                        response.status_code,
+                        header.get("statusCode") or "unknown",
+                        header.get("statusDesc") or "unexpected payload",
                     )
         finally:
             session.close()
