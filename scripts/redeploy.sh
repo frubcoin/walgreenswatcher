@@ -37,6 +37,11 @@ service_status_summary() {
   fi
 }
 
+systemd_unit_exists() {
+  local service_name="$1"
+  systemctl list-unit-files "${service_name}.service" --no-legend 2>/dev/null | grep -q "^${service_name}\.service[[:space:]]"
+}
+
 trim() {
   local value="${1:-}"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -239,6 +244,10 @@ main() {
     log "Reloading systemd units"
     systemctl daemon-reload
     for service_name in "${service_names[@]}"; do
+      if ! systemd_unit_exists "$service_name"; then
+        log "Skipping ${service_name}: systemd unit not found"
+        continue
+      fi
       systemctl reset-failed "$service_name" >/dev/null 2>&1 || true
       log "Restarting ${service_name}"
       systemctl restart "$service_name"
