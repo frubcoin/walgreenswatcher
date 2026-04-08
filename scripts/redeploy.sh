@@ -111,14 +111,14 @@ cleanup_python_artifacts() {
     run_as_app_user "$target_user" find "$APP_DIR" \
       \( -path "$APP_DIR/.git" -o -path "$APP_DIR/.venv" -o -path "$APP_DIR/node_modules" -o -path "$APP_DIR/backend/crawlee/node_modules" \) -prune \
       -o \( -type d -name "__pycache__" -print -exec rm -rf {} + \) \
-      -o \( -type f \( -name "*.pyc" -o -name "*.pyo" \) -print -delete \)
+      -o \( -type f \( -name "*.pyc" -o -name "*.pyo" \) -print -exec rm -f {} + \)
     return
   fi
 
   find "$APP_DIR" \
     \( -path "$APP_DIR/.git" -o -path "$APP_DIR/.venv" -o -path "$APP_DIR/node_modules" -o -path "$APP_DIR/backend/crawlee/node_modules" \) -prune \
     -o \( -type d -name "__pycache__" -print -exec rm -rf {} + \) \
-    -o \( -type f \( -name "*.pyc" -o -name "*.pyo" \) -print -delete \)
+    -o \( -type f \( -name "*.pyc" -o -name "*.pyo" \) -print -exec rm -f {} + \)
 }
 
 find_python() {
