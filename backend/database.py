@@ -377,6 +377,97 @@ class StockDatabase:
             for row in rows
         ]
 
+    def list_trending_products(self, viewer_user_id: int, limit: int = 8) -> List[Dict[str, Any]]:
+        capped_limit = max(1, min(int(limit or 8), 24))
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                WITH grouped AS (
+                    SELECT
+                        article_id,
+                        retailer,
+                        COUNT(DISTINCT user_id) AS tracked_by_count,
+                        MAX(created_at) AS last_tracked_at
+                    FROM tracked_products
+                    WHERE COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
+                    GROUP BY article_id, retailer
+                )
+                SELECT
+                    g.article_id,
+                    g.retailer,
+                    g.tracked_by_count,
+                    g.last_tracked_at,
+                    EXISTS(
+                        SELECT 1
+                        FROM tracked_products own
+                        WHERE own.user_id = ?
+                          AND own.article_id = g.article_id
+                          AND own.retailer = g.retailer
+                    ) AS is_tracked_by_user,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.name), ''), tp.article_id)
+                        FROM tracked_products tp
+                        WHERE tp.article_id = g.article_id
+                          AND tp.retailer = g.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS name,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.planogram), ''), '')
+                        FROM tracked_products tp
+                        WHERE tp.article_id = g.article_id
+                          AND tp.retailer = g.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS planogram,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.image_url), ''), '')
+                        FROM tracked_products tp
+                        WHERE tp.article_id = g.article_id
+                          AND tp.retailer = g.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS image_url,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.source_url), ''), '')
+                        FROM tracked_products tp
+                        WHERE tp.article_id = g.article_id
+                          AND tp.retailer = g.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS source_url,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.product_id), ''), '')
+                        FROM tracked_products tp
+                        WHERE tp.article_id = g.article_id
+                          AND tp.retailer = g.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS product_id
+                FROM grouped g
+                ORDER BY g.tracked_by_count DESC, g.last_tracked_at DESC, lower(name) ASC, g.article_id ASC
+                LIMIT ?
+                """,
+                (int(viewer_user_id), capped_limit),
+            ).fetchall()
+
+        return [
+            {
+                "id": row["article_id"],
+                "retailer": row["retailer"] or "walgreens",
+                "name": row["name"] or row["article_id"],
+                "planogram": row["planogram"] or "",
+                "image_url": row["image_url"] or "",
+                "source_url": row["source_url"] or "",
+                "product_id": row["product_id"] or "",
+                "tracked_by_count": int(row["tracked_by_count"] or 0),
+                "last_tracked_at": row["last_tracked_at"] or "",
+                "is_tracked_by_user": bool(row["is_tracked_by_user"]),
+            }
+            for row in rows
+        ]
+
     def add_tracked_product(
         self,
         user_id: int,

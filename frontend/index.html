@@ -1765,6 +1765,20 @@
       color: var(--accent-hover);
     }
 
+    .btn-edit-icon {
+      background: rgba(72, 156, 212, 0.12);
+      color: var(--green);
+      padding: 6px;
+      min-width: unset !important;
+      border: 1px solid rgba(72, 156, 212, 0.24);
+    }
+
+    .btn-edit-icon:hover {
+      background: rgba(72, 156, 212, 0.22);
+      border-color: rgba(72, 156, 212, 0.48);
+      color: #8ec8ef;
+    }
+
     .status-bar {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -3581,6 +3595,157 @@
       font-family: 'Space Mono', monospace;
     }
 
+    .tracked-products-panel {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .tracked-products-controls {
+      margin-top: 16px;
+    }
+
+    .trending-products-panel {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(72, 156, 212, 0.18);
+      background:
+        radial-gradient(circle at top right, rgba(72, 156, 212, 0.12), transparent 36%),
+        linear-gradient(180deg, rgba(25, 29, 34, 0.92), rgba(17, 20, 23, 0.92));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.03),
+        0 14px 36px rgba(0, 0, 0, 0.18);
+    }
+
+    .trending-products-header {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .trending-products-title {
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-secondary);
+    }
+
+    .trending-products-copy {
+      font-size: 13px;
+      color: var(--text-muted);
+      max-width: 56ch;
+    }
+
+    .trending-products-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .trending-product-item {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .trending-product-thumb {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(5, 7, 10, 0.55);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .trending-product-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .trending-product-thumb-fallback {
+      width: 30px;
+      height: 30px;
+      object-fit: contain;
+      opacity: 0.92;
+    }
+
+    .trending-product-body {
+      min-width: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .trending-product-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      color: var(--text-muted);
+    }
+
+    .trending-product-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(72, 156, 212, 0.1);
+      border: 1px solid rgba(72, 156, 212, 0.18);
+    }
+
+    .trending-product-name {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--text-primary);
+      word-break: break-word;
+    }
+
+    .trending-product-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .trending-product-link {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .trending-product-add-btn {
+      min-width: 154px;
+      justify-content: center;
+    }
+
+    .trending-product-add-btn:disabled {
+      cursor: not-allowed;
+    }
+
+    .trending-products-empty {
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
     .btn-sm {
       padding: 6px 12px;
       font-size: 12px;
@@ -4231,6 +4396,25 @@
       .product-actions {
         width: 100%;
         justify-content: flex-end;
+      }
+
+      .trending-product-item {
+        grid-template-columns: 1fr;
+      }
+
+      .trending-product-thumb {
+        width: 52px;
+        height: 52px;
+      }
+
+      .trending-product-footer {
+        align-items: stretch;
+      }
+
+      .trending-product-footer .btn,
+      .trending-product-footer .result-card-link {
+        width: 100%;
+        justify-content: center;
       }
 
       .logo-text h1 {
@@ -5270,10 +5454,10 @@
             style="display:none;">Stop</button>
         </div>
 
-        <div style="margin-top:32px; padding-top:24px; border-top: 1px solid var(--border);">
+        <div class="tracked-products-panel">
           <div class="form-label" style="margin-bottom:12px;">Tracked Products</div>
           <div id="products-list"></div>
-          <div style="margin-top:16px;">
+          <div class="tracked-products-controls">
             <div class="form-group">
               <input type="url" class="form-input" id="new-product-url" placeholder="Paste a Walgreens product link">
             </div>
@@ -5286,6 +5470,17 @@
               the product metadata and image automatically. If you enter a custom name, that label will be
               used everywhere in the app and Discord alerts.</div>
             <button class="btn btn-primary" type="button" data-action="add-product">+ Add Product From Link</button>
+
+            <div class="trending-products-panel">
+              <div class="trending-products-header">
+                <div class="trending-products-title">Trending Products</div>
+                <div class="trending-products-copy">Recently tracked community links. Add any of them straight to your
+                  monitor without pasting the URL again.</div>
+              </div>
+              <div class="trending-products-list" id="trending-products-list">
+                <div class="trending-products-empty">Loading recent community picks...</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -5355,6 +5550,7 @@
       tone: 'muted'
     };
     let trackedProductsCache = [];
+    let trendingProductsCache = [];
     let editingProductId = null;
     let currentUser = null;
     let authState = null;
@@ -6930,6 +7126,59 @@
       return '/icons/walgreens.png';
     }
 
+    function renderTrendingProducts(products = trendingProductsCache) {
+      trendingProductsCache = Array.isArray(products) ? products : [];
+      const list = document.getElementById('trending-products-list');
+      if (!list) return;
+
+      if (!trendingProductsCache.length) {
+        list.innerHTML = `
+          <div class="trending-products-empty">
+            No shared links yet. Once people start tracking products with valid Walgreens links, they will show up here.
+          </div>`;
+        return;
+      }
+
+      list.innerHTML = trendingProductsCache.map(product => {
+        const safeId = escapeHtml(product.id || '');
+        const safeRetailer = escapeHtml(product.retailer || 'walgreens');
+        const safeName = escapeHtml(product.name || 'Unnamed product');
+        const safeSourceUrl = sanitizeProductSourceUrl(product.source_url || '');
+        const safeImageUrl = sanitizeProductImageUrl(product.image_url || '');
+        const safeRetailerIcon = escapeHtml(retailerIconPath(product.retailer));
+        const trackedByCount = Math.max(0, Number(product.tracked_by_count || 0));
+        const watcherLabel = `${trackedByCount} watcher${trackedByCount === 1 ? '' : 's'}`;
+        const lastTrackedDate = parseApiTimestamp(product.last_tracked_at);
+        const lastTrackedLabel = lastTrackedDate ? formatRelativeDuration(lastTrackedDate) : 'Recently tracked';
+        const isTracked = Boolean(product.is_tracked_by_user);
+        const addLabel = isTracked ? 'Already Tracking' : '+ Add To Monitor';
+
+        return `
+          <div class="trending-product-item" data-product-id="${safeId}" data-retailer="${safeRetailer}">
+            <div class="trending-product-thumb">
+              ${safeImageUrl
+            ? `<img src="${escapeHtml(safeImageUrl)}" alt="${safeName}">`
+            : `<img class="trending-product-thumb-fallback" src="${safeRetailerIcon}" alt="${escapeHtml(retailerLabel(product.retailer))}">`
+          }
+            </div>
+            <div class="trending-product-body">
+              <div class="trending-product-meta">
+                <span class="trending-product-chip">${escapeHtml(watcherLabel)}</span>
+                <span>${escapeHtml(lastTrackedLabel)}</span>
+              </div>
+              <div class="trending-product-name">${safeName}</div>
+              <div class="trending-product-footer">
+                ${safeSourceUrl
+            ? `<a class="result-card-link trending-product-link" href="${escapeHtml(safeSourceUrl)}" target="_blank" rel="noopener noreferrer">Open Link</a>`
+            : `<span class="product-id">Link unavailable</span>`
+          }
+                <button class="btn btn-primary btn-sm trending-product-add-btn" type="button" data-action="add-trending-product"${isTracked ? ' disabled' : ''}>${addLabel}</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
     function renderTrackedProducts(products = trackedProductsCache) {
       trackedProductsCache = Array.isArray(products) ? products : [];
       const list = document.getElementById('products-list');
@@ -6962,7 +7211,9 @@
                     <button class="btn btn-primary btn-sm" type="button" data-action="save-product-name">Save</button>
                   `
             : `
-                    <button class="btn btn-secondary btn-sm" type="button" data-action="start-product-name-edit">Edit</button>
+                    <button class="btn btn-edit-icon" type="button" data-action="start-product-name-edit" title="Edit product name" aria-label="Edit product name">
+                      <span class="btn-icon" style="-webkit-mask-image: url('/edit.png'); mask-image: url('/edit.png'); width: 18px; height: 18px;" aria-hidden="true"></span>
+                    </button>
                     <button class="btn btn-danger-icon" type="button" data-action="remove-product" title="Remove">
                       <span class="btn-icon" style="-webkit-mask-image: url('/trash.webp'); mask-image: url('/trash.webp'); width: 20px; height: 20px;" aria-hidden="true"></span>
                     </button>
@@ -6984,6 +7235,17 @@
     function startProductNameEdit(productId) {
       editingProductId = productId;
       renderTrackedProducts();
+    }
+
+    async function loadTrendingProducts(limit = 8) {
+      const result = await apiCall(`/api/products/trending?limit=${Math.max(1, Number(limit) || 8)}`);
+      if (!result) {
+        renderTrendingProducts([]);
+        return null;
+      }
+
+      renderTrendingProducts(result.products || []);
+      return result;
     }
 
     function cancelProductNameEdit() {
@@ -7862,6 +8124,9 @@
           return;
         case 'add-product':
           await addProduct();
+          return;
+        case 'add-trending-product':
+          await addTrendingProduct(actionElement);
           return;
         case 'cancel-product-name-edit':
           cancelProductNameEdit();
@@ -9061,7 +9326,10 @@
       }
       syncManualLocationSearchUi();
 
-      const data = await apiCall('/api/status');
+      const [data] = await Promise.all([
+        apiCall('/api/status'),
+        loadTrendingProducts()
+      ]);
       if (!data) return;
       const status = data.status || {};
       document.getElementById('cfg-zip').value = status.current_zipcode || '';
@@ -9296,6 +9564,55 @@
         await loadSettings();
       } else {
         showToast('Failed to add product', 'error');
+      }
+    }
+
+    function getTrendingProductItemElement(element) {
+      return element ? element.closest('.trending-product-item') : null;
+    }
+
+    function getTrendingProductFromElement(element) {
+      const row = getTrendingProductItemElement(element);
+      if (!row) return null;
+
+      const productId = row.dataset.productId || '';
+      const retailer = row.dataset.retailer || 'walgreens';
+      return trendingProductsCache.find(product =>
+        String(product.id || '') === productId &&
+        String(product.retailer || 'walgreens') === retailer
+      ) || null;
+    }
+
+    async function addTrendingProduct(sourceElement) {
+      const product = getTrendingProductFromElement(sourceElement);
+      if (!product) {
+        showToast('That trending product is no longer available', 'error');
+        await loadTrendingProducts();
+        return;
+      }
+
+      if (product.is_tracked_by_user) {
+        showToast('You are already tracking that product', 'info');
+        return;
+      }
+
+      const payload = {
+        id: product.id,
+        retailer: product.retailer || 'walgreens',
+        name: product.name || 'Tracked product',
+        planogram: product.planogram || '',
+        image_url: product.image_url || '',
+        source_url: product.source_url || '',
+        product_id: product.product_id || ''
+      };
+
+      const result = await apiCall('/api/products/add', 'POST', payload);
+      if (result) {
+        showToast(`Added ${product.name || 'product'}`, 'success');
+        await loadSettings();
+      } else {
+        showToast('Failed to add trending product', 'error');
+        await loadTrendingProducts();
       }
     }
 

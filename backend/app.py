@@ -1152,6 +1152,14 @@ def resolve_product(user: Dict[str, Any]):
     return jsonify(resolved)
 
 
+@app.route("/api/products/trending", methods=["GET"])
+@require_auth
+def get_trending_products(user: Dict[str, Any]):
+    limit = request.args.get("limit", default=8, type=int)
+    products = db.list_trending_products(int(user["id"]), limit=limit)
+    return jsonify({"products": products, "count": len(products)})
+
+
 @app.route("/api/products/remove", methods=["POST"])
 @require_auth
 def remove_product(user: Dict[str, Any]):
