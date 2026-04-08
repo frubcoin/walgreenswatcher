@@ -227,7 +227,7 @@ def _import_tracked_products(
                     created_at
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(user_id, article_id) DO UPDATE SET
+                ON CONFLICT(user_id, retailer, article_id) DO UPDATE SET
                     retailer = excluded.retailer,
                     name = excluded.name,
                     planogram = excluded.planogram,

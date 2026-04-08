@@ -11,6 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import DEFAULT_CHECK_INTERVAL_MINUTES, DEFAULT_TRACKED_PRODUCTS, TARGET_ZIP_CODE
 
+from cvs_scraper import CvsStockChecker
 from database import StockDatabase
 from discord_notifier import DiscordNotifier
 from walgreens_scraper import WalgreensStockChecker
@@ -57,6 +58,7 @@ class StockCheckScheduler:
         self.state_lock = threading.RLock()
 
         self.walgreens_checker = WalgreensStockChecker()
+        self.cvs_checker = CvsStockChecker()
 
         self.notifier = DiscordNotifier([])
         self.is_running = False
@@ -86,6 +88,12 @@ class StockCheckScheduler:
 
         self.refresh_from_db()
         self._load_last_check_snapshot()
+
+    @staticmethod
+    def _tracked_product_key(article_id: Any, retailer: Any) -> str:
+        normalized_retailer = str(retailer or "walgreens").strip().lower() or "walgreens"
+        normalized_article_id = str(article_id or "").strip()
+        return f"{normalized_retailer}:{normalized_article_id}"
 
     def _load_last_check_snapshot(self) -> None:
         last_check = self.db.get_last_check(self.user_id)
@@ -126,7 +134,10 @@ class StockCheckScheduler:
         self.pokemon_background_tile_size = settings["pokemon_background_tile_size"]
         self.notifier = DiscordNotifier(self.discord_destinations or None)
         self.tracked_products = {
-            product["id"]: {
+            self._tracked_product_key(product["id"], product.get("retailer", "walgreens")): {
+                "key": product.get("key")
+                or self._tracked_product_key(product["id"], product.get("retailer", "walgreens")),
+                "article_id": product["id"],
                 "retailer": product.get("retailer", "walgreens"),
                 "name": product["name"],
                 "planogram": product["planogram"],
@@ -137,6 +148,7 @@ class StockCheckScheduler:
             for product in products
         }
         self.walgreens_checker.current_zip_code = self.current_zipcode
+        self.cvs_checker.current_zip_code = self.current_zipcode
 
 
     @staticmethod
@@ -221,18 +233,23 @@ class StockCheckScheduler:
             self.refresh_from_db()
         return success
 
-    def remove_product(self, product_id: str) -> bool:
-        success = self.db.remove_tracked_product(self.user_id, product_id)
+    def remove_product(self, product_id: str, retailer: str = "") -> bool:
+        success = self.db.remove_tracked_product(self.user_id, product_id, retailer.strip())
         if success:
             self.refresh_from_db()
         return success
 
-    def update_product_name(self, product_id: str, product_name: str) -> bool:
+    def update_product_name(self, product_id: str, product_name: str, retailer: str = "") -> bool:
         product_name = str(product_name).strip()
         if not product_name:
             raise ValueError("Product name cannot be empty")
 
-        success = self.db.update_tracked_product_name(self.user_id, product_id, product_name)
+        success = self.db.update_tracked_product_name(
+            self.user_id,
+            product_id,
+            product_name,
+            retailer.strip(),
+        )
         if success:
             self.refresh_from_db()
         return success
@@ -276,7 +293,8 @@ class StockCheckScheduler:
     def _product_specs(self) -> List[Dict[str, str]]:
         return [
             {
-                "article_id": article_id,
+                "key": key,
+                "article_id": product["article_id"],
                 "retailer": product.get("retailer", "walgreens"),
                 "name": product["name"],
                 "planogram": product["planogram"],
@@ -284,7 +302,7 @@ class StockCheckScheduler:
                 "source_url": product.get("source_url", ""),
                 "product_id": product.get("product_id", ""),
             }
-            for article_id, product in self.tracked_products.items()
+            for key, product in self.tracked_products.items()
         ]
 
     def _reset_progress(self) -> None:
@@ -425,6 +443,8 @@ class StockCheckScheduler:
 
             self.walgreens_checker.progress_callback = update_progress
             self.walgreens_checker.current_zip_code = self.current_zipcode
+            self.cvs_checker.progress_callback = update_progress
+            self.cvs_checker.current_zip_code = self.current_zipcode
 
 
             walgreens_products = [
@@ -473,6 +493,7 @@ class StockCheckScheduler:
             for index, product in enumerate(product_specs, start=1):
                 retailer = product.get("retailer", "walgreens")
                 article_id = str(product["article_id"])
+                product_key = str(product.get("key") or self._tracked_product_key(article_id, retailer))
                 product_display_name = product.get("name") or article_id
 
                 logger.info("\n[%s/%s][%s] %s", index, len(product_specs), retailer, product_display_name)
@@ -485,11 +506,26 @@ class StockCheckScheduler:
                         product_index=index,
                         product_total=len(product_specs),
                     )
-
+                elif retailer == "cvs":
+                    product_result = self.cvs_checker.check_product_availability(
+                        product,
+                        self.current_zipcode,
+                        product_index=index,
+                        product_total=len(product_specs),
+                    )
                 else:
                     raise ValueError(f"Unsupported retailer: {retailer}")
 
-                check_results[article_id] = {
+                scanned_store_keys.update(
+                    f"{retailer}:{store_id}"
+                    for store_id in (product_result.get("location_ids") or [])
+                    if store_id
+                )
+                self.total_stores = max(self.total_stores, len(product_result.get("location_ids") or []))
+
+                check_results[product_key] = {
+                    "id": article_id,
+                    "key": product_key,
                     "retailer": retailer,
                     "name": product_display_name,
                     "image_url": product.get("image_url", ""),
@@ -637,7 +673,8 @@ class StockCheckScheduler:
     def get_status(self) -> Dict[str, Any]:
         products_list = [
             {
-                "id": article_id,
+                "key": product.get("key") or key,
+                "id": product["article_id"],
                 "retailer": product.get("retailer", "walgreens"),
                 "name": product["name"],
                 "planogram": product["planogram"],
@@ -645,7 +682,7 @@ class StockCheckScheduler:
                 "source_url": product.get("source_url", ""),
                 "product_id": product.get("product_id", ""),
             }
-            for article_id, product in self.tracked_products.items()
+            for key, product in self.tracked_products.items()
         ]
 
         return {

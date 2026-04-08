@@ -6,9 +6,10 @@ from typing import Dict
 from urllib.parse import urlparse
 
 
+from cvs_product_resolver import CvsProductResolver
 from walgreens_product_resolver import WalgreensProductResolver
 
-SUPPORTED_RETAILERS = {"walgreens"}
+SUPPORTED_RETAILERS = {"walgreens", "cvs"}
 
 
 def detect_product_retailer(product_link: str) -> str:
@@ -17,13 +18,17 @@ def detect_product_retailer(product_link: str) -> str:
 
     if hostname == "walgreens.com" or hostname.endswith(".walgreens.com"):
         return "walgreens"
-    raise ValueError("Only Walgreens product links are supported right now")
+    if hostname == "cvs.com" or hostname.endswith(".cvs.com"):
+        return "cvs"
+    raise ValueError("Only Walgreens and CVS product links are supported right now")
 
 
 def resolve_product_link(product_link: str) -> Dict[str, str]:
     retailer = detect_product_retailer(product_link)
     if retailer == "walgreens":
         resolved = WalgreensProductResolver.resolve_product_link(product_link)
+    elif retailer == "cvs":
+        resolved = CvsProductResolver.resolve_product_link(product_link)
     else:
         raise ValueError(f"Unsupported retailer: {retailer}")
 

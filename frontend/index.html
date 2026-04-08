@@ -348,13 +348,17 @@
     .app-window {
       margin-top: 18px;
       padding: 0 22px 28px;
-      background: rgba(18, 20, 22, 0.88);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015) 24%, rgba(255, 255, 255, 0.02) 100%),
+        rgba(18, 20, 22, 0.84);
+      border: 1px solid rgba(255, 255, 255, 0.04);
       border-radius: 18px;
       box-shadow:
         0 24px 64px rgba(0, 0, 0, 0.5),
-        inset 0 1px 0 rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(28px);
+        0 12px 32px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(28px) saturate(1.12);
+      -webkit-backdrop-filter: blur(28px) saturate(1.12);
+      background-clip: padding-box;
       overflow: hidden;
     }
 
@@ -369,7 +373,6 @@
       align-items: center;
       justify-content: space-between;
       padding: 24px 0 20px;
-      border-bottom: 1px solid var(--border);
       gap: 16px;
       flex-wrap: wrap;
     }
@@ -445,12 +448,14 @@
       background-position: center, center;
       background-repeat: no-repeat, no-repeat;
       background-size: cover, cover;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.04);
       border-radius: 22px;
       box-shadow:
         0 24px 64px rgba(0, 0, 0, 0.5),
-        inset 0 1px 0 rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(24px) saturate(1.2);
+        0 12px 32px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(24px) saturate(1.15);
+      -webkit-backdrop-filter: blur(24px) saturate(1.15);
+      background-clip: padding-box;
       overflow: hidden;
     }
 
@@ -657,6 +662,21 @@
       color: var(--text-primary);
       line-height: 1;
       margin-bottom: 6px;
+    }
+
+    .auth-metric-value-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .auth-metric-live-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: #7dffb3;
+      box-shadow: 0 0 0 3px rgba(125, 255, 179, 0.16);
+      flex: 0 0 auto;
     }
 
     .auth-metric-label {
@@ -1075,6 +1095,7 @@
 
     .tech-stack-dialog {
       width: min(980px, calc(100vw - 48px));
+      height: min(760px, calc(100vh - 72px));
       max-height: min(760px, calc(100vh - 72px));
       margin: auto;
       display: grid;
@@ -1088,10 +1109,12 @@
 
     .tech-stack-sidebar {
       min-width: 0;
+      min-height: 0;
       padding: 28px;
       display: grid;
       gap: 18px;
       align-content: start;
+      overflow-y: auto;
       background:
         radial-gradient(circle at top left, rgba(230, 38, 0, 0.18), transparent 38%),
         radial-gradient(circle at bottom right, rgba(72, 156, 212, 0.14), transparent 34%),
@@ -1187,6 +1210,31 @@
       line-height: 1.6;
     }
 
+    .tech-stack-card-copy a,
+    .tech-stack-list a {
+      color: var(--green);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+      word-break: break-word;
+    }
+
+    .tech-stack-card-copy a:hover,
+    .tech-stack-card-copy a:focus-visible,
+    .tech-stack-list a:hover,
+    .tech-stack-list a:focus-visible {
+      color: var(--text-primary);
+    }
+
+    .tech-stack-section-title {
+      margin-top: 6px;
+    }
+
+    .tech-stack-section-copy {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
     .tech-stack-list {
       display: grid;
       gap: 8px;
@@ -1212,6 +1260,62 @@
       justify-content: flex-end;
       border-top: 1px solid rgba(255, 255, 255, 0.06);
       background: linear-gradient(180deg, rgba(26, 29, 33, 0.16), rgba(26, 29, 33, 0.42));
+    }
+
+    @media (max-width: 900px), (max-height: 820px) {
+      .tech-stack-dialog {
+        width: min(100vw - 24px, 860px);
+        height: calc(100dvh - 24px);
+        max-height: calc(100dvh - 24px);
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+        overflow: hidden;
+      }
+
+      .tech-stack-sidebar {
+        gap: 12px;
+        padding: 22px 20px 18px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .tech-stack-sidebar h2 {
+        font-size: clamp(22px, 4.2vw, 28px);
+        line-height: 1.08;
+      }
+
+      .tech-stack-chip-list {
+        gap: 7px;
+      }
+
+      .tech-stack-main {
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .tech-stack-content {
+        padding: 24px 20px 20px;
+        gap: 16px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+
+      .tech-stack-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tech-stack-actions {
+        justify-content: stretch;
+        padding: 14px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+        background: linear-gradient(180deg, rgba(23, 26, 30, 0.78), rgba(19, 22, 26, 0.98));
+        backdrop-filter: blur(14px);
+      }
+
+      .tech-stack-actions .btn {
+        width: 100%;
+        min-height: 48px;
+        justify-content: center;
+      }
     }
 
     .onboarding-sidebar {
@@ -3606,64 +3710,198 @@
     }
 
     .trending-products-panel {
-      margin-top: 18px;
-      padding: 16px;
-      border-radius: 16px;
-      border: 1px solid rgba(72, 156, 212, 0.18);
+      position: relative;
+      isolation: isolate;
+      margin-top: 22px;
+      padding: 24px;
+      border-radius: 24px;
+      border: 1px solid rgba(243, 117, 32, 0.16);
       background:
-        radial-gradient(circle at top right, rgba(72, 156, 212, 0.12), transparent 36%),
-        linear-gradient(180deg, rgba(25, 29, 34, 0.92), rgba(17, 20, 23, 0.92));
+        radial-gradient(circle at top right, rgba(243, 117, 32, 0.16), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(72, 156, 212, 0.16), transparent 38%),
+        linear-gradient(145deg, rgba(29, 33, 38, 0.98), rgba(13, 16, 19, 0.98));
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.03),
-        0 14px 36px rgba(0, 0, 0, 0.18);
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 20px 44px rgba(0, 0, 0, 0.24),
+        0 0 0 1px rgba(255, 255, 255, 0.02);
+      overflow: hidden;
+    }
+
+    .trending-products-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.04), transparent 30%, transparent 70%, rgba(255, 255, 255, 0.03)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 24%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .trending-products-panel>* {
+      position: relative;
+      z-index: 1;
     }
 
     .trending-products-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 18px;
+      margin-bottom: 18px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .trending-products-heading {
       display: grid;
-      gap: 6px;
-      margin-bottom: 14px;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .trending-products-title-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .trending-products-title-icon-shell {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border: 1px solid rgba(243, 117, 32, 0.22);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+        linear-gradient(135deg, rgba(243, 117, 32, 0.22), rgba(72, 156, 212, 0.14));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 10px 24px rgba(0, 0, 0, 0.28);
+    }
+
+    .trending-products-title-icon {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      display: block;
+      filter: brightness(0) saturate(100%) invert(76%) sepia(82%) saturate(1128%) hue-rotate(334deg) brightness(99%) contrast(96%);
+    }
+
+    .trending-products-title-block {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .trending-products-kicker {
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      color: rgba(243, 117, 32, 0.92);
     }
 
     .trending-products-title {
-      font-size: 12px;
-      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1.6px;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
-      color: var(--text-secondary);
+      color: var(--text-primary);
+      text-shadow: 0 0 24px rgba(243, 117, 32, 0.12);
     }
 
     .trending-products-copy {
+      font-size: 14px;
+      line-height: 1.6;
+      color: rgba(214, 220, 225, 0.78);
+      max-width: 60ch;
+    }
+
+    .trending-products-highlight {
+      display: grid;
+      gap: 4px;
+      min-width: 180px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+        rgba(10, 12, 14, 0.58);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .trending-products-highlight-value {
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: rgba(244, 247, 249, 0.9);
+    }
+
+    .trending-products-highlight-label {
       font-size: 13px;
-      color: var(--text-muted);
-      max-width: 56ch;
+      color: rgba(214, 220, 225, 0.68);
     }
 
     .trending-products-list {
       display: grid;
-      gap: 10px;
+      gap: 14px;
     }
 
     .trending-product-item {
+      position: relative;
       display: grid;
-      grid-template-columns: 56px minmax(0, 1fr);
-      gap: 12px;
-      align-items: start;
-      padding: 12px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      grid-template-columns: 64px minmax(0, 1fr);
+      gap: 16px;
+      align-items: center;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+        rgba(9, 11, 14, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.03),
+        0 10px 24px rgba(0, 0, 0, 0.14);
+      overflow: hidden;
+      transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+    }
+
+    .trending-product-item::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(243, 117, 32, 0.08), transparent 28%, transparent 72%, rgba(72, 156, 212, 0.08));
+      pointer-events: none;
+      opacity: 0.9;
+    }
+
+    .trending-product-item:hover {
+      transform: translateY(-2px);
+      border-color: rgba(243, 117, 32, 0.24);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 16px 34px rgba(0, 0, 0, 0.22);
     }
 
     .trending-product-thumb {
-      width: 56px;
-      height: 56px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(5, 7, 10, 0.55);
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+        rgba(5, 7, 10, 0.8);
       overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
     }
 
     .trending-product-thumb img {
@@ -3674,8 +3912,8 @@
     }
 
     .trending-product-thumb-fallback {
-      width: 30px;
-      height: 30px;
+      width: 34px;
+      height: 34px;
       object-fit: contain;
       opacity: 0.92;
     }
@@ -3683,34 +3921,36 @@
     .trending-product-body {
       min-width: 0;
       display: grid;
-      gap: 8px;
+      gap: 12px;
     }
 
     .trending-product-meta {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      align-items: center;
+      gap: 10px;
       font-size: 11px;
       font-family: 'Space Mono', monospace;
       text-transform: uppercase;
       letter-spacing: 1.1px;
-      color: var(--text-muted);
+      color: rgba(214, 220, 225, 0.58);
     }
 
     .trending-product-chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 8px;
+      padding: 5px 10px;
       border-radius: 999px;
-      background: rgba(72, 156, 212, 0.1);
-      border: 1px solid rgba(72, 156, 212, 0.18);
+      background: rgba(243, 117, 32, 0.12);
+      border: 1px solid rgba(243, 117, 32, 0.22);
+      color: rgba(255, 204, 161, 0.96);
     }
 
     .trending-product-name {
-      font-size: 15px;
+      font-size: 18px;
       font-weight: 700;
-      line-height: 1.25;
+      line-height: 1.2;
       color: var(--text-primary);
       word-break: break-word;
     }
@@ -3726,23 +3966,42 @@
     .trending-product-link {
       display: inline-flex;
       align-items: center;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border-color: rgba(72, 156, 212, 0.18);
+      background: rgba(72, 156, 212, 0.08);
+      color: rgba(214, 220, 225, 0.94);
+      transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    }
+
+    .trending-product-link:hover {
+      transform: translateY(-1px);
+      border-color: rgba(243, 117, 32, 0.24);
+      background: rgba(243, 117, 32, 0.1);
+      color: var(--text-primary);
     }
 
     .trending-product-add-btn {
-      min-width: 154px;
+      min-width: 164px;
       justify-content: center;
+      box-shadow: 0 10px 24px rgba(251, 1, 28, 0.16);
     }
 
     .trending-product-add-btn:disabled {
       cursor: not-allowed;
+      box-shadow: none;
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .trending-products-empty {
-      padding: 14px;
-      border-radius: 12px;
-      border: 1px dashed rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.02);
-      color: var(--text-muted);
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px dashed rgba(255, 255, 255, 0.14);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+        rgba(9, 11, 14, 0.46);
+      color: rgba(214, 220, 225, 0.68);
       font-size: 13px;
     }
 
@@ -3792,6 +4051,7 @@
     }
 
     .site-footer-copy {
+      flex-basis: 100%;
       white-space: normal;
     }
 
@@ -3989,6 +4249,20 @@
       .onboarding-dialog,
       .tech-stack-dialog {
         grid-template-columns: 1fr;
+      }
+
+      .tech-stack-dialog {
+        width: 100%;
+        min-height: 100dvh;
+        height: 100dvh;
+        max-height: 100dvh;
+        margin: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        grid-template-rows: auto minmax(0, 1fr);
+        overflow: hidden;
+        background: transparent;
       }
 
       .onboarding-dialog {
@@ -4331,10 +4605,10 @@
         margin: 0 20px;
         padding: 16px 0 0;
         transform: none;
-        justify-content: flex-start;
+        justify-content: center;
         gap: 10px;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
-        text-align: left;
+        text-align: center;
         font-size: 10px;
         letter-spacing: 0.05em;
       }
@@ -4364,8 +4638,32 @@
       }
 
       .tech-stack-sidebar {
+        gap: 10px;
+        padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 12px;
         border-right: none;
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        background:
+          radial-gradient(circle at top left, rgba(230, 38, 0, 0.2), transparent 36%),
+          radial-gradient(circle at top right, rgba(72, 156, 212, 0.18), transparent 32%),
+          linear-gradient(180deg, rgba(40, 45, 50, 0.98), rgba(28, 31, 35, 0.98));
+      }
+
+      .tech-stack-sidebar h2 {
+        font-size: clamp(18px, 6.8vw, 24px);
+        line-height: 1.08;
+        letter-spacing: 0.6px;
+      }
+
+      .tech-stack-sidebar p {
+        font-size: 13px;
+        line-height: 1.45;
+        color: rgba(214, 220, 225, 0.88);
+      }
+
+      .tech-stack-chip {
+        font-size: 10px;
+        letter-spacing: 1px;
+        padding: 6px 9px;
       }
 
       .onboarding-actions .btn,
@@ -4398,13 +4696,27 @@
         justify-content: flex-end;
       }
 
+      .trending-products-panel {
+        padding: 18px;
+        border-radius: 20px;
+      }
+
+      .trending-products-header {
+        align-items: stretch;
+      }
+
+      .trending-products-highlight {
+        min-width: 0;
+      }
+
       .trending-product-item {
         grid-template-columns: 1fr;
+        padding: 16px;
       }
 
       .trending-product-thumb {
-        width: 52px;
-        height: 52px;
+        width: 56px;
+        height: 56px;
       }
 
       .trending-product-footer {
@@ -4470,12 +4782,42 @@
         grid-template-columns: 1fr;
       }
 
+      .tech-stack-main {
+        min-height: 0;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(29, 32, 36, 0.98), rgba(22, 25, 29, 0.98));
+      }
+
       .tech-stack-content {
-        padding: 24px 20px;
+        gap: 14px;
+        padding: 14px 16px 18px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
       }
 
       .tech-stack-actions {
-        padding: 18px 20px 24px;
+        padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+        background: linear-gradient(180deg, rgba(27, 30, 34, 0.82), rgba(20, 23, 27, 0.98));
+        backdrop-filter: blur(16px);
+        box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.18);
+      }
+
+      .tech-stack-actions .btn {
+        width: 100%;
+        min-height: 50px;
+        justify-content: center;
+      }
+
+      .tech-stack-card {
+        padding: 14px;
+        border-radius: 14px;
+      }
+
+      .tech-stack-card-copy,
+      .tech-stack-list li,
+      .tech-stack-section-copy {
+        font-size: 13px;
+        line-height: 1.5;
       }
 
       .tech-stack-grid {
@@ -4615,10 +4957,10 @@
         margin: 20px 14px 0;
         padding: 14px 0 0;
         transform: none;
-        justify-content: flex-start;
+        justify-content: center;
         gap: 10px;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
-        text-align: left;
+        text-align: center;
         font-size: 10px;
         letter-spacing: 0.05em;
       }
@@ -4994,7 +5336,7 @@
                 <div class="auth-metric-meta" id="auth-service-uptime">Loading uptime...</div>
               </div>
               <div class="auth-metric">
-                <div class="auth-metric-value">Live</div>
+                <div class="auth-metric-value auth-metric-value-live"><span class="auth-metric-live-dot" aria-hidden="true"></span><span>Live</span></div>
                 <div class="auth-metric-label">Discord alerts</div>
               </div>
             </div>
@@ -5127,7 +5469,7 @@
       <div class="tech-stack-dialog" role="dialog" aria-modal="true" aria-labelledby="tech-stack-title">
         <aside class="tech-stack-sidebar">
           <div class="onboarding-kicker">Inside The Build</div>
-          <h2 id="tech-stack-title">What runs this dashboard.</h2>
+          <h2 id="tech-stack-title">What runs this dashboard?</h2>
           <p>The app is intentionally simple: a static browser UI in front of a small Python service that handles auth,
             scheduling, persistence, scraping, and Discord notifications.</p>
           <div class="tech-stack-chip-list" aria-label="Stack summary">
@@ -5144,7 +5486,7 @@
           <div class="tech-stack-content">
             <div class="onboarding-step-meta">
               <span>Architecture</span>
-              <span>Hosted Monitor</span>
+              <span>Hosted Monitor + Credits</span>
             </div>
             <div class="tech-stack-grid">
               <article class="tech-stack-card">
@@ -5177,6 +5519,51 @@
                 </div>
               </article>
             </div>
+            <div class="tech-stack-card-title tech-stack-section-title">Credits + Attributions</div>
+            <div class="tech-stack-section-copy">Third-party fonts, icons, maps, services, and open-source packages
+              used directly by this app and surfaced here in one place.</div>
+            <div class="tech-stack-grid">
+              <article class="tech-stack-card">
+                <div class="tech-stack-card-title">Fonts + Identity</div>
+                <div class="tech-stack-card-copy"><a href="https://fonts.google.com/specimen/Rajdhani" target="_blank"
+                    rel="noopener noreferrer">Rajdhani</a> and <a
+                    href="https://fonts.google.com/specimen/Space+Mono" target="_blank"
+                    rel="noopener noreferrer">Space Mono</a> are loaded through <a
+                    href="https://fonts.google.com/" target="_blank" rel="noopener noreferrer">Google Fonts</a>.
+                  Sign-in uses <a href="https://developers.google.com/identity/gsi/web" target="_blank"
+                    rel="noopener noreferrer">Google Identity Services</a>, and backend token verification uses
+                  <strong>google-auth</strong>.</div>
+              </article>
+              <article class="tech-stack-card">
+                <div class="tech-stack-card-title">Maps + Search</div>
+                <div class="tech-stack-card-copy">Interactive maps are powered by <a href="https://leafletjs.com/"
+                    target="_blank" rel="noopener noreferrer">Leaflet</a>. Map tiles are credited to <a
+                    href="https://www.openstreetmap.org/copyright" target="_blank"
+                    rel="noopener noreferrer">OpenStreetMap contributors</a> and <a href="https://carto.com/"
+                    target="_blank" rel="noopener noreferrer">CARTO</a>, while location search uses <a
+                    href="https://nominatim.org/" target="_blank" rel="noopener noreferrer">Nominatim</a>.</div>
+              </article>
+              <article class="tech-stack-card">
+                <div class="tech-stack-card-title">Icons + Visual Assets</div>
+                <div class="tech-stack-card-copy">Local SVG interface icons such as <strong>add_location.svg</strong>,
+                  <strong>location.svg</strong>, <strong>map.svg</strong>, <strong>list.svg</strong>,
+                  <strong>dark.svg</strong>, <strong>light.svg</strong>, and <strong>road.svg</strong> use <a
+                    href="https://fonts.google.com/icons" target="_blank" rel="noopener noreferrer">Google Material
+                    Symbols</a> icon paths. Project-local raster action icons used in buttons and utility states are
+                  attributed here as <a href="https://www.flaticon.com/" target="_blank"
+                    rel="noopener noreferrer">Flaticon</a> exports where applicable.</div>
+              </article>
+              <article class="tech-stack-card">
+                <div class="tech-stack-card-title">Backend + Alerts</div>
+                <div class="tech-stack-card-copy">The service stack includes <strong>Flask</strong>,
+                  <strong>Flask-CORS</strong>, <strong>APScheduler</strong>, <strong>requests</strong>,
+                  <strong>BeautifulSoup4</strong>, <strong>lxml</strong>, <strong>python-dotenv</strong>,
+                  <strong>websocket-client</strong>, <strong>Gunicorn</strong>, and <strong>SQLite</strong>. Alert
+                  delivery uses <a href="https://discord.com/developers/docs/resources/webhook" target="_blank"
+                    rel="noopener noreferrer">Discord webhooks</a>.
+                </div>
+              </article>
+            </div>
             <ul class="tech-stack-list">
               <li><strong>Auth:</strong> Google OAuth identity token verification on the backend with `google-auth`.
               </li>
@@ -5184,6 +5571,9 @@
                 frontend can point at different environments.</li>
               <li><strong>Why this stack:</strong> Lightweight to host, easy to debug, and fast to ship without needing
                 a frontend framework bundle.</li>
+              <li><strong>Brand marks:</strong> Walgreens, Best Buy, CVS, Discord, Google, OpenStreetMap, and other
+                service names or logos remain the property of their respective owners and are shown only to identify
+                integrations, retailers, or data sources.</li>
             </ul>
           </div>
           <div class="tech-stack-actions">
@@ -5459,13 +5849,13 @@
           <div id="products-list"></div>
           <div class="tracked-products-controls">
             <div class="form-group">
-              <input type="url" class="form-input" id="new-product-url" placeholder="Paste a Walgreens product link">
+              <input type="url" class="form-input" id="new-product-url" placeholder="Paste a Walgreens or CVS product link">
             </div>
             <div class="form-group" style="margin-top:10px;">
               <input type="text" class="form-input" id="new-product-name"
                 placeholder="Optional custom name (e.g., Pokemon Booster Bundle)">
             </div>
-            <div class="form-hint" style="margin-bottom:12px;">Paste a Walgreens product link
+            <div class="form-hint" style="margin-bottom:12px;">Paste a Walgreens or CVS product link
               and the app will extract
               the product metadata and image automatically. If you enter a custom name, that label will be
               used everywhere in the app and Discord alerts.</div>
@@ -5473,9 +5863,23 @@
 
             <div class="trending-products-panel">
               <div class="trending-products-header">
-                <div class="trending-products-title">Trending Products</div>
-                <div class="trending-products-copy">Recently tracked community links. Add any of them straight to your
-                  monitor without pasting the URL again.</div>
+                <div class="trending-products-heading">
+                  <div class="trending-products-title-row">
+                    <span class="trending-products-title-icon-shell" aria-hidden="true">
+                      <img class="trending-products-title-icon" src="/trend.png" alt="">
+                    </span>
+                    <div class="trending-products-title-block">
+                      <div class="trending-products-kicker">Community Radar</div>
+                      <div class="trending-products-title">Trending Products</div>
+                    </div>
+                  </div>
+                  <div class="trending-products-copy" id="trending-products-copy">Recently tracked community links from
+                    the last 24 hours. Add any of them straight to your monitor without pasting the URL again.</div>
+                </div>
+                <div class="trending-products-highlight">
+                  <span class="trending-products-highlight-value" id="trending-products-highlight-value">Last 24 Hours</span>
+                  <span class="trending-products-highlight-label" id="trending-products-highlight-label">Shared by active watchers</span>
+                </div>
               </div>
               <div class="trending-products-list" id="trending-products-list">
                 <div class="trending-products-empty">Loading recent community picks...</div>
@@ -5507,7 +5911,7 @@
     <span aria-hidden="true">•</span>
     <a class="site-footer-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>
     <span aria-hidden="true">•</span>
-    <button class="site-footer-link" type="button" data-action="open-tech-stack">Tech Stack</button>
+    <button class="site-footer-link" type="button" data-action="open-tech-stack">TECH &amp; CREDITS</button>
   </footer>
   <div id="shell-scrollbar" class="shell-scrollbar is-hidden" aria-hidden="true">
     <div class="shell-scrollbar-track"></div>
@@ -5551,6 +5955,7 @@
     };
     let trackedProductsCache = [];
     let trendingProductsCache = [];
+    let trendingRetentionHours = 24;
     let editingProductId = null;
     let currentUser = null;
     let authState = null;
@@ -6328,10 +6733,10 @@
         {
           tag: 'Products',
           title: 'Add the first product you want watched.',
-          copy: 'Paste one Walgreens product link and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
+          copy: 'Paste one Walgreens or CVS product link and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
           calloutTitle: 'Add at least one tracked item',
           bullets: [
-            'Paste a Walgreens product page URL.',
+            'Paste a Walgreens or CVS product page URL.',
             'Use a custom name if you want cleaner Discord labels.',
             `You currently have ${trackedCount} tracked product${trackedCount === 1 ? '' : 's'} saved.`
           ],
@@ -6346,12 +6751,12 @@
                 <div class="onboarding-form-card-title">First tracked product</div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-url">Product URL</label>
-                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a Walgreens product link" value="${escapeHtml(draft.productUrl)}">
+                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a Walgreens or CVS product link" value="${escapeHtml(draft.productUrl)}">
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-name">Custom Name</label>
                   <input type="text" class="form-input" id="onboarding-product-name" maxlength="160" placeholder="Optional custom name" value="${escapeHtml(draft.productName)}">
-                  <span class="form-hint">Optional, but useful if the Walgreens title is messy.</span>
+                  <span class="form-hint">Optional, but useful if the retailer title is messy.</span>
                 </div>
               </div>
             `,
@@ -6678,7 +7083,7 @@
           setOnboardingFeedback('You already have a tracked product, so we can move on.', 'success');
           return true;
         }
-        setOnboardingFeedback('Paste a Walgreens product link before continuing.', 'error');
+        setOnboardingFeedback('Paste a Walgreens or CVS product link before continuing.', 'error');
         return false;
       }
 
@@ -7059,6 +7464,14 @@
       return getProductItemElement(element)?.dataset?.productId || '';
     }
 
+    function getProductRetailerFromElement(element) {
+      return retailerKey(getProductItemElement(element)?.dataset?.retailer || 'walgreens');
+    }
+
+    function getProductKeyFromElement(element) {
+      return getProductItemElement(element)?.dataset?.productKey || '';
+    }
+
     function collectDiscordDestinations() {
       return Array.from(document.querySelectorAll('.discord-destination')).map(row => {
         const url = row.querySelector('.discord-webhook-url')?.value.trim() || '';
@@ -7083,8 +7496,18 @@
       return Boolean(normalized) && (normalized === 'walgreens.com' || normalized.endsWith('.walgreens.com'));
     }
 
+    function isAllowedCvsHost(hostname) {
+      const normalized = String(hostname || '').trim().toLowerCase();
+      return Boolean(normalized) && (
+        normalized === 'cvs.com' ||
+        normalized.endsWith('.cvs.com') ||
+        normalized === 'cvsassets.com' ||
+        normalized.endsWith('.cvsassets.com')
+      );
+    }
+
     function isAllowedProductSourceHost(hostname) {
-      return isAllowedWalgreensHost(hostname);
+      return isAllowedWalgreensHost(hostname) || isAllowedCvsHost(hostname);
     }
 
     function isAllowedProductImageHost(hostname) {
@@ -7115,18 +7538,51 @@
     }
 
     function retailerKey(retailer) {
+      const normalized = String(retailer || '').trim().toLowerCase();
+      if (normalized === 'cvs') return 'cvs';
       return 'walgreens';
     }
 
     function retailerLabel(retailer) {
-      return 'Walgreens';
+      switch (retailerKey(retailer)) {
+        case 'cvs':
+          return 'CVS';
+        default:
+          return 'Walgreens';
+      }
     }
 
     function retailerIconPath(retailer) {
-      return '/icons/walgreens.png';
+      switch (retailerKey(retailer)) {
+        case 'cvs':
+          return '/icons/cvs.svg';
+        default:
+          return '/icons/walgreens.png';
+      }
     }
 
-    function renderTrendingProducts(products = trendingProductsCache) {
+    function productIdentityKey(productId, retailer = 'walgreens') {
+      return `${retailerKey(retailer)}:${String(productId || '').trim()}`;
+    }
+
+    function updateTrendingProductsSummary(retentionHours = trendingRetentionHours) {
+      const normalizedHours = Math.max(1, Number(retentionHours) || 24);
+      const copy = document.getElementById('trending-products-copy');
+      const highlightValue = document.getElementById('trending-products-highlight-value');
+      const highlightLabel = document.getElementById('trending-products-highlight-label');
+
+      if (copy) {
+        copy.textContent = `Recently tracked community links from the last ${normalizedHours} hours. Add any of them straight to your monitor without pasting the URL again.`;
+      }
+      if (highlightValue) {
+        highlightValue.textContent = normalizedHours === 24 ? 'Last 24 Hours' : `Last ${normalizedHours} Hours`;
+      }
+      if (highlightLabel) {
+        highlightLabel.textContent = 'Stored community picks';
+      }
+    }
+
+    function renderTrendingProducts(products = trendingProductsCache, retentionHours = trendingRetentionHours) {
       trendingProductsCache = Array.isArray(products) ? products : [];
       const list = document.getElementById('trending-products-list');
       if (!list) return;
@@ -7134,14 +7590,14 @@
       if (!trendingProductsCache.length) {
         list.innerHTML = `
           <div class="trending-products-empty">
-            No shared links yet. Once people start tracking products with valid Walgreens links, they will show up here.
+            No shared links from the last ${Math.max(1, Number(retentionHours) || 24)} hours yet. Once people start tracking products with valid retailer links, they will show up here.
           </div>`;
         return;
       }
 
       list.innerHTML = trendingProductsCache.map(product => {
         const safeId = escapeHtml(product.id || '');
-        const safeRetailer = escapeHtml(product.retailer || 'walgreens');
+        const safeRetailer = escapeHtml(retailerKey(product.retailer));
         const safeName = escapeHtml(product.name || 'Unnamed product');
         const safeSourceUrl = sanitizeProductSourceUrl(product.source_url || '');
         const safeImageUrl = sanitizeProductImageUrl(product.image_url || '');
@@ -7185,15 +7641,18 @@
       if (!list) return;
 
       list.innerHTML = trackedProductsCache.map(p => {
-        const isEditing = editingProductId === p.id;
+        const productKey = p.key || productIdentityKey(p.id, p.retailer);
+        const isEditing = editingProductId === productKey;
         const safeName = escapeHtml(p.name || 'Unnamed product');
         const safePlanogram = escapeHtml(p.planogram || 'missing-planogram');
         const safeId = escapeHtml(p.id || '');
+        const safeRetailerKey = escapeHtml(retailerKey(p.retailer));
         const safeRetailer = escapeHtml(retailerLabel(p.retailer));
         const safeRetailerIcon = escapeHtml(retailerIconPath(p.retailer));
+        const safeProductKey = escapeHtml(productKey);
 
         return `
-            <div class="product-item${isEditing ? ' is-editing' : ''}" data-product-id="${safeId}">
+            <div class="product-item${isEditing ? ' is-editing' : ''}" data-product-id="${safeId}" data-retailer="${safeRetailerKey}" data-product-key="${safeProductKey}">
               <div class="product-info">
                 <div class="product-name-row">
                   <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailer}" title="${safeRetailer}">
@@ -7232,19 +7691,21 @@
       }
     }
 
-    function startProductNameEdit(productId) {
-      editingProductId = productId;
+    function startProductNameEdit(productKey) {
+      editingProductId = productKey;
       renderTrackedProducts();
     }
 
     async function loadTrendingProducts(limit = 8) {
       const result = await apiCall(`/api/products/trending?limit=${Math.max(1, Number(limit) || 8)}`);
       if (!result) {
-        renderTrendingProducts([]);
+        renderTrendingProducts([], trendingRetentionHours);
         return null;
       }
 
-      renderTrendingProducts(result.products || []);
+      trendingRetentionHours = Math.max(1, Number(result.retention_hours) || trendingRetentionHours || 24);
+      updateTrendingProductsSummary(trendingRetentionHours);
+      renderTrendingProducts(result.products || [], trendingRetentionHours);
       return result;
     }
 
@@ -7253,10 +7714,10 @@
       renderTrackedProducts();
     }
 
-    function handleProductNameKeydown(event, productId, sourceElement = null) {
+    function handleProductNameKeydown(event, productId, retailer, sourceElement = null) {
       if (event.key === 'Enter') {
         event.preventDefault();
-        saveProductName(productId, sourceElement);
+        saveProductName(productId, retailer, sourceElement);
         return;
       }
 
@@ -7266,7 +7727,7 @@
       }
     }
 
-    async function saveProductName(productId, sourceElement = null) {
+    async function saveProductName(productId, retailer = 'walgreens', sourceElement = null) {
       const row = getProductItemElement(sourceElement);
       const input = row ? row.querySelector('.product-name-input') : null;
       const nextName = input ? input.value.trim() : '';
@@ -7277,7 +7738,11 @@
         return;
       }
 
-      const result = await apiCall('/api/products/update', 'POST', { id: productId, name: nextName });
+      const result = await apiCall('/api/products/update', 'POST', {
+        id: productId,
+        retailer: retailerKey(retailer),
+        name: nextName
+      });
       if (result) {
         editingProductId = null;
         showToast('Product name updated', 'success');
@@ -8133,22 +8598,24 @@
           return;
         case 'save-product-name': {
           const productId = getProductIdFromElement(actionElement);
+          const retailer = getProductRetailerFromElement(actionElement);
           if (productId) {
-            await saveProductName(productId, actionElement);
+            await saveProductName(productId, retailer, actionElement);
           }
           return;
         }
         case 'start-product-name-edit': {
-          const productId = getProductIdFromElement(actionElement);
-          if (productId) {
-            startProductNameEdit(productId);
+          const productKey = getProductKeyFromElement(actionElement);
+          if (productKey) {
+            startProductNameEdit(productKey);
           }
           return;
         }
         case 'remove-product': {
           const productId = getProductIdFromElement(actionElement);
+          const retailer = getProductRetailerFromElement(actionElement);
           if (productId) {
-            await removeProduct(productId);
+            await removeProduct(productId, retailer);
           }
           return;
         }
@@ -8871,8 +9338,9 @@
     document.addEventListener('keydown', event => {
       if (event.target instanceof HTMLElement && event.target.classList.contains('product-name-input')) {
         const productId = getProductIdFromElement(event.target);
+        const retailer = getProductRetailerFromElement(event.target);
         if (productId) {
-          handleProductNameKeydown(event, productId, event.target);
+          handleProductNameKeydown(event, productId, retailer, event.target);
           if (event.defaultPrevented) return;
         }
       }
@@ -9485,7 +9953,7 @@
 
         const finalMessage = finalProgress?.message || '';
         const finalPhase = finalProgress?.phase || '';
-        const noStoresFound = finalMessage.startsWith('No Walgreens stores found near ');
+        const noStoresFound = /^No .+ stores found near /.test(finalMessage);
 
         if (finalPhase === 'error' || noStoresFound) {
           showToast(finalMessage || 'Check failed', 'error');
@@ -9543,7 +10011,7 @@
       const customName = document.getElementById('new-product-name').value.trim();
 
       if (!url) {
-        showToast('Paste a Walgreens product link first', 'error');
+        showToast('Paste a Walgreens or CVS product link first', 'error');
         return;
       }
 
@@ -9576,10 +10044,10 @@
       if (!row) return null;
 
       const productId = row.dataset.productId || '';
-      const retailer = row.dataset.retailer || 'walgreens';
+      const retailer = retailerKey(row.dataset.retailer || 'walgreens');
       return trendingProductsCache.find(product =>
         String(product.id || '') === productId &&
-        String(product.retailer || 'walgreens') === retailer
+        retailerKey(product.retailer || 'walgreens') === retailer
       ) || null;
     }
 
@@ -9598,7 +10066,7 @@
 
       const payload = {
         id: product.id,
-        retailer: product.retailer || 'walgreens',
+        retailer: retailerKey(product.retailer || 'walgreens'),
         name: product.name || 'Tracked product',
         planogram: product.planogram || '',
         image_url: product.image_url || '',
@@ -9616,8 +10084,11 @@
       }
     }
 
-    async function removeProduct(id) {
-      const result = await apiCall('/api/products/remove', 'POST', { id });
+    async function removeProduct(id, retailer = 'walgreens') {
+      const result = await apiCall('/api/products/remove', 'POST', {
+        id,
+        retailer: retailerKey(retailer)
+      });
       if (result) {
         showToast('Product removed', 'success');
         await loadSettings();

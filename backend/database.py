@@ -20,6 +20,7 @@ DEFAULT_POKEMON_BACKGROUND_THEME = "gyra"
 DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645
 DEFAULT_ADMIN_ALERT_NEW_USERS = True
 DEFAULT_ADMIN_ALERT_USER_ACTIONS = True
+TRENDING_PRODUCTS_RETENTION_HOURS = 24
 
 
 def _normalize_email(email: Any) -> str:
@@ -88,7 +89,7 @@ class StockDatabase:
                     source_url TEXT DEFAULT '',
                     product_id TEXT DEFAULT '',
                     created_at TEXT NOT NULL,
-                    PRIMARY KEY (user_id, article_id),
+                    PRIMARY KEY (user_id, retailer, article_id),
                     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
 
@@ -104,6 +105,23 @@ class StockDatabase:
 
                 CREATE INDEX IF NOT EXISTS idx_check_history_user_time
                     ON check_history(user_id, timestamp DESC);
+
+                CREATE TABLE IF NOT EXISTS trending_products (
+                    user_id INTEGER NOT NULL,
+                    article_id TEXT NOT NULL,
+                    retailer TEXT NOT NULL DEFAULT 'walgreens',
+                    name TEXT NOT NULL,
+                    planogram TEXT NOT NULL,
+                    image_url TEXT DEFAULT '',
+                    source_url TEXT DEFAULT '',
+                    product_id TEXT DEFAULT '',
+                    last_tracked_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, retailer, article_id),
+                    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_trending_products_last_tracked_at
+                    ON trending_products(last_tracked_at DESC);
 
                 CREATE TABLE IF NOT EXISTS service_uptime_samples (
                     sample_minute TEXT PRIMARY KEY,
@@ -139,6 +157,7 @@ class StockDatabase:
                     ON audit_events(created_at DESC);
                 """
             )
+            self._migrate_tracked_products_primary_key(conn)
             self._ensure_column(
                 conn,
                 "users",
@@ -163,6 +182,181 @@ class StockDatabase:
                 "retailer",
                 "TEXT NOT NULL DEFAULT 'walgreens'",
             )
+            self._backfill_recent_trending_products(conn)
+            self._prune_expired_trending_products(conn)
+
+    @staticmethod
+    def _product_key(article_id: Any, retailer: Any) -> str:
+        normalized_retailer = str(retailer or "walgreens").strip().lower() or "walgreens"
+        normalized_article_id = str(article_id or "").strip()
+        return f"{normalized_retailer}:{normalized_article_id}"
+
+    @staticmethod
+    def _trending_retention_cutoff(now: Optional[datetime] = None) -> str:
+        reference = now or datetime.utcnow()
+        return (reference - timedelta(hours=TRENDING_PRODUCTS_RETENTION_HOURS)).isoformat()
+
+    def _migrate_tracked_products_primary_key(self, conn: sqlite3.Connection) -> None:
+        row = conn.execute(
+            """
+            SELECT sql
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'tracked_products'
+            """
+        ).fetchone()
+        table_sql = str(row["sql"] if row is not None and row["sql"] is not None else "")
+        normalized_sql = " ".join(table_sql.split()).lower()
+
+        if not normalized_sql:
+            return
+        if "primary key (user_id, retailer, article_id)" in normalized_sql:
+            return
+        if "primary key (user_id, article_id)" not in normalized_sql:
+            return
+
+        conn.execute("ALTER TABLE tracked_products RENAME TO tracked_products_legacy")
+        conn.executescript(
+            """
+            CREATE TABLE tracked_products (
+                user_id INTEGER NOT NULL,
+                article_id TEXT NOT NULL,
+                retailer TEXT NOT NULL DEFAULT 'walgreens',
+                name TEXT NOT NULL,
+                planogram TEXT NOT NULL,
+                image_url TEXT DEFAULT '',
+                source_url TEXT DEFAULT '',
+                product_id TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, retailer, article_id),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO tracked_products (
+                user_id,
+                article_id,
+                retailer,
+                name,
+                planogram,
+                image_url,
+                source_url,
+                product_id,
+                created_at
+            )
+            SELECT
+                user_id,
+                article_id,
+                COALESCE(NULLIF(TRIM(retailer), ''), 'walgreens'),
+                name,
+                planogram,
+                image_url,
+                source_url,
+                product_id,
+                created_at
+            FROM tracked_products_legacy
+            ORDER BY created_at ASC, article_id ASC
+            """
+        )
+        conn.execute("DROP TABLE tracked_products_legacy")
+
+    def _prune_expired_trending_products(
+        self,
+        conn: sqlite3.Connection,
+        now: Optional[datetime] = None,
+    ) -> None:
+        conn.execute(
+            "DELETE FROM trending_products WHERE last_tracked_at < ?",
+            (self._trending_retention_cutoff(now),),
+        )
+
+    def _backfill_recent_trending_products(self, conn: sqlite3.Connection) -> None:
+        cutoff = self._trending_retention_cutoff()
+        rows = conn.execute(
+            """
+            SELECT
+                user_id,
+                article_id,
+                COALESCE(NULLIF(TRIM(retailer), ''), 'walgreens') AS retailer,
+                COALESCE(NULLIF(TRIM(name), ''), article_id) AS name,
+                COALESCE(NULLIF(TRIM(planogram), ''), '') AS planogram,
+                COALESCE(NULLIF(TRIM(image_url), ''), '') AS image_url,
+                COALESCE(NULLIF(TRIM(source_url), ''), '') AS source_url,
+                COALESCE(NULLIF(TRIM(product_id), ''), '') AS product_id,
+                created_at AS last_tracked_at
+            FROM tracked_products
+            WHERE created_at >= ?
+              AND COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
+            """,
+            (cutoff,),
+        ).fetchall()
+        for row in rows:
+            self._upsert_trending_product(
+                conn,
+                int(row["user_id"]),
+                str(row["article_id"] or "").strip(),
+                str(row["retailer"] or "walgreens").strip() or "walgreens",
+                str(row["name"] or "").strip() or str(row["article_id"] or "").strip(),
+                str(row["planogram"] or "").strip(),
+                image_url=str(row["image_url"] or "").strip(),
+                source_url=str(row["source_url"] or "").strip(),
+                product_id=str(row["product_id"] or "").strip(),
+                tracked_at=str(row["last_tracked_at"] or "").strip(),
+            )
+
+    def _upsert_trending_product(
+        self,
+        conn: sqlite3.Connection,
+        user_id: int,
+        article_id: str,
+        retailer: str,
+        name: str,
+        planogram: str,
+        *,
+        image_url: str = "",
+        source_url: str = "",
+        product_id: str = "",
+        tracked_at: Optional[str] = None,
+    ) -> None:
+        normalized_source_url = str(source_url or "").strip()
+        if not normalized_source_url:
+            return
+
+        conn.execute(
+            """
+            INSERT INTO trending_products (
+                user_id,
+                article_id,
+                retailer,
+                name,
+                planogram,
+                image_url,
+                source_url,
+                product_id,
+                last_tracked_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, retailer, article_id) DO UPDATE
+            SET name = excluded.name,
+                planogram = excluded.planogram,
+                image_url = excluded.image_url,
+                source_url = excluded.source_url,
+                product_id = excluded.product_id,
+                last_tracked_at = excluded.last_tracked_at
+            """,
+            (
+                int(user_id),
+                str(article_id or "").strip(),
+                str(retailer or "walgreens").strip() or "walgreens",
+                str(name or article_id or "").strip() or str(article_id or "").strip(),
+                str(planogram or "").strip(),
+                str(image_url or "").strip(),
+                normalized_source_url,
+                str(product_id or "").strip(),
+                str(tracked_at or datetime.utcnow().isoformat()),
+            ),
+        )
 
     @staticmethod
     def _ensure_column(
@@ -366,6 +560,7 @@ class StockDatabase:
 
         return [
             {
+                "key": self._product_key(row["article_id"], row["retailer"]),
                 "id": row["article_id"],
                 "retailer": row["retailer"] or "walgreens",
                 "name": row["name"],
@@ -381,6 +576,7 @@ class StockDatabase:
         capped_limit = max(1, min(int(limit or 8), 24))
 
         with self._connect() as conn:
+            self._prune_expired_trending_products(conn)
             rows = conn.execute(
                 """
                 WITH grouped AS (
@@ -388,8 +584,8 @@ class StockDatabase:
                         article_id,
                         retailer,
                         COUNT(DISTINCT user_id) AS tracked_by_count,
-                        MAX(created_at) AS last_tracked_at
-                    FROM tracked_products
+                        MAX(last_tracked_at) AS last_tracked_at
+                    FROM trending_products
                     WHERE COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
                     GROUP BY article_id, retailer
                 )
@@ -407,42 +603,42 @@ class StockDatabase:
                     ) AS is_tracked_by_user,
                     (
                         SELECT COALESCE(NULLIF(TRIM(tp.name), ''), tp.article_id)
-                        FROM tracked_products tp
+                        FROM trending_products tp
                         WHERE tp.article_id = g.article_id
                           AND tp.retailer = g.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
                         LIMIT 1
                     ) AS name,
                     (
                         SELECT COALESCE(NULLIF(TRIM(tp.planogram), ''), '')
-                        FROM tracked_products tp
+                        FROM trending_products tp
                         WHERE tp.article_id = g.article_id
                           AND tp.retailer = g.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
                         LIMIT 1
                     ) AS planogram,
                     (
                         SELECT COALESCE(NULLIF(TRIM(tp.image_url), ''), '')
-                        FROM tracked_products tp
+                        FROM trending_products tp
                         WHERE tp.article_id = g.article_id
                           AND tp.retailer = g.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
                         LIMIT 1
                     ) AS image_url,
                     (
                         SELECT COALESCE(NULLIF(TRIM(tp.source_url), ''), '')
-                        FROM tracked_products tp
+                        FROM trending_products tp
                         WHERE tp.article_id = g.article_id
                           AND tp.retailer = g.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
                         LIMIT 1
                     ) AS source_url,
                     (
                         SELECT COALESCE(NULLIF(TRIM(tp.product_id), ''), '')
-                        FROM tracked_products tp
+                        FROM trending_products tp
                         WHERE tp.article_id = g.article_id
                           AND tp.retailer = g.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
                         LIMIT 1
                     ) AS product_id
                 FROM grouped g
@@ -454,6 +650,7 @@ class StockDatabase:
 
         return [
             {
+                "key": self._product_key(row["article_id"], row["retailer"]),
                 "id": row["article_id"],
                 "retailer": row["retailer"] or "walgreens",
                 "name": row["name"] or row["article_id"],
@@ -501,28 +698,82 @@ class StockDatabase:
                         timestamp,
                     ),
                 )
+                self._upsert_trending_product(
+                    conn,
+                    int(user_id),
+                    article_id,
+                    retailer,
+                    name,
+                    planogram,
+                    image_url=image_url,
+                    source_url=source_url,
+                    product_id=product_id,
+                    tracked_at=timestamp,
+                )
+                self._prune_expired_trending_products(conn)
             return True
         except sqlite3.IntegrityError:
             return False
 
-    def remove_tracked_product(self, user_id: int, article_id: str) -> bool:
+    def remove_tracked_product(self, user_id: int, article_id: str, retailer: str = "") -> bool:
         with self._connect() as conn:
-            cursor = conn.execute(
-                "DELETE FROM tracked_products WHERE user_id = ? AND article_id = ?",
-                (user_id, article_id),
-            )
+            if retailer:
+                cursor = conn.execute(
+                    """
+                    DELETE FROM tracked_products
+                    WHERE user_id = ? AND article_id = ? AND retailer = ?
+                    """,
+                    (user_id, article_id, retailer),
+                )
+            else:
+                cursor = conn.execute(
+                    "DELETE FROM tracked_products WHERE user_id = ? AND article_id = ?",
+                    (user_id, article_id),
+                )
         return cursor.rowcount > 0
 
-    def update_tracked_product_name(self, user_id: int, article_id: str, name: str) -> bool:
+    def update_tracked_product_name(
+        self,
+        user_id: int,
+        article_id: str,
+        name: str,
+        retailer: str = "",
+    ) -> bool:
         with self._connect() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE tracked_products
-                SET name = ?
-                WHERE user_id = ? AND article_id = ?
-                """,
-                (name, user_id, article_id),
-            )
+            if retailer:
+                cursor = conn.execute(
+                    """
+                    UPDATE tracked_products
+                    SET name = ?
+                    WHERE user_id = ? AND article_id = ? AND retailer = ?
+                    """,
+                    (name, user_id, article_id, retailer),
+                )
+                conn.execute(
+                    """
+                    UPDATE trending_products
+                    SET name = ?
+                    WHERE user_id = ? AND article_id = ? AND retailer = ?
+                    """,
+                    (name, user_id, article_id, retailer),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    UPDATE tracked_products
+                    SET name = ?
+                    WHERE user_id = ? AND article_id = ?
+                    """,
+                    (name, user_id, article_id),
+                )
+                conn.execute(
+                    """
+                    UPDATE trending_products
+                    SET name = ?
+                    WHERE user_id = ? AND article_id = ?
+                    """,
+                    (name, user_id, article_id),
+                )
         return cursor.rowcount > 0
 
     def add_check_result(
@@ -668,9 +919,10 @@ class StockDatabase:
 
         tracked_products = self.list_tracked_products(user_id)
         recent_product_hits: Dict[str, Dict[str, Any]] = {
-            str(product["id"]): {
+            str(product.get("key") or self._product_key(product["id"], product.get("retailer"))): {
                 "id": str(product["id"]),
                 "name": str(product["name"] or product["id"]),
+                "retailer": str(product.get("retailer") or "walgreens"),
                 "recent_hits": 0,
             }
             for product in tracked_products
@@ -681,6 +933,11 @@ class StockDatabase:
             for product_id in products_found.keys():
                 if product_id in recent_product_hits:
                     recent_product_hits[product_id]["recent_hits"] += 1
+                    continue
+
+                legacy_walgreens_key = self._product_key(product_id, "walgreens")
+                if legacy_walgreens_key in recent_product_hits:
+                    recent_product_hits[legacy_walgreens_key]["recent_hits"] += 1
 
         most_active_product = None
         least_active_product = None
@@ -869,7 +1126,7 @@ class StockDatabase:
                     COALESCE(s.current_zipcode, '') AS current_zipcode,
                     COALESCE(s.check_interval_minutes, ?) AS check_interval_minutes,
                     (
-                        SELECT COUNT(DISTINCT tp.article_id)
+                        SELECT COUNT(DISTINCT tp.retailer || ':' || tp.article_id)
                         FROM tracked_products tp
                         WHERE tp.user_id = u.id
                     ) AS tracked_product_count,

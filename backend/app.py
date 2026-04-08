@@ -33,7 +33,7 @@ from config import (  # noqa: E402
     SESSION_COOKIE_SECURE,
 )
 from admin_notifications import AdminAlertService  # noqa: E402
-from database import StockDatabase  # noqa: E402
+from database import StockDatabase, TRENDING_PRODUCTS_RETENTION_HOURS  # noqa: E402
 from product_resolver import resolve_product_link  # noqa: E402
 from scheduler import SchedulerManager  # noqa: E402
 
@@ -87,11 +87,21 @@ def _is_allowed_walgreens_host(hostname: str) -> bool:
     return bool(normalized) and (normalized == "walgreens.com" or normalized.endswith(".walgreens.com"))
 
 
+def _is_allowed_cvs_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return bool(normalized) and (
+        normalized == "cvs.com"
+        or normalized.endswith(".cvs.com")
+        or normalized == "cvsassets.com"
+        or normalized.endswith(".cvsassets.com")
+    )
+
+
 
 
 
 def _is_allowed_product_source_host(hostname: str) -> bool:
-    return _is_allowed_walgreens_host(hostname)
+    return _is_allowed_walgreens_host(hostname) or _is_allowed_cvs_host(hostname)
 
 
 def _is_allowed_product_image_host(hostname: str) -> bool:
@@ -1157,7 +1167,13 @@ def resolve_product(user: Dict[str, Any]):
 def get_trending_products(user: Dict[str, Any]):
     limit = request.args.get("limit", default=8, type=int)
     products = db.list_trending_products(int(user["id"]), limit=limit)
-    return jsonify({"products": products, "count": len(products)})
+    return jsonify(
+        {
+            "products": products,
+            "count": len(products),
+            "retention_hours": TRENDING_PRODUCTS_RETENTION_HOURS,
+        }
+    )
 
 
 @app.route("/api/products/remove", methods=["POST"])
@@ -1166,20 +1182,21 @@ def remove_product(user: Dict[str, Any]):
     scheduler = _current_scheduler(user)
     data = request.json or {}
     product_id = str(data.get("id", "")).strip()
+    retailer = str(data.get("retailer", "")).strip()
     product_name = str(data.get("name", "")).strip()
     if not product_id:
         return jsonify({"error": "Product ID required"}), 400
 
-    success = scheduler.remove_product(product_id)
+    success = scheduler.remove_product(product_id, retailer=retailer)
     if success:
         _record_audit_event(
             "user.product_removed",
             f"Tracked product removed by {user['email']}: {product_name or product_id}",
             actor_user=user,
-            metadata={"product_id": product_id, "name": product_name},
+            metadata={"product_id": product_id, "retailer": retailer or "walgreens", "name": product_name},
             alert_category="user_action",
         )
-        return jsonify({"message": "Product removed", "id": product_id})
+        return jsonify({"message": "Product removed", "id": product_id, "retailer": retailer or "walgreens"})
     return jsonify({"error": "Product not found"}), 404
 
 
@@ -1189,6 +1206,7 @@ def update_product(user: Dict[str, Any]):
     scheduler = _current_scheduler(user)
     data = request.json or {}
     product_id = str(data.get("id", "")).strip()
+    retailer = str(data.get("retailer", "")).strip()
     product_name = str(data.get("name", "")).strip()
 
     if not product_id:
@@ -1197,7 +1215,7 @@ def update_product(user: Dict[str, Any]):
         return jsonify({"error": "Product name required"}), 400
 
     try:
-        success = scheduler.update_product_name(product_id, product_name)
+        success = scheduler.update_product_name(product_id, product_name, retailer=retailer)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -1206,10 +1224,17 @@ def update_product(user: Dict[str, Any]):
             "user.product_renamed",
             f"Tracked product renamed by {user['email']}: {product_name}",
             actor_user=user,
-            metadata={"product_id": product_id, "name": product_name},
+            metadata={"product_id": product_id, "retailer": retailer or "walgreens", "name": product_name},
             alert_category="user_action",
         )
-        return jsonify({"message": "Product updated", "id": product_id, "name": product_name})
+        return jsonify(
+            {
+                "message": "Product updated",
+                "id": product_id,
+                "retailer": retailer or "walgreens",
+                "name": product_name,
+            }
+        )
     return jsonify({"error": "Product not found"}), 404
 
 
