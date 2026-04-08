@@ -6341,7 +6341,7 @@
     let resultsMapMarkersByKey = new Map();
     let userLocationMarker = null;
     let resultsMapInvalidateTimer = 0;
-    let resultsMapFocusTimer = 0;
+    let resultsMapFocusRequestId = 0;
     let resultsMapResizeObserver = null;
     let activeResultsMapKey = null;
     let currentResultsMapTheme = loadStoredResultsMapTheme();
@@ -8617,10 +8617,7 @@
         window.clearTimeout(resultsMapInvalidateTimer);
         resultsMapInvalidateTimer = 0;
       }
-      if (resultsMapFocusTimer) {
-        window.clearTimeout(resultsMapFocusTimer);
-        resultsMapFocusTimer = 0;
-      }
+      resultsMapFocusRequestId += 1;
       if (resultsMapResizeObserver) {
         resultsMapResizeObserver.disconnect();
         resultsMapResizeObserver = null;
@@ -8783,6 +8780,67 @@
       });
     }
 
+    function waitForMobileMapScrollToSettle(callback, timeoutMs = 900) {
+      if (!isMobileSignedInDashboard()) {
+        callback();
+        return;
+      }
+
+      const target = document.querySelector('#results-view-map.active .results-map-card')
+        || document.querySelector('#panel-results .results-map-card');
+      if (!target) {
+        callback();
+        return;
+      }
+
+      const startedAt = window.performance?.now?.() || Date.now();
+      let stableFrames = 0;
+      let lastTop = null;
+
+      const check = () => {
+        const now = window.performance?.now?.() || Date.now();
+        const currentTop = target.getBoundingClientRect().top;
+
+        if (lastTop !== null && Math.abs(currentTop - lastTop) < 0.5) {
+          stableFrames += 1;
+        } else {
+          stableFrames = 0;
+        }
+        lastTop = currentTop;
+
+        if (stableFrames >= 2 || now - startedAt >= timeoutMs) {
+          callback();
+          return;
+        }
+
+        window.requestAnimationFrame(check);
+      };
+
+      window.requestAnimationFrame(check);
+    }
+
+    function openMarkerPopupWithoutAutoPan(marker) {
+      if (!marker?.openPopup) return;
+
+      const popup = marker.getPopup?.();
+      if (!popup?.options) {
+        marker.openPopup();
+        return;
+      }
+
+      const previousAutoPan = popup.options.autoPan;
+      const previousKeepInView = popup.options.keepInView;
+      popup.options.autoPan = false;
+      popup.options.keepInView = false;
+
+      try {
+        marker.openPopup();
+      } finally {
+        popup.options.autoPan = previousAutoPan;
+        popup.options.keepInView = previousKeepInView;
+      }
+    }
+
     function getInitialTrendingScrollTarget() {
       return document.querySelector('#panel-settings .trending-products-panel')
         || document.getElementById('trending-products-list');
@@ -8829,6 +8887,7 @@
     function focusResultsMapMarker(locationKey, options = {}) {
       const marker = resultsMapMarkersByKey.get(locationKey);
       if (!resultsMap || !marker) return;
+      const focusRequestId = ++resultsMapFocusRequestId;
 
       const {
         animate = true,
@@ -8842,10 +8901,12 @@
       setActiveResultsMapItem(locationKey);
 
       const applyFocus = () => {
+        if (focusRequestId !== resultsMapFocusRequestId) return;
         if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
 
         resultsMap.invalidateSize();
         window.requestAnimationFrame(() => {
+          if (focusRequestId !== resultsMapFocusRequestId) return;
           if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
 
           resultsMap.invalidateSize();
@@ -8855,9 +8916,10 @@
 
           resultsMap.once('moveend', () => {
             window.requestAnimationFrame(() => {
+              if (focusRequestId !== resultsMapFocusRequestId) return;
               if (!resultsMap) return;
               resultsMap.invalidateSize();
-              marker.openPopup();
+              openMarkerPopupWithoutAutoPan(marker);
             });
           });
 
@@ -8873,17 +8935,8 @@
         });
       };
 
-      if (resultsMapFocusTimer) {
-        window.clearTimeout(resultsMapFocusTimer);
-        resultsMapFocusTimer = 0;
-      }
-
-      const focusDelay = scrollIntoView && isMobileSignedInDashboard() ? 260 : 0;
-      if (focusDelay > 0) {
-        resultsMapFocusTimer = window.setTimeout(() => {
-          resultsMapFocusTimer = 0;
-          applyFocus();
-        }, focusDelay);
+      if (scrollIntoView && isMobileSignedInDashboard()) {
+        waitForMobileMapScrollToSettle(applyFocus);
       } else {
         applyFocus();
       }
