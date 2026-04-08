@@ -4801,7 +4801,7 @@
             <div class="auth-metrics">
               <div class="auth-metric">
                 <div class="auth-metric-value" id="auth-global-checks">0</div>
-                <div class="auth-metric-label">Checks run</div>
+                <div class="auth-metric-label">Successful checks run</div>
                 <div class="auth-metric-meta" id="auth-global-successes">0 successful stock checks recorded</div>
               </div>
               <div class="auth-metric">
@@ -5421,7 +5421,7 @@
       const successfulChecks = Number(stats?.successful_checks || 0);
       const uptimeLabel = String(stats?.service_uptime?.label || 'Loading uptime...');
       checksNode.textContent = formatCompactNumber(totalChecks);
-      successesNode.textContent = `${formatCompactNumber(successfulChecks)} successful stock checks recorded`;
+      successesNode.textContent = `${formatCompactNumber(successfulChecks)} in-stock checks recorded`;
       uptimeNode.textContent = uptimeLabel;
     }
 
