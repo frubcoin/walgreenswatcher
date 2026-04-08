@@ -2831,6 +2831,24 @@
       color: var(--text-secondary);
     }
 
+    .map-popup-address a,
+    .map-popup-products a {
+      color: var(--green);
+      text-decoration-color: rgba(72, 156, 212, 0.45);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+      transition: color 0.18s ease, text-decoration-color 0.18s ease;
+    }
+
+    .map-popup-address a:hover,
+    .map-popup-address a:focus-visible,
+    .map-popup-products a:hover,
+    .map-popup-products a:focus-visible {
+      color: var(--text-primary);
+      text-decoration-color: rgba(243, 117, 32, 0.55);
+      outline: none;
+    }
+
     .results-store-marker {
       position: relative;
       width: 24px;
@@ -3034,11 +3052,31 @@
       color: #42515f;
     }
 
+    .results-map-card[data-map-theme="light"] .map-popup-address a,
+    .results-map-card[data-map-theme="light"] .map-popup-products a,
+    .results-map-card[data-map-theme="streets"] .map-popup-address a,
+    .results-map-card[data-map-theme="streets"] .map-popup-products a {
+      color: #1b6e9f;
+      text-decoration-color: rgba(27, 110, 159, 0.4);
+    }
+
     .results-map-card[data-map-theme="light"] .map-popup-meta,
     .results-map-card[data-map-theme="light"] .map-popup-products,
     .results-map-card[data-map-theme="streets"] .map-popup-meta,
     .results-map-card[data-map-theme="streets"] .map-popup-products {
       color: #4d5c6b;
+    }
+
+    .results-map-card[data-map-theme="light"] .map-popup-address a:hover,
+    .results-map-card[data-map-theme="light"] .map-popup-address a:focus-visible,
+    .results-map-card[data-map-theme="light"] .map-popup-products a:hover,
+    .results-map-card[data-map-theme="light"] .map-popup-products a:focus-visible,
+    .results-map-card[data-map-theme="streets"] .map-popup-address a:hover,
+    .results-map-card[data-map-theme="streets"] .map-popup-address a:focus-visible,
+    .results-map-card[data-map-theme="streets"] .map-popup-products a:hover,
+    .results-map-card[data-map-theme="streets"] .map-popup-products a:focus-visible {
+      color: #15212c;
+      text-decoration-color: rgba(243, 117, 32, 0.48);
     }
 
     .results-map-card[data-map-theme="light"] .results-store-marker::before,
@@ -3713,8 +3751,8 @@
       position: relative;
       isolation: isolate;
       margin-top: 22px;
-      padding: 24px;
-      border-radius: 24px;
+      padding: 20px;
+      border-radius: 22px;
       border: 1px solid rgba(243, 117, 32, 0.16);
       background:
         radial-gradient(circle at top right, rgba(243, 117, 32, 0.16), transparent 34%),
@@ -3748,29 +3786,29 @@
       align-items: flex-end;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 18px;
-      margin-bottom: 18px;
-      padding-bottom: 18px;
+      gap: 14px;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .trending-products-heading {
       display: grid;
-      gap: 10px;
+      gap: 8px;
       min-width: 0;
     }
 
     .trending-products-title-row {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       min-width: 0;
     }
 
     .trending-products-title-icon-shell {
-      width: 46px;
-      height: 46px;
-      border-radius: 14px;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -3785,8 +3823,8 @@
     }
 
     .trending-products-title-icon {
-      width: 22px;
-      height: 22px;
+      width: 20px;
+      height: 20px;
       object-fit: contain;
       display: block;
       filter: brightness(0) saturate(100%) invert(76%) sepia(82%) saturate(1128%) hue-rotate(334deg) brightness(99%) contrast(96%);
@@ -3799,7 +3837,7 @@
     }
 
     .trending-products-kicker {
-      font-size: 11px;
+      font-size: 10px;
       font-family: 'Space Mono', monospace;
       text-transform: uppercase;
       letter-spacing: 1.8px;
@@ -3807,7 +3845,7 @@
     }
 
     .trending-products-title {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 700;
       letter-spacing: 1.6px;
       text-transform: uppercase;
@@ -3816,22 +3854,22 @@
     }
 
     .trending-products-copy {
-      font-size: 14px;
-      line-height: 1.6;
+      font-size: 13px;
+      line-height: 1.5;
       color: rgba(214, 220, 225, 0.78);
       max-width: 60ch;
     }
 
     .trending-products-highlight {
       display: grid;
-      gap: 4px;
+      gap: 2px;
       min-width: 0;
       justify-items: end;
       align-content: end;
     }
 
     .trending-products-highlight-value {
-      font-size: 11px;
+      font-size: 10px;
       font-family: 'Space Mono', monospace;
       text-transform: uppercase;
       letter-spacing: 1.4px;
@@ -3839,7 +3877,7 @@
     }
 
     .trending-products-highlight-label {
-      font-size: 13px;
+      font-size: 12px;
       color: rgba(214, 220, 225, 0.68);
     }
 
@@ -3851,10 +3889,10 @@
     .trending-product-item {
       position: relative;
       display: grid;
-      grid-template-columns: 56px minmax(0, 1fr);
-      gap: 14px;
+      grid-template-columns: 52px minmax(0, 1fr) auto;
+      gap: 12px;
       align-items: center;
-      padding: 12px 14px;
+      padding: 10px 12px;
       border-radius: 16px;
       background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
@@ -3885,9 +3923,9 @@
     }
 
     .trending-product-thumb {
-      width: 56px;
-      height: 56px;
-      border-radius: 14px;
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.1);
       background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
@@ -3907,8 +3945,8 @@
     }
 
     .trending-product-thumb-fallback {
-      width: 34px;
-      height: 34px;
+      width: 30px;
+      height: 30px;
       object-fit: contain;
       opacity: 0.92;
     }
@@ -3916,20 +3954,14 @@
     .trending-product-body {
       min-width: 0;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas:
-        "meta footer"
-        "name footer";
-      gap: 6px 14px;
-      align-items: center;
+      gap: 5px;
     }
 
     .trending-product-meta {
-      grid-area: meta;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       font-size: 10px;
       font-family: 'Space Mono', monospace;
       text-transform: uppercase;
@@ -3940,7 +3972,7 @@
     .trending-product-retailer {
       display: inline-flex;
       align-items: center;
-      gap: 7px;
+      gap: 6px;
       color: rgba(244, 247, 249, 0.84);
     }
 
@@ -3953,8 +3985,8 @@
     .trending-product-chip {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 8px;
+      gap: 4px;
+      padding: 3px 7px;
       border-radius: 999px;
       background: rgba(243, 117, 32, 0.12);
       border: 1px solid rgba(243, 117, 32, 0.22);
@@ -3962,8 +3994,7 @@
     }
 
     .trending-product-name {
-      grid-area: name;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       line-height: 1.15;
       color: var(--text-primary);
@@ -3971,23 +4002,23 @@
     }
 
     .trending-product-footer {
-      grid-area: footer;
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
+      align-items: center;
       justify-content: center;
       gap: 8px;
+      flex-shrink: 0;
     }
 
     .trending-product-link {
       display: inline-flex;
       align-items: center;
-      min-height: 34px;
-      padding: 0 12px;
+      min-height: 30px;
+      padding: 0 10px;
       border-radius: 999px;
       border-color: rgba(72, 156, 212, 0.18);
       background: rgba(72, 156, 212, 0.08);
       color: rgba(214, 220, 225, 0.94);
+      font-size: 11px;
       transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.2s ease;
     }
 
@@ -3999,9 +4030,9 @@
     }
 
     .trending-product-add-btn {
-      min-width: 148px;
-      min-height: 34px;
-      padding: 6px 12px;
+      min-width: 136px;
+      min-height: 32px;
+      padding: 5px 12px;
       justify-content: center;
       box-shadow: 0 10px 24px rgba(251, 1, 28, 0.16);
     }
