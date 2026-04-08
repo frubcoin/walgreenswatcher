@@ -2024,6 +2024,13 @@
       margin-top: 4px;
     }
 
+    .stat-sub-detail {
+      display: block;
+      margin-top: 2px;
+      font-size: 10px;
+      color: rgba(152, 164, 174, 0.92);
+    }
+
     .tabs {
       display: flex;
       gap: 4px;
@@ -6030,11 +6037,6 @@
           <div class="stat-sub" id="stat-status-sub">-</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Scheduler</div>
-          <div class="stat-value" id="stat-scheduler">-</div>
-          <div class="stat-sub">Every 1 hour</div>
-        </div>
-        <div class="stat-card">
           <div class="stat-label">Last Check</div>
           <div class="stat-value" id="stat-lastcheck">-</div>
           <div class="stat-sub"></div>
@@ -6043,11 +6045,6 @@
           <div class="stat-label">Tracked Products</div>
           <div class="stat-value" id="stat-products">-</div>
           <div class="stat-sub" id="stat-products-sub">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Checks</div>
-          <div class="stat-value" id="stat-total-checks">-</div>
-          <div class="stat-sub">Lifetime scans</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Success Rate</div>
@@ -10243,13 +10240,14 @@
 
       const checksToday = Number(statistics.checks_today || 0);
       const checksWeek = Number(statistics.checks_this_week || 0);
+      const totalChecks = Number(statistics.total_checks || 0);
       const checksTodayNode = document.getElementById('stat-checks-today');
       const checksTodaySubNode = document.getElementById('stat-checks-today-sub');
       if (checksTodayNode) {
         checksTodayNode.textContent = String(checksToday);
       }
       if (checksTodaySubNode) {
-        checksTodaySubNode.textContent = `Week: ${checksWeek}`;
+        checksTodaySubNode.innerHTML = `Week: ${checksWeek}<span class="stat-sub-detail">Lifetime scans: ${totalChecks}</span>`;
       }
     }
 
@@ -10828,17 +10826,16 @@
         const intervalMinutes = status.check_interval_minutes || 60;
 
         document.getElementById('stat-status').textContent = status.is_running ? 'Running' : 'Stopped';
-        document.getElementById('stat-scheduler').textContent = status.is_running ? 'On' : 'Off';
-        document.querySelector('#stat-scheduler + .stat-sub').textContent = formatIntervalLabel(intervalMinutes);
-        document.getElementById('stat-status-sub').textContent = status.discord_webhook_count
-          ? `${status.discord_webhook_count} Discord webhook${status.discord_webhook_count === 1 ? '' : 's'} configured`
-          : 'No Discord webhooks configured';
+        document.getElementById('stat-status-sub').innerHTML = `${
+          status.discord_webhook_count
+            ? `${status.discord_webhook_count} Discord webhook${status.discord_webhook_count === 1 ? '' : 's'} configured`
+            : 'No Discord webhooks configured'
+        }<span class="stat-sub-detail">${escapeHtml(formatIntervalLabel(intervalMinutes))}</span>`;
         document.getElementById('stat-products').textContent = trackedProducts.length;
         document.getElementById('stat-products-sub').textContent = `${Object.keys(lastProductsFound).length} in stock last check`;
 
         const statistics = data.statistics || {};
         if (statistics) {
-          document.getElementById('stat-total-checks').textContent = statistics.total_checks || 0;
           const rate = statistics.success_rate || 0;
           document.getElementById('stat-success-rate').textContent = (rate % 1 === 0 ? rate : rate.toFixed(1)) + '%';
         }
