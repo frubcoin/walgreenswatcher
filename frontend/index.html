@@ -9743,7 +9743,9 @@
         return marker;
       });
 
-      if (mapDistanceReference) {
+      const shouldShowDistanceReferenceMarker = Boolean(mapDistanceReference) && !preferredLocation && !locations.length;
+
+      if (shouldShowDistanceReferenceMarker && mapDistanceReference) {
         ensureUserLocationMarker(mapDistanceReference.latitude, mapDistanceReference.longitude);
         bounds.push([mapDistanceReference.latitude, mapDistanceReference.longitude]);
       }
