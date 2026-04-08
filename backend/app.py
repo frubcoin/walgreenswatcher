@@ -1504,6 +1504,11 @@ def index():
     return _serve_frontend_html_file("index.html")
 
 
+@app.route("/map")
+def map_view():
+    return _serve_frontend_html_file("index.html")
+
+
 @app.route("/admin")
 @app.route("/admin.html")
 def admin_panel():

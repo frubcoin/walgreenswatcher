@@ -4860,7 +4860,7 @@
         min-height: auto;
         max-height: none;
         overflow: visible;
-        padding: calc(14px + env(safe-area-inset-top, 0px)) 14px calc(12px + env(safe-area-inset-bottom, 0px));
+        padding: calc(14px + env(safe-area-inset-top, 0px)) 14px calc(24px + env(safe-area-inset-bottom, 0px));
         border: none;
         border-radius: 0;
         box-shadow: none;
@@ -5978,6 +5978,8 @@
       message: 'Enter an address, city, or ZIP to center the map.',
       tone: 'muted'
     };
+    const INITIAL_ROUTE_PATH = window.location.pathname.replace(/\/+$/, '') || '/';
+    let pendingInitialMapScroll = INITIAL_ROUTE_PATH === '/map';
     let trackedProductsCache = [];
     let trendingProductsCache = [];
     let trendingRetentionHours = 24;
@@ -7333,6 +7335,7 @@
       updateAuthStatus('');
       await loadSettings();
       const statusPayload = await loadStatus();
+      maybeScrollToInitialMapView();
       maybeOpenOnboarding(statusPayload);
       startStatusPolling();
       return true;
@@ -8018,6 +8021,30 @@
         const element = marker?.getElement?.();
         if (!element) return;
         element.classList.toggle('is-active', marker?.options?.locationKey === activeResultsMapKey);
+      });
+    }
+
+    function getInitialMapScrollTarget() {
+      return document.querySelector('#results-view-map.active .results-map-shell')
+        || document.querySelector('#panel-results .results-shell')
+        || document.getElementById('results-container')
+        || document.getElementById('panel-results');
+    }
+
+    function maybeScrollToInitialMapView() {
+      if (!pendingInitialMapScroll || document.body.classList.contains('auth-gate-active')) return;
+
+      const target = getInitialMapScrollTarget();
+      if (!target) return;
+
+      pendingInitialMapScroll = false;
+      window.requestAnimationFrame(() => {
+        target.scrollIntoView({
+          block: 'start',
+          inline: 'nearest',
+          behavior: 'auto'
+        });
+        queueShellScrollbarUpdate();
       });
     }
 
@@ -8980,6 +9007,7 @@
       }
 
       syncManualLocationSearchUi();
+      maybeScrollToInitialMapView();
     }
 
     async function setResultsView(view) {
@@ -9774,6 +9802,7 @@
         <div class="empty-title">No checks yet</div>
         <div class="empty-text">Click <strong>Check Now</strong> or start the scheduler.</div>
       </div>`;
+        maybeScrollToInitialMapView();
         return;
       }
 
@@ -9799,6 +9828,7 @@
       <div class="empty-text">Checked ${total} stores${timestamp ? ` on ${formatLocalDate(timestamp)}` : ''}</div>
       </div>`;
         lastResultsSignature = resultsSignature;
+        maybeScrollToInitialMapView();
         return;
       }
 
