@@ -2,7 +2,14 @@ const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
 const apiBase = String(runtimeConfig.apiBaseUrl || window.location.origin).replace(/\/+$/, '');
 const statusBanner = document.getElementById('status-banner');
 
-let latestOverview = null;
+const state = {
+  session: null,
+  overview: null,
+  userSearch: '',
+  userFilter: 'all',
+  eventFilter: 'all'
+};
+
 let bannerTimer = 0;
 
 function apiUrl(path) {
@@ -23,6 +30,11 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
+}
+
+function formatPercent(value) {
+  const numeric = Number(value || 0);
+  return `${numeric.toFixed(1)}%`;
 }
 
 function showBanner(message, tone = 'info') {
@@ -65,6 +77,15 @@ function setGoogleStatus(message, tone = 'info') {
   element.dataset.tone = tone;
 }
 
+function isUserNew(user) {
+  if (!user?.created_at) return false;
+  return Date.now() - new Date(user.created_at).getTime() < 1000 * 60 * 60 * 24 * 3;
+}
+
+function userNeedsAttention(user) {
+  return Boolean(user?.is_banned || !user?.is_authorized_email || user?.scheduler_enabled);
+}
+
 function setSessionUi(session) {
   const authPanel = document.getElementById('admin-auth-panel');
   const dashboard = document.getElementById('admin-dashboard');
@@ -94,12 +115,11 @@ function setSessionUi(session) {
   }
 
   const googleAuthenticated = Boolean(session.google_authenticated && session.user);
-  const passwordAuthenticated = Boolean(session.password_authenticated);
   const fullyAuthenticated = Boolean(session.authenticated);
 
   authPanel.hidden = fullyAuthenticated;
   dashboard.hidden = !fullyAuthenticated;
-  logoutButton.hidden = !googleAuthenticated && !passwordAuthenticated;
+  logoutButton.hidden = !googleAuthenticated;
 
   if (fullyAuthenticated) {
     sessionChip.textContent = `Admin unlocked | ${session.user.email}`;
@@ -107,7 +127,7 @@ function setSessionUi(session) {
     setGoogleStatus('Google verified and admin password accepted.', 'success');
   } else if (googleAuthenticated) {
     sessionChip.textContent = `Google verified | ${session.user.email}`;
-    authCopy.textContent = 'Google sign-in is complete. Enter the admin password to unlock the panel.';
+    authCopy.textContent = 'Google sign-in is complete. Enter the admin password to unlock the control room.';
     setGoogleStatus('Google sign-in complete. Continue with the admin password.', 'success');
   } else {
     sessionChip.textContent = 'Locked';
@@ -125,7 +145,7 @@ function setSessionUi(session) {
     googleCard.hidden = false;
     googleName.textContent = session.user.name || session.user.email;
     googleEmail.textContent = session.user.email || '';
-    googleCopy.textContent = 'Your current Google session will be checked against the app allowlist.';
+    googleCopy.textContent = 'Your current Google session is checked against the app allowlist before admin unlock.';
   } else {
     googleCard.hidden = true;
     googleName.textContent = '';
@@ -138,21 +158,104 @@ function setSessionUi(session) {
   passwordSubmit.disabled = !googleAuthenticated;
 }
 
-function renderStats(overview) {
-  const users = overview.users || [];
-  const authorizedEmails = overview.authorized_google_emails || [];
-  const settings = overview.settings || {};
-  const bannedUsers = users.filter(user => user.is_banned);
-  const webhooks = settings.admin_webhook_destinations || [];
+function renderPlatformSnapshot(platform) {
+  const globalStats = platform?.global_statistics || {};
+  const uptime = platform?.service_uptime || {};
+  const totals = platform?.totals || {};
 
-  document.getElementById('stat-users').textContent = String(users.length);
-  document.getElementById('stat-users-meta').textContent = `${users.filter(user => user.scheduler_enabled).length} running schedulers`;
-  document.getElementById('stat-allowlist').textContent = String(authorizedEmails.length);
-  document.getElementById('stat-allowlist-meta').textContent = settings.google_allowlist_enabled ? 'Allowlist enforced' : 'Allowlist optional';
-  document.getElementById('stat-banned').textContent = String(bannedUsers.length);
-  document.getElementById('stat-banned-meta').textContent = bannedUsers.length ? 'Accounts blocked' : 'No current bans';
-  document.getElementById('stat-webhooks').textContent = String(webhooks.length);
-  document.getElementById('stat-webhooks-meta').textContent = `${overview.events?.length || 0} recent audit events`;
+  document.getElementById('hero-uptime-label').textContent = uptime.label || 'Service uptime unavailable';
+  document.getElementById('hero-users-total').textContent = `${totals.users || 0} users`;
+  document.getElementById('hero-summary-copy').textContent =
+    `${totals.scheduler_enabled_users || 0} user schedulers are active, ${totals.login_denials || 0} recent login denials were recorded, and ${totals.alert_webhooks || 0} admin alert webhooks are configured.`;
+
+  const metrics = [
+    {
+      label: 'Uptime',
+      value: formatPercent(uptime.uptime_percentage || 0),
+      note: uptime.label || `${uptime.tracked_minutes || 0} minutes tracked`
+    },
+    {
+      label: 'Total Checks',
+      value: String(globalStats.total_checks || 0),
+      note: `${globalStats.successful_checks || 0} successful checks recorded`
+    },
+    {
+      label: 'Login Denials',
+      value: String(totals.login_denials || 0),
+      note: 'Recent blocked sign-in attempts'
+    },
+    {
+      label: 'Schedulers',
+      value: String(totals.scheduler_enabled_users || 0),
+      note: `${totals.banned_users || 0} banned | ${totals.authorized_users || 0} allowlisted`
+    }
+  ];
+
+  document.getElementById('platform-metrics-strip').innerHTML = metrics.map(metric => `
+    <article class="metric-card">
+      <div class="metric-label">${escapeHtml(metric.label)}</div>
+      <div class="metric-value">${escapeHtml(metric.value)}</div>
+      <div class="metric-note">${escapeHtml(metric.note)}</div>
+    </article>
+  `).join('');
+}
+
+function buildAttentionItems(overview) {
+  const users = overview?.users || [];
+  const totals = overview?.platform?.totals || {};
+  const unauthorizedUsers = users.filter(user => !user.is_authorized_email);
+  const runningUnauthorized = unauthorizedUsers.filter(user => user.scheduler_enabled);
+  const recentlyJoined = users.filter(user => isUserNew(user));
+
+  const items = [];
+
+  if (runningUnauthorized.length) {
+    items.push({
+      title: `${runningUnauthorized.length} scheduler account${runningUnauthorized.length === 1 ? '' : 's'} need allowlist review`,
+      body: 'These users still have schedulers enabled while their email is not allowlisted.',
+      tone: 'warning'
+    });
+  }
+
+  if (totals.login_denials) {
+    items.push({
+      title: `${totals.login_denials} recent login denial${totals.login_denials === 1 ? '' : 's'}`,
+      body: 'Review the event stream to confirm whether they were expected allowlist or ban decisions.',
+      tone: 'danger'
+    });
+  }
+
+  if (recentlyJoined.length) {
+    items.push({
+      title: `${recentlyJoined.length} new user${recentlyJoined.length === 1 ? '' : 's'} in the last 72 hours`,
+      body: 'Verify their access posture and decide whether they should remain on the platform.',
+      tone: 'success'
+    });
+  }
+
+  if (!items.length) {
+    items.push({
+      title: 'No active operator queue',
+      body: 'Nothing urgent is standing out right now. The platform appears stable.',
+      tone: 'success'
+    });
+  }
+
+  return items;
+}
+
+function renderAttentionQueue(overview) {
+  const items = buildAttentionItems(overview);
+  const container = document.getElementById('attention-list');
+  container.innerHTML = items.map(item => `
+    <article class="attention-item">
+      <div class="tag-row">
+        <span class="chip ${item.tone === 'danger' ? 'chip-danger' : item.tone === 'warning' ? 'chip-warning' : 'chip-success'}">${escapeHtml(item.tone)}</span>
+      </div>
+      <strong>${escapeHtml(item.title)}</strong>
+      <p>${escapeHtml(item.body)}</p>
+    </article>
+  `).join('');
 }
 
 function renderSettings(settings) {
@@ -173,103 +276,166 @@ function renderAuthorizedEmails(entries) {
   }
 
   container.innerHTML = entries.map(entry => `
-    <article class="token-row">
-      <div class="token-main">
+    <article class="allowlist-item">
+      <div class="allowlist-address">
         <strong>${escapeHtml(entry.email)}</strong>
-        <span>${escapeHtml(entry.note || 'No note')} | Added ${escapeHtml(formatDateTime(entry.added_at))}</span>
+        <span class="allowlist-note">${escapeHtml(entry.note || 'No note')} | Added ${escapeHtml(formatDateTime(entry.added_at))}</span>
       </div>
-      <button class="danger-button" type="button" data-action="remove-authorized-email" data-email="${escapeHtml(entry.email)}">Remove</button>
+      <button class="button button-danger button-compact" type="button" data-action="remove-authorized-email" data-email="${escapeHtml(entry.email)}">Remove</button>
     </article>
   `).join('');
+}
+
+function filterUsers(users) {
+  const search = state.userSearch.trim().toLowerCase();
+  let filtered = users.slice();
+
+  if (state.userFilter === 'attention') {
+    filtered = filtered.filter(userNeedsAttention);
+  } else if (state.userFilter === 'banned') {
+    filtered = filtered.filter(user => user.is_banned);
+  } else if (state.userFilter === 'unauthorized') {
+    filtered = filtered.filter(user => !user.is_authorized_email);
+  } else if (state.userFilter === 'scheduler') {
+    filtered = filtered.filter(user => user.scheduler_enabled);
+  } else if (state.userFilter === 'new') {
+    filtered = filtered.filter(isUserNew);
+  }
+
+  if (search) {
+    filtered = filtered.filter(user => [
+      user.name,
+      user.email,
+      user.current_zipcode,
+      user.ban_reason
+    ].join(' ').toLowerCase().includes(search));
+  }
+
+  return filtered;
 }
 
 function renderUsers(users) {
+  const filtered = filterUsers(users);
   const container = document.getElementById('user-list');
-  if (!users.length) {
-    container.innerHTML = '<div class="empty-state">No user accounts have signed in yet.</div>';
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state">No users match the current filter.</div>';
     return;
   }
 
-  container.innerHTML = users.map(user => `
-    <article class="user-card ${user.is_banned ? 'is-banned' : ''}">
-      <div class="user-card-header">
-        <div>
-          <strong class="user-card-title">${escapeHtml(user.name || user.email)}</strong>
-          <div class="user-meta">${escapeHtml(user.email)} | Joined ${escapeHtml(formatDateTime(user.created_at))}</div>
+  container.innerHTML = filtered.map(user => `
+    <article class="user-card ${user.is_banned ? 'is-banned' : ''} ${userNeedsAttention(user) ? 'needs-attention' : ''}">
+      <div class="user-card-head">
+        <div class="user-title">
+          <strong>${escapeHtml(user.name || user.email)}</strong>
+          <div class="user-meta">${escapeHtml(user.email)} | Joined ${escapeHtml(formatDateTime(user.created_at))} | Last login ${escapeHtml(formatDateTime(user.last_login_at))}</div>
         </div>
-        <div class="user-badges">
-          <span class="badge ${user.is_banned ? 'badge-danger' : 'badge-success'}">${user.is_banned ? 'Banned' : 'Active'}</span>
-          <span class="badge ${user.is_authorized_email ? 'badge-success' : ''}">${user.is_authorized_email ? 'Authorized Email' : 'Not Allowlisted'}</span>
-          <span class="badge">${user.scheduler_enabled ? 'Scheduler On' : 'Scheduler Off'}</span>
-        </div>
-      </div>
-      <div class="user-grid">
-        <div class="user-metric">
-          <strong>${escapeHtml(String(user.tracked_product_count || 0))}</strong>
-          <span>Tracked products</span>
-        </div>
-        <div class="user-metric">
-          <strong>${escapeHtml(String(user.total_checks || 0))}</strong>
-          <span>Total checks</span>
-        </div>
-        <div class="user-metric">
-          <strong>${escapeHtml(user.current_zipcode || 'None')}</strong>
-          <span>ZIP code</span>
-        </div>
-        <div class="user-metric">
-          <strong>${escapeHtml(formatDateTime(user.last_login_at))}</strong>
-          <span>Last login</span>
+        <div class="tag-row">
+          <span class="chip ${user.is_banned ? 'chip-danger' : 'chip-success'}">${user.is_banned ? 'Banned' : 'Active'}</span>
+          <span class="chip ${user.is_authorized_email ? 'chip-success' : 'chip-warning'}">${user.is_authorized_email ? 'Allowlisted' : 'Not allowlisted'}</span>
+          <span class="chip ${user.scheduler_enabled ? 'chip-warning' : ''}">${user.scheduler_enabled ? 'Scheduler on' : 'Scheduler off'}</span>
+          ${isUserNew(user) ? '<span class="chip chip-success">New user</span>' : ''}
         </div>
       </div>
+
+      <div class="user-stats">
+        <div class="user-stat"><strong>${escapeHtml(String(user.tracked_product_count || 0))}</strong><span>Tracked products</span></div>
+        <div class="user-stat"><strong>${escapeHtml(String(user.total_checks || 0))}</strong><span>Total checks</span></div>
+        <div class="user-stat"><strong>${escapeHtml(user.current_zipcode || 'None')}</strong><span>ZIP code</span></div>
+        <div class="user-stat"><strong>${escapeHtml(String(user.check_interval_minutes || 0))}m</strong><span>Check interval</span></div>
+        <div class="user-stat"><strong>${escapeHtml(formatDateTime(user.last_check))}</strong><span>Last check</span></div>
+      </div>
+
       ${user.ban_reason ? `<div class="user-meta">Ban reason: ${escapeHtml(user.ban_reason)}</div>` : ''}
-      <div class="user-card-actions">
-        <input class="reason-input" id="ban-reason-${user.id}" type="text" placeholder="Ban reason (optional)" value="${escapeHtml(user.ban_reason || '')}">
+
+      <div class="reason-field">
+        <label for="ban-reason-${user.id}">Moderation note</label>
+        <input id="ban-reason-${user.id}" type="text" placeholder="Reason or note for moderation action" value="${escapeHtml(user.ban_reason || '')}">
+      </div>
+
+      <div class="action-row">
+        ${user.is_authorized_email
+          ? `<button class="button button-muted button-compact" type="button" data-action="revoke-user-email" data-email="${escapeHtml(user.email)}">Revoke allowlist</button>`
+          : `<button class="button button-success button-compact" type="button" data-action="authorize-user-email" data-email="${escapeHtml(user.email)}">Allowlist email</button>`}
+        ${user.scheduler_enabled
+          ? `<button class="button button-warning button-compact" type="button" data-action="stop-user-scheduler" data-user-id="${user.id}">Stop scheduler</button>`
+          : ''}
         ${user.is_banned
-          ? `<button class="primary-button" type="button" data-action="unban-user" data-user-id="${user.id}">Unban</button>`
-          : `<button class="danger-button" type="button" data-action="ban-user" data-user-id="${user.id}">Ban User</button>`}
+          ? `<button class="button button-success button-compact" type="button" data-action="unban-user" data-user-id="${user.id}">Unban</button>`
+          : `<button class="button button-danger button-compact" type="button" data-action="ban-user" data-user-id="${user.id}">Ban user</button>`}
       </div>
     </article>
   `).join('');
 }
 
+function filterEvents(events) {
+  if (state.eventFilter === 'all') {
+    return events;
+  }
+  if (state.eventFilter === 'denied') {
+    return events.filter(event => String(event.event_type || '').startsWith('auth.login_denied'));
+  }
+  if (state.eventFilter === 'admin') {
+    return events.filter(event => String(event.event_type || '').startsWith('admin.'));
+  }
+  if (state.eventFilter === 'user') {
+    return events.filter(event => String(event.event_type || '').startsWith('user.') || String(event.event_type || '').startsWith('auth.login') || String(event.event_type || '').startsWith('auth.logout'));
+  }
+  if (state.eventFilter === 'joins') {
+    return events.filter(event => String(event.event_type || '') === 'auth.user_created');
+  }
+  return events;
+}
+
 function renderEvents(events) {
+  const filtered = filterEvents(events);
   const container = document.getElementById('event-list');
-  if (!events.length) {
-    container.innerHTML = '<div class="empty-state">No audit events recorded yet.</div>';
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state">No audit events match the current filter.</div>';
     return;
   }
 
-  container.innerHTML = events.map(event => {
+  container.innerHTML = filtered.slice(0, 80).map(event => {
     const actor = event.actor_email || event.user_email || 'System';
-    const target = event.target_email ? `Target: ${escapeHtml(event.target_email)}` : '';
-    const metadata = event.metadata && Object.keys(event.metadata).length
-      ? `<div class="event-meta">${escapeHtml(JSON.stringify(event.metadata))}</div>`
-      : '';
+    const toneClass = String(event.event_type || '').startsWith('auth.login_denied')
+      ? 'chip-danger'
+      : String(event.event_type || '').startsWith('admin.')
+        ? 'chip-warning'
+        : 'chip';
 
     return `
       <article class="event-card">
-        <div class="event-card-header">
-          <strong class="event-card-title">${escapeHtml(event.summary || event.event_type)}</strong>
-          <span class="event-meta">${escapeHtml(formatDateTime(event.created_at))}</span>
+        <div class="event-card-head">
+          <div>
+            <div class="tag-row">
+              <span class="chip ${toneClass}">${escapeHtml(event.event_type || 'event')}</span>
+              ${event.target_email ? `<span class="meta-tag">${escapeHtml(event.target_email)}</span>` : ''}
+            </div>
+            <div class="event-title">${escapeHtml(event.summary || event.event_type)}</div>
+          </div>
+          <div class="event-meta">${escapeHtml(formatDateTime(event.created_at))}</div>
         </div>
-        <div class="event-body">${escapeHtml(event.event_type)} | Actor: ${escapeHtml(actor)}</div>
-        ${target ? `<div class="event-meta">${target}</div>` : ''}
-        ${metadata}
+        <div class="event-body">Actor: ${escapeHtml(actor)}</div>
+        ${event.metadata && Object.keys(event.metadata).length
+          ? `<div class="event-meta">${escapeHtml(JSON.stringify(event.metadata))}</div>`
+          : ''}
       </article>
     `;
   }).join('');
 }
 
+function renderDashboard() {
+  if (!state.overview) return;
+  renderPlatformSnapshot(state.overview.platform || {});
+  renderAttentionQueue(state.overview);
+  renderSettings(state.overview.settings || {});
+  renderAuthorizedEmails(state.overview.authorized_google_emails || []);
+  renderUsers(state.overview.users || []);
+  renderEvents(state.overview.events || []);
+}
+
 function renderOverview(overview) {
-  latestOverview = {
-    ...overview,
-    sessionState: latestOverview?.sessionState || null
-  };
-  renderStats(overview);
-  renderSettings(overview.settings || {});
-  renderAuthorizedEmails(overview.authorized_google_emails || []);
-  renderUsers(overview.users || []);
-  renderEvents(overview.events || []);
+  state.overview = overview;
+  renderDashboard();
 }
 
 async function waitForGoogleIdentity(timeoutMs = 10000) {
@@ -283,18 +449,17 @@ async function waitForGoogleIdentity(timeoutMs = 10000) {
   return false;
 }
 
-async function renderGoogleSignInButton(clientId, { force = false } = {}) {
+async function renderGoogleSignInButton(clientId) {
   const container = document.getElementById('admin-google-button');
   if (!container) return;
 
-  const session = latestOverview?.sessionState || null;
   if (!clientId) {
     container.innerHTML = '';
     container.classList.remove('is-pending');
     return;
   }
 
-  if (session?.google_authenticated && !force) {
+  if (state.session?.google_authenticated) {
     container.innerHTML = '';
     container.classList.remove('is-pending');
     return;
@@ -302,7 +467,6 @@ async function renderGoogleSignInButton(clientId, { force = false } = {}) {
 
   container.innerHTML = '';
   container.classList.add('is-pending');
-
   const googleReady = await waitForGoogleIdentity();
   if (!googleReady) {
     setGoogleStatus('Google sign-in did not finish loading. Refresh and try again.', 'error');
@@ -350,18 +514,17 @@ async function loadAdminOverview(showSuccessBanner = false) {
 }
 
 async function refreshAdminSession({ loadOverviewIfUnlocked = true } = {}) {
-  const session = await apiRequest('/api/admin/session');
-  latestOverview = { ...(latestOverview || {}), sessionState: session };
-  setSessionUi(session);
-  await renderGoogleSignInButton(session.google_client_id || '');
+  state.session = await apiRequest('/api/admin/session');
+  setSessionUi(state.session);
+  await renderGoogleSignInButton(state.session.google_client_id || '');
 
-  if (session.authenticated && loadOverviewIfUnlocked) {
+  if (state.session.authenticated && loadOverviewIfUnlocked) {
     await loadAdminOverview();
-  } else if (!session.authenticated) {
+  } else if (!state.session.authenticated) {
     document.getElementById('admin-dashboard').hidden = true;
   }
 
-  return session;
+  return state.session;
 }
 
 async function initializeAdminPage() {
@@ -377,10 +540,9 @@ async function handleAdminLogin(event) {
   const password = document.getElementById('admin-password').value;
 
   try {
-    const session = await apiRequest('/api/admin/login', 'POST', { password });
+    state.session = await apiRequest('/api/admin/login', 'POST', { password });
     document.getElementById('admin-password').value = '';
-    latestOverview = { ...(latestOverview || {}), sessionState: session };
-    setSessionUi(session);
+    setSessionUi(state.session);
     await loadAdminOverview();
     showBanner('Admin session unlocked', 'success');
   } catch (error) {
@@ -403,7 +565,8 @@ async function handleFullSignOut() {
     window.google.accounts.id.disableAutoSelect();
   }
 
-  latestOverview = null;
+  state.session = null;
+  state.overview = null;
   document.getElementById('admin-password').value = '';
   await refreshAdminSession({ loadOverviewIfUnlocked: false });
   showBanner('Signed out of the admin session', 'success');
@@ -428,7 +591,7 @@ async function handleSettingsSave(event) {
     });
     renderSettings(response.settings || {});
     await loadAdminOverview();
-    showBanner('Admin settings saved', 'success');
+    showBanner('Platform settings saved', 'success');
   } catch (error) {
     showBanner(error.message, 'error');
   }
@@ -463,6 +626,39 @@ async function removeAuthorizedEmail(email) {
   }
 }
 
+async function authorizeUserEmail(email) {
+  try {
+    await apiRequest('/api/admin/authorized-emails', 'POST', {
+      email,
+      note: 'Approved from control room'
+    });
+    await loadAdminOverview();
+    showBanner('User email allowlisted', 'success');
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+}
+
+async function revokeUserEmail(email) {
+  try {
+    await apiRequest('/api/admin/authorized-emails/remove', 'POST', { email });
+    await loadAdminOverview();
+    showBanner('User email removed from allowlist', 'success');
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+}
+
+async function stopUserScheduler(userId) {
+  try {
+    await apiRequest(`/api/admin/users/${userId}/stop-scheduler`, 'POST', {});
+    await loadAdminOverview();
+    showBanner('User scheduler stopped', 'success');
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+}
+
 async function banUser(userId) {
   const reason = document.getElementById(`ban-reason-${userId}`)?.value.trim() || '';
   try {
@@ -490,7 +686,7 @@ document.getElementById('authorized-email-form').addEventListener('submit', hand
 document.getElementById('logout-button').addEventListener('click', handleFullSignOut);
 document.getElementById('google-signout-button').addEventListener('click', handleFullSignOut);
 document.getElementById('refresh-button').addEventListener('click', () => refreshAdminSession().then(() => {
-  if (latestOverview?.sessionState?.authenticated) {
+  if (state.session?.authenticated) {
     showBanner('Admin data refreshed', 'success');
   } else {
     showBanner('Admin session refreshed', 'success');
@@ -499,6 +695,21 @@ document.getElementById('refresh-button').addEventListener('click', () => refres
   showBanner(error.message, 'error');
 }));
 
+document.getElementById('user-search-input').addEventListener('input', event => {
+  state.userSearch = event.target.value || '';
+  if (state.overview) renderUsers(state.overview.users || []);
+});
+
+document.getElementById('user-filter-select').addEventListener('change', event => {
+  state.userFilter = event.target.value || 'all';
+  if (state.overview) renderUsers(state.overview.users || []);
+});
+
+document.getElementById('event-filter-select').addEventListener('change', event => {
+  state.eventFilter = event.target.value || 'all';
+  if (state.overview) renderEvents(state.overview.events || []);
+});
+
 document.addEventListener('click', event => {
   const actionElement = event.target instanceof Element ? event.target.closest('[data-action]') : null;
   if (!actionElement) return;
@@ -506,11 +717,15 @@ document.addEventListener('click', event => {
   const action = actionElement.dataset.action;
   if (action === 'remove-authorized-email') {
     removeAuthorizedEmail(actionElement.dataset.email || '');
-  }
-  if (action === 'ban-user') {
+  } else if (action === 'authorize-user-email') {
+    authorizeUserEmail(actionElement.dataset.email || '');
+  } else if (action === 'revoke-user-email') {
+    revokeUserEmail(actionElement.dataset.email || '');
+  } else if (action === 'stop-user-scheduler') {
+    stopUserScheduler(Number(actionElement.dataset.userId || 0));
+  } else if (action === 'ban-user') {
     banUser(Number(actionElement.dataset.userId || 0));
-  }
-  if (action === 'unban-user') {
+  } else if (action === 'unban-user') {
     unbanUser(Number(actionElement.dataset.userId || 0));
   }
 });

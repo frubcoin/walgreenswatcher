@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="/admin.css">
   <script src="/runtime-config.js"></script>
@@ -18,35 +18,34 @@
 </head>
 
 <body>
-  <div class="page-shell">
-    <header class="masthead">
-      <div>
-        <p class="eyebrow">Operations Console</p>
-        <h1>Walgreens Watcher Admin</h1>
-        <p class="lede">Approve Google accounts, moderate users, and forward security-relevant activity to your own
-          webhook endpoints.</p>
+  <div class="admin-root">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <p class="eyebrow">Platform Management</p>
+        <h1>Watcher Control Room</h1>
+        <p class="topbar-copy">A tighter operational surface for access control, user moderation, alert routing, and
+          platform health.</p>
       </div>
-      <div class="masthead-actions">
-        <div class="chip" id="admin-session-chip">Checking session</div>
-        <button class="ghost-button" id="refresh-button" type="button">Refresh</button>
-        <button class="ghost-button" id="logout-button" type="button" hidden>Log Out</button>
+      <div class="topbar-actions">
+        <div class="status-pill" id="admin-session-chip">Checking session</div>
+        <button class="button button-muted" id="refresh-button" type="button">Refresh</button>
+        <button class="button button-muted" id="logout-button" type="button" hidden>Sign Out</button>
       </div>
     </header>
 
-    <main class="layout">
-      <section class="panel auth-panel" id="admin-auth-panel">
-        <div class="panel-header">
-          <div>
-            <p class="panel-kicker">Admin Login</p>
-            <h2>Google + Password</h2>
-          </div>
+    <main class="admin-shell">
+      <section class="auth-gate panel" id="admin-auth-panel">
+        <div class="auth-copy">
+          <p class="eyebrow">Admin Unlock</p>
+          <h2>Verified Operator Access</h2>
+          <p id="admin-auth-copy">Sign in with an authorized Google account first, then enter the server-side admin
+            password to unlock moderation controls.</p>
         </div>
-        <p class="panel-copy" id="admin-auth-copy">Sign in with an authorized Google account first, then enter the
-          server-side admin password to unlock moderation controls.</p>
-        <div class="admin-auth-stack">
-          <section class="auth-step-card">
-            <div class="auth-step-header">
-              <span class="auth-step-number">1</span>
+
+        <div class="auth-grid">
+          <section class="panel panel-soft auth-step">
+            <div class="auth-step-head">
+              <span class="step-index">01</span>
               <div>
                 <h3>Google Identity</h3>
                 <p id="admin-google-copy">Use one of the authorized Google emails for this app.</p>
@@ -59,15 +58,15 @@
             </div>
             <div class="google-slot is-pending" id="admin-google-button"></div>
             <div class="google-status" id="admin-google-status" aria-live="polite"></div>
-            <button class="ghost-button" id="google-signout-button" type="button" hidden>Sign Out Google</button>
+            <button class="button button-muted" id="google-signout-button" type="button" hidden>Sign Out Google</button>
           </section>
 
-          <section class="auth-step-card">
-            <div class="auth-step-header">
-              <span class="auth-step-number">2</span>
+          <section class="panel panel-soft auth-step">
+            <div class="auth-step-head">
+              <span class="step-index">02</span>
               <div>
                 <h3>Admin Password</h3>
-                <p>Only available after Google sign-in succeeds.</p>
+                <p>Available only after Google sign-in succeeds.</p>
               </div>
             </div>
             <form id="admin-login-form" class="stack">
@@ -76,42 +75,70 @@
                 <input id="admin-password" name="password" type="password" autocomplete="current-password"
                   placeholder="Admin password" required>
               </label>
-              <button class="primary-button" id="admin-password-submit" type="submit">Unlock Admin</button>
+              <button class="button button-primary" id="admin-password-submit" type="submit">Unlock Control Room</button>
             </form>
           </section>
         </div>
       </section>
 
       <section class="dashboard" id="admin-dashboard" hidden>
-        <section class="stat-grid" id="stats-grid">
-          <article class="panel stat-card">
-            <span class="stat-label">Users</span>
-            <strong class="stat-value" id="stat-users">0</strong>
-            <span class="stat-meta" id="stat-users-meta">No data yet</span>
+        <section class="hero-grid">
+          <article class="panel hero-card hero-card-primary">
+            <div class="hero-card-head">
+              <div>
+                <p class="eyebrow">Platform Snapshot</p>
+                <h2 id="hero-uptime-label">Service status</h2>
+              </div>
+              <div class="hero-badge" id="hero-users-total">0 users</div>
+            </div>
+            <p class="hero-copy" id="hero-summary-copy">Loading platform overview...</p>
+            <div class="metric-strip" id="platform-metrics-strip"></div>
           </article>
-          <article class="panel stat-card">
-            <span class="stat-label">Allowlist</span>
-            <strong class="stat-value" id="stat-allowlist">0</strong>
-            <span class="stat-meta" id="stat-allowlist-meta">Email approvals</span>
-          </article>
-          <article class="panel stat-card">
-            <span class="stat-label">Banned</span>
-            <strong class="stat-value" id="stat-banned">0</strong>
-            <span class="stat-meta" id="stat-banned-meta">Restricted accounts</span>
-          </article>
-          <article class="panel stat-card">
-            <span class="stat-label">Alerts</span>
-            <strong class="stat-value" id="stat-webhooks">0</strong>
-            <span class="stat-meta" id="stat-webhooks-meta">Webhook destinations</span>
+
+          <article class="panel hero-card hero-card-secondary">
+            <div class="hero-card-head">
+              <div>
+                <p class="eyebrow">Attention Queue</p>
+                <h2>Needs Operator Review</h2>
+              </div>
+            </div>
+            <div class="attention-list" id="attention-list"></div>
           </article>
         </section>
 
-        <section class="content-grid">
-          <section class="panel" id="settings-panel">
-            <div class="panel-header">
+        <section class="panel workspace-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Operator Workbench</p>
+              <h2>Users</h2>
+            </div>
+            <div class="toolbar">
+              <label class="inline-field search-field">
+                <span>Search</span>
+                <input id="user-search-input" type="search" placeholder="Email, name, zip, or note">
+              </label>
+              <label class="inline-field">
+                <span>Filter</span>
+                <select id="user-filter-select">
+                  <option value="all">All users</option>
+                  <option value="attention">Needs review</option>
+                  <option value="banned">Banned</option>
+                  <option value="unauthorized">Not allowlisted</option>
+                  <option value="scheduler">Scheduler enabled</option>
+                  <option value="new">Recently joined</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="user-list" id="user-list"></div>
+        </section>
+
+        <section class="operations-grid">
+          <section class="panel settings-panel">
+            <div class="section-head">
               <div>
-                <p class="panel-kicker">Access Control</p>
-                <h2>Admin Settings</h2>
+                <p class="eyebrow">Platform Controls</p>
+                <h2>Guardrails & Alerts</h2>
               </div>
             </div>
             <form id="admin-settings-form" class="stack">
@@ -126,62 +153,63 @@
                 <input id="alert-new-users" type="checkbox">
                 <span>
                   <strong>Alert on new users</strong>
-                  <small>Send a webhook event when someone joins for the first time.</small>
+                  <small>Webhook events fire when a new user joins.</small>
                 </span>
               </label>
               <label class="toggle-row">
                 <input id="alert-user-actions" type="checkbox">
                 <span>
                   <strong>Alert on user actions</strong>
-                  <small>Send alerts for sign-ins, settings changes, scheduler changes, and product actions.</small>
+                  <small>Capture sign-ins, product edits, scheduler changes, and moderation-sensitive activity.</small>
                 </span>
               </label>
               <label class="field">
                 <span>Admin alert webhooks</span>
-                <textarea id="admin-webhooks" rows="5"
-                  placeholder="One webhook URL per line"></textarea>
+                <textarea id="admin-webhooks" rows="5" placeholder="One webhook URL per line"></textarea>
               </label>
-              <button class="primary-button" type="submit">Save Settings</button>
+              <button class="button button-primary" type="submit">Save Platform Settings</button>
             </form>
           </section>
 
-          <section class="panel" id="allowlist-panel">
-            <div class="panel-header">
+          <section class="panel allowlist-panel">
+            <div class="section-head">
               <div>
-                <p class="panel-kicker">Authorized Emails</p>
-                <h2>Google Allowlist</h2>
+                <p class="eyebrow">Identity Directory</p>
+                <h2>Authorized Google Emails</h2>
               </div>
             </div>
-            <form id="authorized-email-form" class="stack compact-form">
+            <form id="authorized-email-form" class="stack">
               <label class="field">
                 <span>Email</span>
                 <input id="authorized-email-input" type="email" placeholder="name@example.com" required>
               </label>
               <label class="field">
                 <span>Note</span>
-                <input id="authorized-email-note" type="text" placeholder="Optional note">
+                <input id="authorized-email-note" type="text" placeholder="Owner, team, or reason">
               </label>
-              <button class="primary-button" type="submit">Add Email</button>
+              <button class="button button-primary" type="submit">Add Authorized Email</button>
             </form>
-            <div class="list-shell" id="authorized-email-list"></div>
+            <div class="allowlist-list" id="authorized-email-list"></div>
           </section>
         </section>
 
-        <section class="panel" id="users-panel">
-          <div class="panel-header">
+        <section class="panel events-panel">
+          <div class="section-head">
             <div>
-              <p class="panel-kicker">Moderation</p>
-              <h2>Users</h2>
-            </div>
-          </div>
-          <div class="user-list" id="user-list"></div>
-        </section>
-
-        <section class="panel" id="events-panel">
-          <div class="panel-header">
-            <div>
-              <p class="panel-kicker">Recent Activity</p>
+              <p class="eyebrow">Event Stream</p>
               <h2>Audit Feed</h2>
+            </div>
+            <div class="toolbar">
+              <label class="inline-field">
+                <span>Type</span>
+                <select id="event-filter-select">
+                  <option value="all">All events</option>
+                  <option value="denied">Login denials</option>
+                  <option value="admin">Admin actions</option>
+                  <option value="user">User actions</option>
+                  <option value="joins">New users</option>
+                </select>
+              </label>
             </div>
           </div>
           <div class="event-list" id="event-list"></div>
