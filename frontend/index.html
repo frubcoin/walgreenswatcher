@@ -5005,7 +5005,11 @@
       }
 
       body:not(.auth-gate-active) .results-map-sidebar {
-        height: 460px;
+        height: auto;
+      }
+
+      body:not(.auth-gate-active) .results-map-list {
+        overflow: visible;
       }
 
       body:not(.auth-gate-active) .results-map-card .leaflet-popup-content-wrapper {
@@ -8832,7 +8836,7 @@
           latitude: lat,
           longitude: lng
         },
-        { persist: false }
+        { persist: true }
       );
 
       if (latestRenderedResults && currentResultsView === 'map') {
@@ -8845,6 +8849,21 @@
     }
 
     async function focusSavedMapLocation() {
+      const existingReference = mapDistanceReference || loadStoredMapAddressReference();
+      if (existingReference && resultsMap) {
+        setMapDistanceReference(existingReference, { persist: false });
+        ensureUserLocationMarker(existingReference.latitude, existingReference.longitude);
+        resultsMap.setView([existingReference.latitude, existingReference.longitude], 14, { animate: true });
+        hideManualLocationFallback({ preserveQuery: true });
+        showToast(
+          existingReference.label === 'Current location'
+            ? 'Centered map on your saved location'
+            : `Centered map on ${existingReference.label || 'your saved address'}`,
+          'success'
+        );
+        return true;
+      }
+
       const savedReference = await ensureSavedMapAddressReference();
       if (!savedReference || !resultsMap) return false;
       ensureUserLocationMarker(savedReference.latitude, savedReference.longitude);
