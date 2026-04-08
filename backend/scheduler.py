@@ -158,8 +158,8 @@ class StockCheckScheduler:
         except (TypeError, ValueError) as exc:
             raise ValueError("Schedule interval must be a whole number of minutes") from exc
 
-        if value < 1:
-            raise ValueError("Schedule interval must be at least 1 minute")
+        if value < 30:
+            raise ValueError("Schedule interval must be at least 30 minutes")
         if value > 1440:
             raise ValueError("Schedule interval must be 1440 minutes or less")
         return value
