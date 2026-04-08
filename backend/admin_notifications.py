@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Union
 from urllib.parse import urlparse
 
@@ -62,7 +63,33 @@ class AdminAlertService:
             return 0x489CD4
         return 0xFB011C
 
-    def _send_discord_alert(self, destination_url: str, event: Dict[str, Any]) -> bool:
+    @staticmethod
+    def _delivery_result(url: str, *, delivered: bool, status_code: int | None = None, error: str = "") -> Dict[str, Any]:
+        return {
+            "url": url,
+            "delivered": bool(delivered),
+            "status_code": status_code,
+            "error": error,
+        }
+
+    @staticmethod
+    def _post_json(destination_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            response = requests.post(destination_url, json=payload, timeout=10)
+            delivered = 200 <= response.status_code < 300
+            error = ""
+            if not delivered:
+                error = (response.text or "").strip()[:400]
+            return AdminAlertService._delivery_result(
+                destination_url,
+                delivered=delivered,
+                status_code=response.status_code,
+                error=error,
+            )
+        except Exception as exc:
+            return AdminAlertService._delivery_result(destination_url, delivered=False, error=str(exc))
+
+    def _send_discord_alert(self, destination_url: str, event: Dict[str, Any]) -> Dict[str, Any]:
         actor = event.get("actor") or {}
         target = event.get("target") or {}
         metadata = event.get("metadata") or {}
@@ -90,26 +117,13 @@ class AdminAlertService:
                 }
             ]
         }
-        response = requests.post(destination_url, json=payload, timeout=10)
-        return 200 <= response.status_code < 300
+        return self._post_json(destination_url, payload)
 
-    @staticmethod
-    def _send_json_alert(destination_url: str, event: Dict[str, Any]) -> bool:
-        response = requests.post(destination_url, json=event, timeout=10)
-        return 200 <= response.status_code < 300
+    def _send_json_alert(self, destination_url: str, event: Dict[str, Any]) -> Dict[str, Any]:
+        return self._post_json(destination_url, event)
 
-    def notify(self, *, category: str, event: Dict[str, Any]) -> bool:
-        settings = self.db.get_admin_settings()
-        destinations = self.normalize_destinations(settings.get("admin_webhook_destinations"))
-        if not destinations:
-            return False
-
-        if category == "new_user" and not settings.get("alert_new_users", True):
-            return False
-        if category == "user_action" and not settings.get("alert_user_actions", True):
-            return False
-
-        payload = {
+    def _build_payload(self, *, category: str, event: Dict[str, Any]) -> Dict[str, Any]:
+        return {
             "category": category,
             "event_type": event.get("event_type"),
             "summary": event.get("summary"),
@@ -128,15 +142,71 @@ class AdminAlertService:
             "metadata": event.get("metadata") or {},
         }
 
-        success = False
+    def deliver_event(
+        self,
+        *,
+        category: str,
+        event: Dict[str, Any],
+        respect_preferences: bool = True,
+    ) -> Dict[str, Any]:
+        settings = self.db.get_admin_settings()
+        destinations = self.normalize_destinations(settings.get("admin_webhook_destinations"))
+        result: Dict[str, Any] = {
+            "category": category,
+            "attempted": 0,
+            "delivered": 0,
+            "destinations": [],
+            "skipped_reason": "",
+        }
+        if not destinations:
+            result["skipped_reason"] = "No admin webhook destinations configured"
+            return result
+
+        if respect_preferences and category == "new_user" and not settings.get("alert_new_users", True):
+            result["skipped_reason"] = "New user alerts are disabled"
+            return result
+        if respect_preferences and category == "user_action" and not settings.get("alert_user_actions", True):
+            result["skipped_reason"] = "User action alerts are disabled"
+            return result
+
+        payload = self._build_payload(category=category, event=event)
+        result["attempted"] = len(destinations)
+
         for destination in destinations:
             url = destination["url"]
             try:
                 if self._is_discord_webhook(url):
-                    delivered = self._send_discord_alert(url, payload)
+                    delivery = self._send_discord_alert(url, payload)
                 else:
-                    delivered = self._send_json_alert(url, payload)
-                success = success or delivered
+                    delivery = self._send_json_alert(url, payload)
             except Exception as exc:
                 logger.warning("Admin alert delivery failed for %s: %s", url, exc)
-        return success
+                delivery = self._delivery_result(url, delivered=False, error=str(exc))
+            result["destinations"].append(delivery)
+
+        result["delivered"] = sum(1 for item in result["destinations"] if item.get("delivered"))
+        return result
+
+    def notify(self, *, category: str, event: Dict[str, Any]) -> bool:
+        result = self.deliver_event(category=category, event=event, respect_preferences=True)
+        return bool(result.get("delivered"))
+
+    def send_test_alert(self, *, actor_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        actor_user = actor_user or {}
+        event = {
+            "event_type": "admin.webhook_test",
+            "summary": "Admin webhook test",
+            "created_at": datetime.utcnow().isoformat(),
+            "user_email": str(actor_user.get("email") or ""),
+            "actor_user_id": actor_user.get("id"),
+            "actor_name": actor_user.get("name"),
+            "actor_email": actor_user.get("email"),
+            "target_user_id": None,
+            "target_name": "",
+            "target_email": "",
+            "metadata": {
+                "source": "admin_panel",
+                "note": "Manual webhook test triggered from the admin panel",
+            },
+        }
+        return self.deliver_event(category="user_action", event=event, respect_preferences=False)

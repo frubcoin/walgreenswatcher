@@ -332,7 +332,7 @@ textarea {
 .settings-panel,
 .allowlist-panel,
 .events-panel {
-  padding: 22px;
+  padding: 24px;
 }
 
 .auth-copy h2 {
@@ -448,20 +448,27 @@ textarea {
 
 .stack {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .field,
 .inline-field,
 .reason-field {
   display: grid;
-  gap: 8px;
+  gap: 6px;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .field span,
 .inline-field span {
   color: var(--text-secondary);
   font-size: 13px;
+  line-height: 1.2;
 }
 
 input,
@@ -472,7 +479,7 @@ textarea {
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-primary);
-  padding: 10px 14px;
+  padding: 11px 14px;
 }
 
 input::placeholder,
@@ -514,6 +521,13 @@ textarea {
   justify-content: space-between;
   align-items: flex-start;
   gap: 14px;
+}
+
+.workspace-panel .section-head,
+.settings-panel .section-head,
+.allowlist-panel .section-head,
+.events-panel .section-head {
+  margin-bottom: 18px;
 }
 
 .hero-card h2,
@@ -569,7 +583,7 @@ textarea {
 .user-list,
 .event-list {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .attention-item,
@@ -605,23 +619,32 @@ textarea {
 }
 
 .toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  gap: 14px;
   align-items: end;
 }
 
 .inline-field {
-  min-width: 170px;
+  min-width: 0;
 }
 
 .search-field {
-  min-width: 280px;
+  min-width: 0;
+}
+
+.workspace-panel .toolbar {
+  grid-template-columns: minmax(280px, 1fr) minmax(180px, 210px);
+}
+
+.events-panel .toolbar {
+  grid-template-columns: minmax(180px, 220px);
+  justify-content: start;
 }
 
 .operations-grid {
   margin-top: 16px;
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.9fr);
+  align-items: start;
 }
 
 .toggle-row {
@@ -629,7 +652,7 @@ textarea {
   grid-template-columns: auto 1fr;
   align-items: flex-start;
   gap: 12px;
-  padding: 14px;
+  padding: 16px 18px;
 }
 
 .toggle-row input {
@@ -648,7 +671,7 @@ textarea {
 
 .toggle-row small {
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
   line-height: 1.5;
 }
 
@@ -657,6 +680,7 @@ textarea {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  padding: 14px 16px;
 }
 
 .allowlist-address {
@@ -670,7 +694,7 @@ textarea {
 
 .user-card {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .user-card.is-banned {
@@ -686,7 +710,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  gap: 18px;
 }
 
 .user-title {
@@ -703,6 +727,7 @@ textarea {
 .user-meta {
   color: var(--text-muted);
   font-size: 13px;
+  line-height: 1.35;
 }
 
 .tag-row,
@@ -710,6 +735,10 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.user-card .tag-row {
+  align-self: start;
 }
 
 .chip {
@@ -739,7 +768,7 @@ textarea {
 .user-stats {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .user-products-block {
@@ -782,7 +811,7 @@ textarea {
 }
 
 .user-stat {
-  padding: 12px;
+  padding: 13px 12px;
 }
 
 .user-stat strong {
@@ -809,7 +838,8 @@ textarea {
 
 .event-card {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  padding: 14px 16px;
 }
 
 .event-card-head {
@@ -894,6 +924,10 @@ textarea {
   .user-stats {
     grid-template-columns: 1fr 1fr;
   }
+
+  .workspace-panel .toolbar {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 860px) {
@@ -930,9 +964,13 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .toolbar,
+  .workspace-panel .toolbar,
+  .events-panel .toolbar,
   .search-field,
   .inline-field {
     min-width: 0;
     width: 100%;
+    grid-template-columns: 1fr;
   }
 }

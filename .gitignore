@@ -3,3 +3,6 @@
 /.playwright-cli
 __pycache__/
 *.py[cod]
+*.pyc
+*.pyc
+/backend/__pycache__

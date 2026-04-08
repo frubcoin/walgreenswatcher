@@ -1072,6 +1072,28 @@ def update_admin_settings():
     return jsonify({"settings": settings})
 
 
+@app.route("/api/admin/test-webhook", methods=["POST"])
+@require_admin
+def test_admin_webhook():
+    admin_user = _session_user()
+    result = admin_alerts.send_test_alert(actor_user=admin_user)
+    _record_audit_event(
+        "admin.webhook_tested",
+        "Admin webhook test triggered",
+        actor_user=admin_user,
+        metadata={
+            "attempted": result.get("attempted", 0),
+            "delivered": result.get("delivered", 0),
+            "skipped_reason": result.get("skipped_reason", ""),
+        },
+    )
+    if result.get("skipped_reason"):
+        return jsonify({"error": result["skipped_reason"], "result": result}), 400
+    if not result.get("delivered"):
+        return jsonify({"error": "Webhook test did not deliver to any destination", "result": result}), 502
+    return jsonify({"result": result})
+
+
 @app.route("/api/admin/authorized-emails", methods=["POST"])
 @require_admin
 def add_authorized_email():

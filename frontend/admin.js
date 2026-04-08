@@ -618,6 +618,29 @@ async function handleSettingsSave(event) {
   }
 }
 
+async function handleTestWebhook() {
+  const button = document.getElementById('test-webhook-button');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Sending...';
+  }
+
+  try {
+    const response = await apiRequest('/api/admin/test-webhook', 'POST', {});
+    const result = response?.result || {};
+    const delivered = Number(result.delivered || 0);
+    const attempted = Number(result.attempted || 0);
+    showBanner(`Webhook test delivered to ${delivered} of ${attempted} destination${attempted === 1 ? '' : 's'}`, 'success');
+  } catch (error) {
+    showBanner(error.message, 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Send Test Alert';
+    }
+  }
+}
+
 async function handleAuthorizedEmailAdd(event) {
   event.preventDefault();
   const emailInput = document.getElementById('authorized-email-input');
@@ -703,6 +726,7 @@ async function unbanUser(userId) {
 
 document.getElementById('admin-login-form').addEventListener('submit', handleAdminLogin);
 document.getElementById('admin-settings-form').addEventListener('submit', handleSettingsSave);
+document.getElementById('test-webhook-button').addEventListener('click', handleTestWebhook);
 document.getElementById('authorized-email-form').addEventListener('submit', handleAuthorizedEmailAdd);
 document.getElementById('logout-button').addEventListener('click', handleFullSignOut);
 document.getElementById('google-signout-button').addEventListener('click', handleFullSignOut);
