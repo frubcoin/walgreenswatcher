@@ -59,27 +59,83 @@ async function apiRequest(path, method = 'GET', body = null) {
   return payload;
 }
 
-function setSessionUi({ authenticated, configured }) {
+function setGoogleStatus(message, tone = 'info') {
+  const element = document.getElementById('admin-google-status');
+  element.textContent = message || '';
+  element.dataset.tone = tone;
+}
+
+function setSessionUi(session) {
   const authPanel = document.getElementById('admin-auth-panel');
   const dashboard = document.getElementById('admin-dashboard');
   const logoutButton = document.getElementById('logout-button');
   const sessionChip = document.getElementById('admin-session-chip');
   const authCopy = document.getElementById('admin-auth-copy');
+  const googleCard = document.getElementById('admin-google-user-card');
+  const googleName = document.getElementById('admin-google-user-name');
+  const googleEmail = document.getElementById('admin-google-user-email');
+  const googleCopy = document.getElementById('admin-google-copy');
+  const googleSignoutButton = document.getElementById('google-signout-button');
+  const passwordInput = document.getElementById('admin-password');
+  const passwordSubmit = document.getElementById('admin-password-submit');
 
-  if (!configured) {
+  if (!session.configured) {
     authPanel.hidden = false;
     dashboard.hidden = true;
     logoutButton.hidden = true;
     sessionChip.textContent = 'Admin password missing';
     authCopy.textContent = 'Set ADMIN_PANEL_PASSWORD on the backend before this panel can be used.';
+    googleCard.hidden = true;
+    googleSignoutButton.hidden = true;
+    passwordInput.disabled = true;
+    passwordSubmit.disabled = true;
+    setGoogleStatus('Admin password is not configured on the backend.', 'error');
     return;
   }
 
-  authPanel.hidden = authenticated;
-  dashboard.hidden = !authenticated;
-  logoutButton.hidden = !authenticated;
-  sessionChip.textContent = authenticated ? 'Admin session active' : 'Locked';
-  authCopy.textContent = 'Enter the server-side admin password to unlock moderation and access controls.';
+  const googleAuthenticated = Boolean(session.google_authenticated && session.user);
+  const passwordAuthenticated = Boolean(session.password_authenticated);
+  const fullyAuthenticated = Boolean(session.authenticated);
+
+  authPanel.hidden = fullyAuthenticated;
+  dashboard.hidden = !fullyAuthenticated;
+  logoutButton.hidden = !googleAuthenticated && !passwordAuthenticated;
+
+  if (fullyAuthenticated) {
+    sessionChip.textContent = `Admin unlocked | ${session.user.email}`;
+    authCopy.textContent = 'Admin access is active for this session.';
+    setGoogleStatus('Google verified and admin password accepted.', 'success');
+  } else if (googleAuthenticated) {
+    sessionChip.textContent = `Google verified | ${session.user.email}`;
+    authCopy.textContent = 'Google sign-in is complete. Enter the admin password to unlock the panel.';
+    setGoogleStatus('Google sign-in complete. Continue with the admin password.', 'success');
+  } else {
+    sessionChip.textContent = 'Locked';
+    authCopy.textContent = 'Sign in with an authorized Google account first, then enter the server-side admin password to unlock moderation controls.';
+    if (session.access_denied_reason) {
+      setGoogleStatus(session.access_denied_reason, 'error');
+    } else if (!session.google_client_id) {
+      setGoogleStatus('GOOGLE_CLIENT_ID is not configured on the backend.', 'error');
+    } else {
+      setGoogleStatus('Use one of the authorized Google emails for this app.', 'info');
+    }
+  }
+
+  if (googleAuthenticated) {
+    googleCard.hidden = false;
+    googleName.textContent = session.user.name || session.user.email;
+    googleEmail.textContent = session.user.email || '';
+    googleCopy.textContent = 'Your current Google session will be checked against the app allowlist.';
+  } else {
+    googleCard.hidden = true;
+    googleName.textContent = '';
+    googleEmail.textContent = '';
+    googleCopy.textContent = 'Use one of the authorized Google emails for this app.';
+  }
+
+  googleSignoutButton.hidden = !googleAuthenticated;
+  passwordInput.disabled = !googleAuthenticated;
+  passwordSubmit.disabled = !googleAuthenticated;
 }
 
 function renderStats(overview) {
@@ -205,12 +261,84 @@ function renderEvents(events) {
 }
 
 function renderOverview(overview) {
-  latestOverview = overview;
+  latestOverview = {
+    ...overview,
+    sessionState: latestOverview?.sessionState || null
+  };
   renderStats(overview);
   renderSettings(overview.settings || {});
   renderAuthorizedEmails(overview.authorized_google_emails || []);
   renderUsers(overview.users || []);
   renderEvents(overview.events || []);
+}
+
+async function waitForGoogleIdentity(timeoutMs = 10000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (window.google?.accounts?.id) {
+      return true;
+    }
+    await new Promise(resolve => window.setTimeout(resolve, 120));
+  }
+  return false;
+}
+
+async function renderGoogleSignInButton(clientId, { force = false } = {}) {
+  const container = document.getElementById('admin-google-button');
+  if (!container) return;
+
+  const session = latestOverview?.sessionState || null;
+  if (!clientId) {
+    container.innerHTML = '';
+    container.classList.remove('is-pending');
+    return;
+  }
+
+  if (session?.google_authenticated && !force) {
+    container.innerHTML = '';
+    container.classList.remove('is-pending');
+    return;
+  }
+
+  container.innerHTML = '';
+  container.classList.add('is-pending');
+
+  const googleReady = await waitForGoogleIdentity();
+  if (!googleReady) {
+    setGoogleStatus('Google sign-in did not finish loading. Refresh and try again.', 'error');
+    container.classList.remove('is-pending');
+    return;
+  }
+
+  window.google.accounts.id.initialize({
+    client_id: clientId,
+    callback: handleGoogleCredentialResponse,
+    auto_select: false
+  });
+  window.google.accounts.id.renderButton(container, {
+    theme: 'outline',
+    size: 'large',
+    shape: 'rectangular',
+    text: 'continue_with',
+    width: 320
+  });
+  container.classList.remove('is-pending');
+}
+
+async function handleGoogleCredentialResponse(response) {
+  if (!response?.credential) {
+    showBanner('Google sign-in did not return a usable credential.', 'error');
+    return;
+  }
+
+  try {
+    await apiRequest('/api/auth/google', 'POST', { credential: response.credential });
+    await refreshAdminSession({ loadOverviewIfUnlocked: false });
+    showBanner('Google sign-in complete. Enter the admin password to continue.', 'success');
+  } catch (error) {
+    showBanner(error.message, 'error');
+    setGoogleStatus(error.message, 'error');
+  }
 }
 
 async function loadAdminOverview(showSuccessBanner = false) {
@@ -221,13 +349,24 @@ async function loadAdminOverview(showSuccessBanner = false) {
   }
 }
 
+async function refreshAdminSession({ loadOverviewIfUnlocked = true } = {}) {
+  const session = await apiRequest('/api/admin/session');
+  latestOverview = { ...(latestOverview || {}), sessionState: session };
+  setSessionUi(session);
+  await renderGoogleSignInButton(session.google_client_id || '');
+
+  if (session.authenticated && loadOverviewIfUnlocked) {
+    await loadAdminOverview();
+  } else if (!session.authenticated) {
+    document.getElementById('admin-dashboard').hidden = true;
+  }
+
+  return session;
+}
+
 async function initializeAdminPage() {
   try {
-    const session = await apiRequest('/api/admin/session');
-    setSessionUi(session);
-    if (session.authenticated) {
-      await loadAdminOverview();
-    }
+    await refreshAdminSession();
   } catch (error) {
     showBanner(error.message, 'error');
   }
@@ -240,6 +379,7 @@ async function handleAdminLogin(event) {
   try {
     const session = await apiRequest('/api/admin/login', 'POST', { password });
     document.getElementById('admin-password').value = '';
+    latestOverview = { ...(latestOverview || {}), sessionState: session };
     setSessionUi(session);
     await loadAdminOverview();
     showBanner('Admin session unlocked', 'success');
@@ -248,17 +388,25 @@ async function handleAdminLogin(event) {
   }
 }
 
-async function handleAdminLogout() {
+async function handleFullSignOut() {
   try {
     await apiRequest('/api/admin/logout', 'POST', {});
-    setSessionUi({ authenticated: false, configured: true });
-    latestOverview = null;
-    document.getElementById('admin-dashboard').hidden = true;
-    document.getElementById('admin-auth-panel').hidden = false;
-    showBanner('Admin session cleared', 'success');
   } catch (error) {
-    showBanner(error.message, 'error');
   }
+
+  try {
+    await apiRequest('/api/auth/logout', 'POST', {});
+  } catch (error) {
+  }
+
+  if (window.google?.accounts?.id?.disableAutoSelect) {
+    window.google.accounts.id.disableAutoSelect();
+  }
+
+  latestOverview = null;
+  document.getElementById('admin-password').value = '';
+  await refreshAdminSession({ loadOverviewIfUnlocked: false });
+  showBanner('Signed out of the admin session', 'success');
 }
 
 function webhookTextareaToDestinations() {
@@ -339,8 +487,15 @@ async function unbanUser(userId) {
 document.getElementById('admin-login-form').addEventListener('submit', handleAdminLogin);
 document.getElementById('admin-settings-form').addEventListener('submit', handleSettingsSave);
 document.getElementById('authorized-email-form').addEventListener('submit', handleAuthorizedEmailAdd);
-document.getElementById('logout-button').addEventListener('click', handleAdminLogout);
-document.getElementById('refresh-button').addEventListener('click', () => loadAdminOverview(true).catch(error => {
+document.getElementById('logout-button').addEventListener('click', handleFullSignOut);
+document.getElementById('google-signout-button').addEventListener('click', handleFullSignOut);
+document.getElementById('refresh-button').addEventListener('click', () => refreshAdminSession().then(() => {
+  if (latestOverview?.sessionState?.authenticated) {
+    showBanner('Admin data refreshed', 'success');
+  } else {
+    showBanner('Admin session refreshed', 'success');
+  }
+}).catch(error => {
   showBanner(error.message, 'error');
 }));
 

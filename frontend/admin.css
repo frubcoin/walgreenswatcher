@@ -199,6 +199,96 @@ textarea {
   gap: 14px;
 }
 
+.admin-auth-stack {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.auth-step-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.auth-step-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.auth-step-header h3 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.auth-step-header p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+
+.auth-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #ffd8ca;
+  font-family: "Space Mono", monospace;
+  font-size: 13px;
+}
+
+.signed-in-card {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(130, 205, 169, 0.08);
+  border: 1px solid rgba(130, 205, 169, 0.16);
+}
+
+.signed-in-label,
+.google-status {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.signed-in-name {
+  font-size: 20px;
+  color: var(--text);
+}
+
+.signed-in-email {
+  color: var(--text-soft);
+}
+
+.google-slot {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.google-slot.is-pending {
+  opacity: 0.85;
+}
+
+.google-status[data-tone="error"] {
+  color: #ffd1ca;
+}
+
+.google-status[data-tone="success"] {
+  color: #d6f6e3;
+}
+
+.google-status[data-tone="info"] {
+  color: var(--text-soft);
+}
+
 .compact-form {
   grid-template-columns: 1.3fr 1fr auto;
   align-items: end;
@@ -461,7 +551,8 @@ textarea {
   .stat-grid,
   .content-grid,
   .user-grid,
-  .compact-form {
+  .compact-form,
+  .admin-auth-stack {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -498,7 +589,8 @@ textarea {
   .stat-grid,
   .content-grid,
   .user-grid,
-  .compact-form {
+  .compact-form,
+  .admin-auth-stack {
     grid-template-columns: 1fr;
   }
 

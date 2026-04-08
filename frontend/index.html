@@ -2228,83 +2228,87 @@
       position: relative;
     }
 
-    .map-locate-btn {
+    .map-utility-controls {
       position: absolute;
-      bottom: 20px;
       right: 20px;
+      bottom: 20px;
       z-index: 1000;
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 999px;
+      background: rgba(27, 31, 36, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+
+    .map-utility-btn {
+      appearance: none;
       width: 44px;
       height: 44px;
-      border-radius: 50%;
-      background: rgba(30, 34, 40, 0.88);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      display: flex;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-secondary);
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-      backdrop-filter: blur(8px);
-      transition: all 0.2s ease;
       padding: 0;
-    }
-
-    .map-search-toggle-btn {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      z-index: 1000;
-      min-height: 40px;
-      padding: 10px 14px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(30, 34, 40, 0.88);
-      color: var(--text-primary);
-      font-family: 'Space Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-      backdrop-filter: blur(8px);
-      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+      transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
     }
 
-    .map-search-toggle-btn:hover,
-    .map-search-toggle-btn:focus-visible {
-      background: rgba(40, 45, 50, 0.96);
-      border-color: var(--accent-soft-border);
-      transform: translateY(-1px);
+    .map-utility-btn:hover,
+    .map-utility-btn:focus-visible {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
       outline: none;
     }
 
-    .map-search-toggle-btn.is-active {
+    .map-utility-btn.is-active {
       background: var(--accent);
-      border-color: rgba(255, 255, 255, 0.16);
       color: var(--accent-contrast);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
     }
 
-    .map-locate-btn:hover {
-      background: var(--accent);
-      border-color: var(--accent-soft-border);
-      transform: scale(1.05);
-      box-shadow: 0 0 15px var(--accent-ring);
-    }
-
-    .map-locate-btn:active {
+    .map-utility-btn:active {
       transform: scale(0.95);
     }
 
-    .map-locate-btn img {
+    .map-utility-icon {
       width: 22px;
       height: 22px;
-      filter: invert(1) brightness(2);
-      /* Make the black icon white */
+      background: currentColor;
+      flex-shrink: 0;
+      -webkit-mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      -webkit-mask-size: contain;
+      mask-repeat: no-repeat;
+      mask-position: center;
+      mask-size: contain;
+    }
+
+    .map-utility-icon-location {
+      -webkit-mask-image: url('/location.svg');
+      mask-image: url('/location.svg');
+    }
+
+    .map-utility-icon-add-location {
+      -webkit-mask-image: url('/add_location.svg');
+      mask-image: url('/add_location.svg');
+    }
+
+    .map-locate-btn,
+    .map-search-toggle-btn {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      min-height: 0;
     }
 
     .map-location-search {
       position: absolute;
-      top: 70px;
-      left: 20px;
+      right: 20px;
+      bottom: 76px;
       z-index: 1000;
       width: min(360px, calc(100% - 40px));
       padding: 14px;
@@ -2763,17 +2767,20 @@
       color: var(--theme-icon-hover-color);
     }
 
-    .results-map-card[data-map-theme="light"] .map-search-toggle-btn {
+    .results-map-card[data-map-theme="light"] .map-utility-controls {
       background: rgba(248, 251, 253, 0.94);
       border-color: rgba(62, 81, 98, 0.18);
-      color: #15212c;
       box-shadow: 0 10px 24px rgba(14, 29, 41, 0.16);
     }
 
-    .results-map-card[data-map-theme="light"] .map-search-toggle-btn:hover,
-    .results-map-card[data-map-theme="light"] .map-search-toggle-btn:focus-visible {
-      background: #ffffff;
-      border-color: rgba(72, 156, 212, 0.4);
+    .results-map-card[data-map-theme="light"] .map-utility-btn {
+      color: #42515f;
+    }
+
+    .results-map-card[data-map-theme="light"] .map-utility-btn:hover,
+    .results-map-card[data-map-theme="light"] .map-utility-btn:focus-visible {
+      background: rgba(62, 81, 98, 0.08);
+      color: #15212c;
     }
 
     .results-map-card[data-map-theme="light"] .map-search-toggle-btn.is-active {
@@ -3524,16 +3531,11 @@
 
       .map-location-search {
         width: min(360px, calc(100% - 32px));
-        top: 68px;
-        left: 16px;
+        right: 16px;
+        bottom: 68px;
       }
 
-      .map-search-toggle-btn {
-        top: 16px;
-        left: 16px;
-      }
-
-      .map-locate-btn {
+      .map-utility-controls {
         right: 16px;
         bottom: 16px;
       }
@@ -3656,8 +3658,8 @@
 
       .map-location-search {
         width: calc(100% - 24px);
-        top: 60px;
-        left: 12px;
+        right: 12px;
+        bottom: 64px;
         padding: 12px;
       }
 
@@ -3669,12 +3671,7 @@
         width: 100%;
       }
 
-      .map-search-toggle-btn {
-        top: 12px;
-        left: 12px;
-      }
-
-      .map-locate-btn {
+      .map-utility-controls {
         right: 12px;
         bottom: 12px;
       }
@@ -6172,9 +6169,22 @@
       }
 
       updateAuthStatus('Verifying Google sign-in...');
-      const result = await apiCall('/api/auth/google', 'POST', { credential: response.credential }, { allowUnauthorized: true });
-      if (!result || !result.authenticated) {
-        updateAuthStatus('Google sign-in failed. Check your backend Google client ID and allowed origins.');
+      let result = null;
+      try {
+        const authResponse = await fetch(apiUrl('/api/auth/google'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential })
+        });
+        result = await authResponse.json();
+        if (!authResponse.ok || !result?.authenticated) {
+          const message = result?.error || 'Google sign-in failed. Check your backend Google client ID and allowed origins.';
+          updateAuthStatus(message);
+          return;
+        }
+      } catch (error) {
+        updateAuthStatus('Google sign-in failed. Check your connection and try again.');
         return;
       }
 
@@ -6202,6 +6212,9 @@
           }
         } else {
           updateAuthStatus('');
+        }
+        if (payload?.access_denied_reason) {
+          updateAuthStatus(payload.access_denied_reason);
         }
         return false;
       }
@@ -7269,15 +7282,6 @@
               <div class="results-map-shell">
                 <div class="results-map-card">
                   <div class="results-map-canvas" id="results-map"></div>
-                  <button
-                    class="map-search-toggle-btn ${manualLocationFallbackVisible ? 'is-active' : ''}"
-                    id="map-location-search-toggle"
-                    type="button"
-                    data-action="${manualLocationFallbackVisible ? 'hide-manual-location-fallback' : 'show-manual-location-fallback'}"
-                    aria-controls="map-location-search"
-                    aria-expanded="${manualLocationFallbackVisible ? 'true' : 'false'}">
-                    Search address
-                  </button>
                   <div class="map-location-search" id="map-location-search" ${manualLocationFallbackVisible ? '' : 'hidden'}>
                     <div class="map-location-search-head">
                       <div class="map-location-search-title">Manual Location</div>
@@ -7300,9 +7304,27 @@
                       ${renderManualLocationSuggestionsHtml()}
                     </div>
                   </div>
-                  <button class="map-locate-btn" type="button" data-action="show-my-location" title="Show my location">
-                    <img src="/location.svg" alt="Locate me">
-                  </button>
+                  <div class="map-utility-controls" aria-label="Map controls">
+                    <button
+                      class="map-utility-btn map-search-toggle-btn ${manualLocationFallbackVisible ? 'is-active' : ''}"
+                      id="map-location-search-toggle"
+                      type="button"
+                      data-action="${manualLocationFallbackVisible ? 'hide-manual-location-fallback' : 'show-manual-location-fallback'}"
+                      aria-label="Search address"
+                      title="Search address"
+                      aria-controls="map-location-search"
+                      aria-expanded="${manualLocationFallbackVisible ? 'true' : 'false'}">
+                      <span class="map-utility-icon map-utility-icon-add-location" aria-hidden="true"></span>
+                    </button>
+                    <button
+                      class="map-utility-btn map-locate-btn"
+                      type="button"
+                      data-action="show-my-location"
+                      aria-label="Show my location"
+                      title="Show my location">
+                      <span class="map-utility-icon map-utility-icon-location" aria-hidden="true"></span>
+                    </button>
+                  </div>
                 </div>
                 <aside class="results-map-sidebar">
                   <div class="results-map-sidebar-head">

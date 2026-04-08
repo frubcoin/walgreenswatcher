@@ -229,10 +229,24 @@ def _admin_panel_configured() -> bool:
 
 def _access_denied_reason_for_user(user: Dict[str, Any]) -> Optional[str]:
     if bool(user.get("is_banned")):
-        return "Your account has been banned"
+        ban_reason = str(user.get("ban_reason") or "").strip()
+        if ban_reason:
+            return f"Your account has been banned. Reason: {ban_reason}"
+        return "Your account has been banned."
     if not db.is_google_email_authorized(str(user.get("email") or "")):
         return "Your Google account is not authorized for this app"
     return None
+
+
+def _serialized_user(user: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not user:
+        return None
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user["name"],
+        "picture": user.get("picture", ""),
+    }
 
 
 def _record_audit_event(
@@ -271,6 +285,7 @@ def require_auth(func):
         access_denied_reason = _access_denied_reason_for_user(user)
         if access_denied_reason:
             _clear_user_session()
+            _clear_admin_session()
             return jsonify({"error": access_denied_reason}), 403
         return func(user, *args, **kwargs)
 
@@ -282,6 +297,15 @@ def require_admin(func):
     def wrapper(*args, **kwargs):
         if not _admin_panel_configured():
             return jsonify({"error": "Admin panel password is not configured"}), 503
+        user = _session_user()
+        if user is None:
+            _clear_admin_session()
+            return jsonify({"error": "Google sign-in required for admin access"}), 401
+        access_denied_reason = _access_denied_reason_for_user(user)
+        if access_denied_reason:
+            _clear_user_session()
+            _clear_admin_session()
+            return jsonify({"error": access_denied_reason}), 403
         if not _session_admin_authenticated():
             return jsonify({"error": "Admin authentication required"}), 401
         return func(*args, **kwargs)
@@ -312,6 +336,7 @@ def _public_auth_payload(user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     access_denied_reason = _access_denied_reason_for_user(user) if user else None
     if user and access_denied_reason:
         _clear_user_session()
+        _clear_admin_session()
         user = None
 
     admin_settings = db.get_admin_settings()
@@ -321,23 +346,28 @@ def _public_auth_payload(user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "google_allowlist_enabled": bool(admin_settings.get("google_allowlist_enabled")),
         "admin_panel_configured": _admin_panel_configured(),
         "access_denied_reason": access_denied_reason or "",
-        "user": (
-            {
-                "id": user["id"],
-                "email": user["email"],
-                "name": user["name"],
-                "picture": user.get("picture", ""),
-            }
-            if user
-            else None
-        ),
+        "user": _serialized_user(user),
     }
 
 
 def _public_admin_payload() -> Dict[str, Any]:
+    user = _session_user()
+    if user is None:
+        _clear_admin_session()
+    access_denied_reason = _access_denied_reason_for_user(user) if user else None
+    if user and access_denied_reason:
+        _clear_user_session()
+        _clear_admin_session()
+        user = None
+
     return {
-        "authenticated": _session_admin_authenticated(),
+        "authenticated": bool(user) and _session_admin_authenticated(),
         "configured": _admin_panel_configured(),
+        "google_authenticated": bool(user),
+        "password_authenticated": bool(user) and _session_admin_authenticated(),
+        "google_client_id": GOOGLE_CLIENT_ID or "",
+        "access_denied_reason": access_denied_reason or "",
+        "user": _serialized_user(user),
     }
 
 
@@ -462,6 +492,7 @@ def google_sign_in():
             alert_category="user_action",
         )
         _clear_user_session()
+        _clear_admin_session()
         return jsonify({"error": access_denied_reason}), 403
 
     was_admin_authenticated = _session_admin_authenticated()
@@ -497,6 +528,7 @@ def logout():
             alert_category="user_action",
         )
     _clear_user_session()
+    _clear_admin_session()
     return jsonify({"success": True})
 
 
@@ -510,32 +542,40 @@ def admin_login():
     if not _admin_panel_configured():
         return jsonify({"error": "Admin panel password is not configured"}), 503
 
+    user = _session_user()
+    if user is None:
+        _clear_admin_session()
+        return jsonify({"error": "Google sign-in required before unlocking admin"}), 401
+
+    access_denied_reason = _access_denied_reason_for_user(user)
+    if access_denied_reason:
+        _clear_user_session()
+        _clear_admin_session()
+        return jsonify({"error": access_denied_reason}), 403
+
     data = request.json or {}
     password = str(data.get("password") or "")
     if not secrets.compare_digest(password, ADMIN_PANEL_PASSWORD):
         return jsonify({"error": "Invalid admin password"}), 401
 
-    user_id = session.get("user_id")
-    session.clear()
-    session.permanent = True
-    if user_id:
-        session["user_id"] = int(user_id)
     session[ADMIN_SESSION_KEY] = True
     _record_audit_event(
         "admin.login",
-        "Admin panel login succeeded",
-        user_email="admin",
+        f"Admin panel unlocked by {user['email']}",
+        actor_user=user,
     )
     return jsonify(_public_admin_payload())
 
 
 @app.route("/api/admin/logout", methods=["POST"])
 def admin_logout():
+    user = _session_user()
     if _session_admin_authenticated():
         _record_audit_event(
             "admin.logout",
-            "Admin panel logout",
-            user_email="admin",
+            f"Admin panel locked by {(user or {}).get('email') or 'unknown user'}",
+            actor_user=user,
+            user_email=str((user or {}).get("email") or ""),
         )
     _clear_admin_session()
     return jsonify({"success": True})
@@ -868,6 +908,7 @@ def get_admin_overview():
 @app.route("/api/admin/settings", methods=["POST"])
 @require_admin
 def update_admin_settings():
+    admin_user = _session_user()
     data = request.json or {}
     updates: Dict[str, Any] = {}
 
@@ -894,7 +935,7 @@ def update_admin_settings():
     _record_audit_event(
         "admin.settings_updated",
         "Admin settings updated",
-        user_email="admin",
+        actor_user=admin_user,
         metadata={
             "google_allowlist_enabled": settings.get("google_allowlist_enabled"),
             "webhook_count": len(settings.get("admin_webhook_destinations") or []),
@@ -908,6 +949,7 @@ def update_admin_settings():
 @app.route("/api/admin/authorized-emails", methods=["POST"])
 @require_admin
 def add_authorized_email():
+    admin_user = _session_user()
     data = request.json or {}
     email = str(data.get("email") or "").strip()
     note = str(data.get("note") or "").strip()
@@ -922,7 +964,7 @@ def add_authorized_email():
     _record_audit_event(
         "admin.authorized_email_added",
         f"Authorized Google email added: {entry['email']}",
-        user_email="admin",
+        actor_user=admin_user,
         metadata={"email": entry["email"], "note": entry.get("note", "")},
     )
     return jsonify(
@@ -936,6 +978,7 @@ def add_authorized_email():
 @app.route("/api/admin/authorized-emails/remove", methods=["POST"])
 @require_admin
 def remove_authorized_email():
+    admin_user = _session_user()
     data = request.json or {}
     email = str(data.get("email") or "").strip()
     if not email:
@@ -948,7 +991,7 @@ def remove_authorized_email():
     _record_audit_event(
         "admin.authorized_email_removed",
         f"Authorized Google email removed: {email.strip().lower()}",
-        user_email="admin",
+        actor_user=admin_user,
         metadata={"email": email.strip().lower()},
     )
     return jsonify({"authorized_google_emails": db.list_authorized_google_emails()})
@@ -957,6 +1000,7 @@ def remove_authorized_email():
 @app.route("/api/admin/users/<int:user_id>/ban", methods=["POST"])
 @require_admin
 def ban_user(user_id: int):
+    admin_user = _session_user()
     target_user = db.get_user_by_id(user_id)
     if target_user is None:
         return jsonify({"error": "User not found"}), 404
@@ -972,8 +1016,8 @@ def ban_user(user_id: int):
     _record_audit_event(
         "admin.user_banned",
         f"User banned: {updated_user['email']}",
+        actor_user=admin_user,
         target_user=updated_user,
-        user_email="admin",
         metadata={"reason": reason},
     )
     return jsonify({"user": updated_user, "users": db.list_users_for_admin()})
@@ -982,6 +1026,7 @@ def ban_user(user_id: int):
 @app.route("/api/admin/users/<int:user_id>/unban", methods=["POST"])
 @require_admin
 def unban_user(user_id: int):
+    admin_user = _session_user()
     target_user = db.get_user_by_id(user_id)
     if target_user is None:
         return jsonify({"error": "User not found"}), 404
@@ -993,8 +1038,8 @@ def unban_user(user_id: int):
     _record_audit_event(
         "admin.user_unbanned",
         f"User unbanned: {updated_user['email']}",
+        actor_user=admin_user,
         target_user=updated_user,
-        user_email="admin",
     )
     return jsonify({"user": updated_user, "users": db.list_users_for_admin()})
 

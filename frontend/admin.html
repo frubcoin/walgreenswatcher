@@ -13,6 +13,7 @@
     rel="stylesheet">
   <link rel="stylesheet" href="/admin.css">
   <script src="/runtime-config.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="/admin.js" defer></script>
 </head>
 
@@ -37,19 +38,48 @@
         <div class="panel-header">
           <div>
             <p class="panel-kicker">Admin Login</p>
-            <h2>Password Required</h2>
+            <h2>Google + Password</h2>
           </div>
         </div>
-        <p class="panel-copy" id="admin-auth-copy">Enter the server-side admin password to unlock moderation and access
-          controls.</p>
-        <form id="admin-login-form" class="stack">
-          <label class="field">
-            <span>Password</span>
-            <input id="admin-password" name="password" type="password" autocomplete="current-password"
-              placeholder="Admin password" required>
-          </label>
-          <button class="primary-button" type="submit">Unlock Admin</button>
-        </form>
+        <p class="panel-copy" id="admin-auth-copy">Sign in with an authorized Google account first, then enter the
+          server-side admin password to unlock moderation controls.</p>
+        <div class="admin-auth-stack">
+          <section class="auth-step-card">
+            <div class="auth-step-header">
+              <span class="auth-step-number">1</span>
+              <div>
+                <h3>Google Identity</h3>
+                <p id="admin-google-copy">Use one of the authorized Google emails for this app.</p>
+              </div>
+            </div>
+            <div class="signed-in-card" id="admin-google-user-card" hidden>
+              <div class="signed-in-label">Signed in as</div>
+              <div class="signed-in-name" id="admin-google-user-name"></div>
+              <div class="signed-in-email" id="admin-google-user-email"></div>
+            </div>
+            <div class="google-slot is-pending" id="admin-google-button"></div>
+            <div class="google-status" id="admin-google-status" aria-live="polite"></div>
+            <button class="ghost-button" id="google-signout-button" type="button" hidden>Sign Out Google</button>
+          </section>
+
+          <section class="auth-step-card">
+            <div class="auth-step-header">
+              <span class="auth-step-number">2</span>
+              <div>
+                <h3>Admin Password</h3>
+                <p>Only available after Google sign-in succeeds.</p>
+              </div>
+            </div>
+            <form id="admin-login-form" class="stack">
+              <label class="field">
+                <span>Password</span>
+                <input id="admin-password" name="password" type="password" autocomplete="current-password"
+                  placeholder="Admin password" required>
+              </label>
+              <button class="primary-button" id="admin-password-submit" type="submit">Unlock Admin</button>
+            </form>
+          </section>
+        </div>
       </section>
 
       <section class="dashboard" id="admin-dashboard" hidden>
