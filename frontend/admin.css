@@ -223,6 +223,7 @@ button {
 .topbar-copy,
 .hero-copy,
 .auth-copy p,
+.section-copy,
 .field span,
 .inline-field span,
 .toggle-row small,
@@ -715,7 +716,8 @@ textarea {
 .workspace-panel .section-head,
 .settings-panel .section-head,
 .allowlist-panel .section-head,
-.events-panel .section-head {
+.events-panel .section-head,
+.trending-panel .section-head {
   margin-bottom: 18px;
 }
 
@@ -801,7 +803,8 @@ textarea {
 .attention-list,
 .allowlist-list,
 .user-list,
-.event-list {
+.event-list,
+.trending-admin-list {
   display: grid;
   gap: 14px;
 }
@@ -809,7 +812,8 @@ textarea {
 .attention-item,
 .allowlist-item,
 .user-card,
-.event-card {
+.event-card,
+.trending-admin-item {
   padding: 16px;
 }
 
@@ -848,6 +852,18 @@ textarea {
 
 .workspace-panel {
   margin-top: 16px;
+}
+
+.trending-panel {
+  margin-top: 16px;
+  padding: 24px;
+}
+
+.section-copy {
+  margin: 10px 0 0;
+  max-width: 760px;
+  font-size: 15px;
+  color: var(--text-secondary);
 }
 
 .toolbar {
@@ -913,6 +929,45 @@ textarea {
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
+}
+
+.trending-admin-item {
+  display: grid;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.trending-admin-item-head,
+.trending-admin-item-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.trending-admin-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.trending-admin-copy strong {
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.trending-admin-meta,
+.trending-admin-note {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.meta-divider {
+  margin-inline: 6px;
+  color: rgba(255, 255, 255, 0.28);
 }
 
 .allowlist-address {
@@ -1266,6 +1321,7 @@ textarea {
   .topbar,
   .auth-gate,
   .workspace-panel,
+  .trending-panel,
   .settings-panel,
   .allowlist-panel,
   .events-panel,
@@ -1278,6 +1334,8 @@ textarea {
   .hero-card-head,
   .section-head,
   .user-card-head,
+  .trending-admin-item-head,
+  .trending-admin-item-body,
   .allowlist-item,
   .event-card-head,
   .review-modal-head,

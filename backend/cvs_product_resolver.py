@@ -11,6 +11,10 @@ from urllib.parse import unquote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+try:
+    from curl_cffi import requests as curl_requests
+except ImportError:  # pragma: no cover - optional runtime dependency
+    curl_requests = None
 
 from config import USER_AGENTS
 
@@ -23,10 +27,17 @@ CVS_PRODUCT_IMAGE_PATH_PATTERN = re.compile(
 CVS_PRODUCT_TIMEOUT = (8, 15)
 CVS_BOOTSTRAP_TIMEOUT = (5, 8)
 CVS_RESOLVE_ATTEMPTS = 2
+CURL_IMPERSONATION_TARGET = "chrome"
 
 
 class CvsProductResolver:
     """Resolve CVS product URLs into a product id plus lightweight metadata."""
+
+    @staticmethod
+    def _new_session() -> requests.Session:
+        if curl_requests is not None:
+            return curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
+        return requests.Session()
 
     @staticmethod
     def _normalize_url(url: str) -> str:
@@ -81,7 +92,7 @@ class CvsProductResolver:
         accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
 
         for _ in range(CVS_RESOLVE_ATTEMPTS):
-            session = requests.Session()
+            session = cls._new_session()
             try:
                 bootstrap_headers = cls._request_headers(accept=accept)
                 for bootstrap_url in ("https://www.cvs.com/", product_link):

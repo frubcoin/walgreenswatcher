@@ -659,7 +659,7 @@ def _get_system_stats() -> Dict[str, Any]:
     }
 
 
-def _admin_overview_payload() -> Dict[str, Any]:
+def _admin_overview_payload(admin_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     settings = db.get_admin_settings()
     settings["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
         settings.get("admin_webhook_destinations")
@@ -669,11 +669,18 @@ def _admin_overview_payload() -> Dict[str, Any]:
     global_statistics = db.get_global_statistics()
     service_uptime = db.get_service_uptime_stats()
     system_stats = _get_system_stats()
+    trending_products = db.list_trending_products_for_admin(limit=48)
     return {
         "settings": settings,
         "authorized_google_emails": db.list_authorized_google_emails(),
         "users": users,
         "events": events,
+        "trending_products": {
+            "products": trending_products,
+            "count": len(trending_products),
+            "retention_hours": TRENDING_PRODUCTS_RETENTION_HOURS,
+            "viewer_user_id": int(admin_user["id"]) if admin_user else None,
+        },
         "platform": {
             "global_statistics": global_statistics,
             "service_uptime": service_uptime,
@@ -1241,7 +1248,44 @@ def update_product(user: Dict[str, Any]):
 @app.route("/api/admin/overview", methods=["GET"])
 @require_admin
 def get_admin_overview():
-    return jsonify(_admin_overview_payload())
+    return jsonify(_admin_overview_payload(_session_user()))
+
+
+@app.route("/api/admin/trending-products/remove", methods=["POST"])
+@require_admin
+def remove_trending_product_admin():
+    admin_user = _session_user()
+    data = request.json or {}
+    product_id = str(data.get("id") or "").strip()
+    retailer = str(data.get("retailer") or "").strip()
+    product_name = str(data.get("name") or "").strip()
+
+    if not product_id:
+        return jsonify({"error": "Product ID required"}), 400
+
+    removed_product = db.hide_trending_product(
+        product_id,
+        retailer,
+        hidden_by_user_id=int(admin_user["id"]) if admin_user else None,
+    )
+    if removed_product is None:
+        return jsonify({"error": "Trending product not found"}), 404
+
+    _record_audit_event(
+        "admin.trending_product_removed",
+        f"Trending product removed from admin radar: {product_name or removed_product['name']}",
+        actor_user=admin_user,
+        metadata={
+            "product_id": removed_product["id"],
+            "retailer": removed_product["retailer"],
+            "name": product_name or removed_product["name"],
+            "tracked_by_count": removed_product["tracked_by_count"],
+            "hidden_at": removed_product["hidden_at"],
+            "trending_only": True,
+        },
+        alert_category="user_action",
+    )
+    return jsonify({"product": removed_product})
 
 
 @app.route("/api/admin/settings", methods=["POST"])

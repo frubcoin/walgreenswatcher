@@ -65,6 +65,13 @@ function formatInterval(value) {
   return `Every ${minutes} min`;
 }
 
+function retailerLabel(retailer) {
+  const normalized = String(retailer || 'walgreens').trim().toLowerCase();
+  if (normalized === 'cvs') return 'CVS';
+  if (normalized === 'bestbuy') return 'Best Buy';
+  return 'Walgreens';
+}
+
 function showBanner(message, tone = 'info') {
   window.clearTimeout(bannerTimer);
   statusBanner.textContent = message;
@@ -636,6 +643,55 @@ function renderAuthorizedEmails(entries) {
   `).join('');
 }
 
+function renderTrendingProductsAdmin(trendingPayload) {
+  const container = document.getElementById('trending-admin-list');
+  const countBadge = document.getElementById('trending-admin-count');
+  const products = Array.isArray(trendingPayload?.products) ? trendingPayload.products : [];
+  const retentionHours = Math.max(1, Number(trendingPayload?.retention_hours || 24));
+
+  if (countBadge) {
+    countBadge.textContent = `${products.length} product${products.length === 1 ? '' : 's'}`;
+  }
+
+  if (!products.length) {
+    container.innerHTML = `<div class="empty-state">No trending products are currently visible in the last ${retentionHours} hours.</div>`;
+    return;
+  }
+
+  container.innerHTML = products.map(product => `
+    <article class="trending-admin-item">
+      <div class="trending-admin-item-head">
+        <div class="trending-admin-copy">
+          <strong>${escapeHtml(product.name || product.id || 'Product')}</strong>
+          <div class="trending-admin-meta">
+            ${escapeHtml(retailerLabel(product.retailer))}
+            <span class="meta-divider">|</span>
+            ${escapeHtml(String(product.id || 'Unknown ID'))}
+            ${product.product_id ? `<span class="meta-divider">|</span>${escapeHtml(product.product_id)}` : ''}
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="chip chip-warning">${escapeHtml(`${Number(product.tracked_by_count || 0)} watcher${Number(product.tracked_by_count || 0) === 1 ? '' : 's'}`)}</span>
+        </div>
+      </div>
+      <div class="trending-admin-item-body">
+        <div class="trending-admin-note">Last tracked ${escapeHtml(formatDateTime(product.last_tracked_at))}</div>
+        ${product.source_url ? `<a class="button button-muted button-compact" href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">Open link</a>` : ''}
+      </div>
+      <div class="action-row">
+        <button
+          class="button button-danger button-compact"
+          type="button"
+          data-action="delete-trending-product"
+          data-product-id="${escapeHtml(product.id || '')}"
+          data-retailer="${escapeHtml(product.retailer || 'walgreens')}"
+          data-name="${escapeHtml(product.name || product.id || 'Product')}"
+        >Delete from trending</button>
+      </div>
+    </article>
+  `).join('');
+}
+
 function filterUsers(users) {
   const search = state.userSearch.trim().toLowerCase();
   let filtered = users.slice();
@@ -792,6 +848,7 @@ function renderDashboard() {
   renderSettings(state.overview.settings || {});
   renderAuthorizedEmails(state.overview.authorized_google_emails || []);
   renderUsers(state.overview.users || []);
+  renderTrendingProductsAdmin(state.overview.trending_products || {});
   renderEvents(state.overview.events || []);
 }
 
@@ -1083,6 +1140,41 @@ async function stopUserScheduler(userId) {
   }
 }
 
+async function deleteTrendingProduct(actionElement) {
+  const productId = String(actionElement?.dataset.productId || '').trim();
+  const retailer = String(actionElement?.dataset.retailer || 'walgreens').trim();
+  const productName = String(actionElement?.dataset.name || productId).trim() || productId;
+
+  if (!productId) {
+    showBanner('Trending product ID missing', 'error');
+    return;
+  }
+
+  const confirmed = window.confirm(`Delete "${productName}" from the trending products list? This only hides it from Community Radar and does not remove it from user accounts.`);
+  if (!confirmed) {
+    return;
+  }
+
+  const originalLabel = actionElement.textContent;
+  actionElement.disabled = true;
+  actionElement.textContent = 'Deleting...';
+
+  try {
+    await apiRequest('/api/admin/trending-products/remove', 'POST', {
+      id: productId,
+      retailer,
+      name: productName
+    });
+    await loadAdminOverview();
+    showBanner('Trending product removed from admin panel', 'success');
+  } catch (error) {
+    showBanner(error.message, 'error');
+  } finally {
+    actionElement.disabled = false;
+    actionElement.textContent = originalLabel;
+  }
+}
+
 async function banUser(userId) {
   const reason = document.getElementById(`ban-reason-${userId}`)?.value.trim() || '';
   try {
@@ -1158,6 +1250,8 @@ document.addEventListener('click', event => {
     banUser(Number(actionElement.dataset.userId || 0));
   } else if (action === 'unban-user') {
     unbanUser(Number(actionElement.dataset.userId || 0));
+  } else if (action === 'delete-trending-product') {
+    deleteTrendingProduct(actionElement);
   }
 });
 

@@ -5,17 +5,22 @@ from __future__ import annotations
 import logging
 import random
 import re
-import time
 import secrets
+import time
 from typing import Any, Dict, Iterable, List
 
 import requests
+try:
+    from curl_cffi import requests as curl_requests
+except ImportError:  # pragma: no cover - optional runtime dependency
+    curl_requests = None
 
 from config import TARGET_ZIP_CODE, USER_AGENTS
 
 PROGRESS_UI_YIELD_SECONDS = 0.02
 
 logger = logging.getLogger(__name__)
+CURL_IMPERSONATION_TARGET = "chrome"
 
 
 class CvsStockChecker:
@@ -33,6 +38,12 @@ class CvsStockChecker:
     def _emit_progress(self, progress_info: Dict[str, Any]) -> None:
         if self.progress_callback:
             self.progress_callback(progress_info)
+
+    @staticmethod
+    def _new_session() -> requests.Session:
+        if curl_requests is not None:
+            return curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
+        return requests.Session()
 
     @staticmethod
     def _request_headers(*, referer: str, api_key: str = "") -> Dict[str, str]:
@@ -157,7 +168,7 @@ class CvsStockChecker:
         if not product_id:
             raise ValueError("CVS products require a numeric product id")
 
-        session = requests.Session()
+        session = self._new_session()
         referer, api_key = self._bootstrap_session(session, product)
         failures: List[str] = []
 
