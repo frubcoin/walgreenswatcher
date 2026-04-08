@@ -2785,6 +2785,18 @@
       border-bottom: 1px solid var(--border);
     }
 
+    .results-map-sidebar-head-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .results-map-sidebar-heading {
+      min-width: 0;
+      flex: 1;
+    }
+
     .results-map-sidebar-title {
       font-size: 13px;
       font-family: 'Space Mono', monospace;
@@ -2797,6 +2809,89 @@
       margin-top: 4px;
       font-size: 12px;
       color: var(--text-muted);
+    }
+
+    .results-map-filter-btn {
+      flex: 0 0 auto;
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    }
+
+    .results-map-filter-btn:hover,
+    .results-map-filter-btn:focus-visible {
+      outline: none;
+      color: var(--text-primary);
+      background: rgba(72, 156, 212, 0.14);
+      border-color: rgba(72, 156, 212, 0.36);
+      transform: translateY(-1px);
+    }
+
+    .results-map-filter-btn.is-active {
+      color: var(--text-primary);
+      background: rgba(72, 156, 212, 0.18);
+      border-color: rgba(72, 156, 212, 0.4);
+      box-shadow: inset 0 0 0 1px rgba(72, 156, 212, 0.16);
+    }
+
+    .results-map-filter-btn-icon {
+      width: 16px;
+      height: 16px;
+      display: inline-block;
+      background: currentColor;
+      -webkit-mask-image: url('/filter.svg');
+      mask-image: url('/filter.svg');
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-position: center;
+      -webkit-mask-size: contain;
+      mask-size: contain;
+    }
+
+    .results-map-filter-row {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .results-map-filter-label {
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+    }
+
+    .results-map-filter-select {
+      width: 100%;
+      min-width: 0;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      padding: 10px 12px;
+      font: inherit;
+    }
+
+    .results-map-filter-select:focus {
+      outline: none;
+      border-color: var(--accent-soft-border);
+      box-shadow: 0 0 0 3px rgba(72, 156, 212, 0.14);
+    }
+
+    .results-map-filter-summary {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.4px;
     }
 
     .results-map-note {
@@ -2868,6 +2963,19 @@
     .leaflet-container {
       background: #1f2327;
       font-family: 'Rajdhani', sans-serif;
+    }
+
+    .results-map-card .leaflet-control-attribution {
+      font-size: 9px;
+      line-height: 1.2;
+      padding: 2px 6px;
+      background: rgba(31, 35, 39, 0.72);
+      color: rgba(214, 220, 225, 0.78);
+      backdrop-filter: blur(6px);
+    }
+
+    .results-map-card .leaflet-control-attribution a {
+      color: rgba(152, 215, 255, 0.88);
     }
 
     .leaflet-popup-content-wrapper,
@@ -6098,6 +6206,8 @@
     let resultsMapResizeObserver = null;
     let activeResultsMapKey = null;
     let currentResultsMapTheme = loadStoredResultsMapTheme();
+    let currentResultsMapProductFilter = '';
+    let resultsMapProductFilterOpen = false;
     let manualLocationFallbackVisible = false;
     let mapDistanceReference = loadStoredMapAddressReference();
     let manualLocationQuery = loadStoredMapAddress();
@@ -9250,6 +9360,13 @@
         case 'focus-results-marker':
           focusResultsMapMarkerByElement(actionElement);
           return;
+        case 'toggle-results-map-product-filter':
+          resultsMapProductFilterOpen = !resultsMapProductFilterOpen;
+          if (latestRenderedResults && currentTab === 'results' && currentResultsView === 'map') {
+            const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
+            syncResultsMapSidebar(mapData);
+          }
+          return;
         case 'set-results-view':
           setResultsView(actionElement.dataset.resultsView || 'cards');
           return;
@@ -9409,10 +9526,20 @@
       }
     }
 
-    function renderResultsMap(locations = []) {
+    function renderResultsMap(locations = [], options = {}) {
+      const {
+        activeLocationKey = '',
+        centerOnReference = false,
+        preserveActiveSelection = true,
+        fallbackLocationKey = ''
+      } = options;
       const mapElement = document.getElementById('results-map');
       if (!mapElement || typeof L === 'undefined') return;
 
+      const preferredLocationKey = String(activeLocationKey || activeResultsMapKey || '').trim();
+      const preferredLocation = preferredLocationKey
+        ? locations.find(location => location.location_key === preferredLocationKey) || null
+        : null;
       destroyResultsMap();
 
       resultsMap = L.map(mapElement, {
@@ -9445,7 +9572,11 @@
         bounds.push([mapDistanceReference.latitude, mapDistanceReference.longitude]);
       }
 
-      if (mapDistanceReference) {
+      if (centerOnReference && mapDistanceReference) {
+        resultsMap.setView([mapDistanceReference.latitude, mapDistanceReference.longitude], 14);
+      } else if (preferredLocation) {
+        resultsMap.setView([preferredLocation.latitude, preferredLocation.longitude], 14);
+      } else if (mapDistanceReference) {
         resultsMap.setView([mapDistanceReference.latitude, mapDistanceReference.longitude], 14);
       } else if (locations.length) {
         resultsMap.setView([locations[0].latitude, locations[0].longitude], 14);
@@ -9459,12 +9590,131 @@
 
       observeResultsMapSize();
       scheduleResultsMapInvalidate({
-        preserveActive: true,
-        fallbackLocationKey: locations[0]?.location_key || ''
+        preserveActive: preserveActiveSelection,
+        fallbackLocationKey: preserveActiveSelection
+          ? (preferredLocation?.location_key || fallbackLocationKey || locations[0]?.location_key || '')
+          : ''
       });
     }
 
+    function rerenderResultsMapForFilteredLocations(locations = []) {
+      const previousActiveLocationKey = String(activeResultsMapKey || '').trim();
+      const hasActiveFilteredLocation = previousActiveLocationKey
+        ? locations.some(location => location.location_key === previousActiveLocationKey)
+        : false;
+      const centerOnReference = Boolean(previousActiveLocationKey) && !hasActiveFilteredLocation && Boolean(mapDistanceReference);
+      const preserveActiveSelection = hasActiveFilteredLocation;
+      const fallbackLocationKey = !previousActiveLocationKey && locations.length
+        ? locations[0].location_key
+        : '';
+
+      renderResultsMap(locations, {
+        activeLocationKey: previousActiveLocationKey,
+        centerOnReference,
+        preserveActiveSelection,
+        fallbackLocationKey
+      });
+    }
+
+    function getResultsMapProductOptions(locations = []) {
+      const seen = new Set();
+      const options = [];
+
+      locations.forEach(location => {
+        (location.products || []).forEach(product => {
+          const name = String(product?.name || '').trim();
+          if (!name || seen.has(name)) return;
+          seen.add(name);
+          options.push(name);
+        });
+      });
+
+      return options.sort((a, b) => a.localeCompare(b));
+    }
+
+    function getFilteredResultsMapLocations(locations = []) {
+      const options = getResultsMapProductOptions(locations);
+      if (currentResultsMapProductFilter && !options.includes(currentResultsMapProductFilter)) {
+        currentResultsMapProductFilter = '';
+      }
+
+      if (!currentResultsMapProductFilter) {
+        return locations;
+      }
+
+      return locations.filter(location =>
+        (location.products || []).some(product => String(product?.name || '').trim() === currentResultsMapProductFilter)
+      );
+    }
+
+    function renderResultsMapSidebarHead(locations = [], missingCoordinates = 0) {
+      const productOptions = getResultsMapProductOptions(locations);
+      const filteredLocations = getFilteredResultsMapLocations(locations);
+      const hasFilterControl = productOptions.length > 1;
+
+      if (!hasFilterControl) {
+        resultsMapProductFilterOpen = false;
+      }
+
+      const filterControlsHtml = hasFilterControl ? `
+        <button
+          class="results-map-filter-btn ${resultsMapProductFilterOpen ? 'is-active' : ''}"
+          type="button"
+          data-action="toggle-results-map-product-filter"
+          aria-label="Filter pinned stores by product"
+          title="Filter pinned stores by product"
+          aria-expanded="${resultsMapProductFilterOpen ? 'true' : 'false'}">
+          <span class="results-map-filter-btn-icon" aria-hidden="true"></span>
+        </button>
+      ` : '';
+
+      const filterPanelHtml = hasFilterControl && resultsMapProductFilterOpen ? `
+        <div class="results-map-filter-row">
+          <label class="results-map-filter-label" for="results-map-product-filter">Filter by product</label>
+          <select class="results-map-filter-select" id="results-map-product-filter">
+            <option value="">All products</option>
+            ${productOptions.map(productName => `
+              <option value="${escapeHtml(productName)}"${productName === currentResultsMapProductFilter ? ' selected' : ''}>${escapeHtml(productName)}</option>
+            `).join('')}
+          </select>
+          <div class="results-map-filter-summary">
+            Showing ${filteredLocations.length} of ${locations.length} pinned store${locations.length === 1 ? '' : 's'}${currentResultsMapProductFilter ? ` for ${escapeHtml(currentResultsMapProductFilter)}` : ''}.
+          </div>
+        </div>
+      ` : '';
+
+      return `
+        <div class="results-map-sidebar-head">
+          <div class="results-map-sidebar-head-top">
+            <div class="results-map-sidebar-heading">
+              <div class="results-map-sidebar-title">Pinned Store View</div>
+              <div class="results-map-sidebar-subtitle">Tap a store to jump the map and open its stock summary.</div>
+            </div>
+            ${filterControlsHtml}
+          </div>
+          ${filterPanelHtml}
+          ${missingCoordinates ? `<div class="results-map-note">${missingCoordinates} stocked store result${missingCoordinates === 1 ? '' : 's'} from older cache data could not be pinned yet.</div>` : ''}
+        </div>
+      `;
+    }
+
+    function getResultsMapSidebarHtml(mapData = { locations: [], missingCoordinates: 0 }) {
+      return `
+        ${renderResultsMapSidebarHead(mapData.locations || [], Number(mapData.missingCoordinates) || 0)}
+        ${renderResultsMapList(mapData.locations || [])}
+      `;
+    }
+
+    function syncResultsMapSidebar(mapData = { locations: [], missingCoordinates: 0 }) {
+      const sidebar = document.querySelector('#results-view-map .results-map-sidebar');
+      if (!sidebar) return;
+      sidebar.innerHTML = getResultsMapSidebarHtml(mapData);
+      setActiveResultsMapItem(activeResultsMapKey);
+    }
+
     function renderResultsMapList(locations = []) {
+      const filteredLocations = getFilteredResultsMapLocations(locations);
+
       if (!locations.length) {
         return `
             <div class="empty-state">
@@ -9474,9 +9724,18 @@
           `;
       }
 
+      if (!filteredLocations.length) {
+        return `
+            <div class="empty-state">
+              <div class="empty-title">No matching stores</div>
+              <div class="empty-text">No pinned stores in this scan currently show ${escapeHtml(currentResultsMapProductFilter)}.</div>
+            </div>
+          `;
+      }
+
       return `
           <div class="results-map-list">
-            ${locations.map((location, index) => `
+            ${filteredLocations.map((location, index) => `
               <button class="results-map-item ${activeResultsMapKey === location.location_key ? 'is-active' : ''}" type="button" data-action="focus-results-marker" data-location-key="${escapeHtml(location.location_key)}">
                 <div class="results-map-item-title">${escapeHtml(location.name)}</div>
                 <div class="results-map-item-address">${escapeHtml(location.address)}</div>
@@ -9496,6 +9755,7 @@
       const timestamp = data.timestamp || checkResult.timestamp;
       const productCount = Object.keys(products).length;
       const mapData = buildResultsMapLocations(products, mapDistanceReference);
+      const filteredMapLocations = getFilteredResultsMapLocations(mapData.locations);
 
       if (currentResultsView === 'map' && !mapData.locations.length) {
         currentResultsView = 'cards';
@@ -9576,21 +9836,14 @@
                     </button>
                   </div>
                 </div>
-                <aside class="results-map-sidebar">
-                  <div class="results-map-sidebar-head">
-                    <div class="results-map-sidebar-title">Pinned Store View</div>
-                    <div class="results-map-sidebar-subtitle">Tap a store to jump the map and open its stock summary.</div>
-                    ${mapData.missingCoordinates ? `<div class="results-map-note">${mapData.missingCoordinates} stocked store result${mapData.missingCoordinates === 1 ? '' : 's'} from older cache data could not be pinned yet.</div>` : ''}
-                  </div>
-                  ${renderResultsMapList(mapData.locations)}
-                </aside>
+                <aside class="results-map-sidebar">${getResultsMapSidebarHtml(mapData)}</aside>
               </div>
             </div>
           </div>
         `;
 
       if (currentResultsView === 'map' && mapData.locations.length) {
-        renderResultsMap(mapData.locations);
+        rerenderResultsMapForFilteredLocations(filteredMapLocations);
       } else {
         destroyResultsMap();
       }
@@ -10125,6 +10378,22 @@
       }
       if (event.target.id === 'onboarding-map-address') {
         queueOnboardingMapAddressAutocomplete(event.target.value);
+      }
+    });
+
+    document.addEventListener('change', event => {
+      if (!(event.target instanceof HTMLSelectElement)) return;
+      if (event.target.id !== 'results-map-product-filter') return;
+
+      currentResultsMapProductFilter = String(event.target.value || '').trim();
+      if (latestRenderedResults && currentTab === 'results') {
+        const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
+        const filteredLocations = getFilteredResultsMapLocations(mapData.locations);
+        syncResultsMapSidebar(mapData);
+
+        if (currentResultsView === 'map') {
+          rerenderResultsMapForFilteredLocations(filteredLocations);
+        }
       }
     });
 
