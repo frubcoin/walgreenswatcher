@@ -5346,7 +5346,11 @@
 
       body:not(.auth-gate-active) .results-map-card .leaflet-popup-content-wrapper {
         border-radius: 12px;
-        max-width: min(232px, calc(100vw - 72px));
+        max-width: min(228px, calc(100vw - 96px));
+      }
+
+      body:not(.auth-gate-active) .results-map-card .leaflet-popup {
+        margin-right: 12px;
       }
 
       body:not(.auth-gate-active) .results-map-card .leaflet-popup-content {
@@ -8737,6 +8741,18 @@
         && Boolean(window.matchMedia?.('(max-width: 640px)').matches);
     }
 
+    function getResultsMapPopupOptions() {
+      const isMobileViewport = Boolean(window.matchMedia?.('(max-width: 640px)').matches);
+      return {
+        autoPan: true,
+        keepInView: true,
+        minWidth: isMobileViewport ? 200 : 220,
+        maxWidth: isMobileViewport ? 252 : 280,
+        autoPanPaddingTopLeft: L.point(18, 18),
+        autoPanPaddingBottomRight: L.point(isMobileViewport ? 30 : 18, isMobileViewport ? 24 : 18)
+      };
+    }
+
     function scrollMobileResultsToMap() {
       if (!isMobileSignedInDashboard()) return;
 
@@ -9835,11 +9851,7 @@
           locationKey: location.location_key
         }).addTo(resultsMap);
 
-        marker.bindPopup(renderMapPopup(location), {
-          autoPan: false,
-          minWidth: 220,
-          maxWidth: 280
-        });
+        marker.bindPopup(renderMapPopup(location), getResultsMapPopupOptions());
         marker.on('click', () => setActiveResultsMapItem(location.location_key));
         marker.on('popupopen', () => setActiveResultsMapItem(location.location_key));
         bounds.push([location.latitude, location.longitude]);
