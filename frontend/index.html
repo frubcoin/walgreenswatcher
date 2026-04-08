@@ -782,6 +782,10 @@
       gap: 0;
     }
 
+    .auth-waitlist-card[hidden] {
+      display: none !important;
+    }
+
     .auth-waitlist-card .auth-actions {
       min-height: auto;
       margin-top: 18px;
@@ -789,12 +793,16 @@
     }
 
     .auth-waitlist-switch-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       min-width: min(100%, 320px);
       padding: 14px 22px;
       background:
         linear-gradient(180deg, rgba(55, 65, 76, 0.94), rgba(39, 47, 56, 0.94));
       color: rgba(239, 243, 246, 0.96);
       border: 1px solid rgba(72, 156, 212, 0.24);
+      text-align: center;
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.05),
         0 12px 28px rgba(0, 0, 0, 0.18);
