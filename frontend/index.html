@@ -9731,7 +9731,11 @@
           locationKey: location.location_key
         }).addTo(resultsMap);
 
-        marker.bindPopup(renderMapPopup(location));
+        marker.bindPopup(renderMapPopup(location), {
+          autoPan: false,
+          minWidth: 220,
+          maxWidth: 280
+        });
         marker.on('click', () => setActiveResultsMapItem(location.location_key));
         marker.on('popupopen', () => setActiveResultsMapItem(location.location_key));
         bounds.push([location.latitude, location.longitude]);
