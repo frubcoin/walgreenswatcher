@@ -709,10 +709,16 @@ class StockCheckScheduler:
             }
             for key, product in self.tracked_products.items()
         ]
+        next_run_time = None
+        if self.scheduler is not None:
+            job = self.scheduler.get_job(self._job_id)
+            if job is not None and getattr(job, "next_run_time", None) is not None:
+                next_run_time = job.next_run_time.isoformat()
 
         return {
             "is_running": self.is_running,
             "last_check": self.last_check_time.isoformat() if self.last_check_time else None,
+            "next_run_time": next_run_time,
             "last_products_found": self.last_products_with_stock,
             "check_interval_minutes": self.check_interval_minutes,
             "discord_configured": self.notifier.is_configured,

@@ -10165,6 +10165,18 @@
       }
 
       const intervalMinutes = Math.max(1, Number(status.check_interval_minutes || 0));
+      const nextRunTime = parseApiTimestamp(status.next_run_time);
+      if (nextRunTime) {
+        return {
+          value: formatLocalTime(nextRunTime.toISOString(), {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          }) || 'Queued',
+          detail: formatRelativeDuration(nextRunTime),
+        };
+      }
+
       const lastCheck = parseApiTimestamp(status.last_check);
       if (!lastCheck) {
         return {
