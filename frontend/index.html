@@ -2966,16 +2966,32 @@
     }
 
     .results-map-card .leaflet-control-attribution {
-      font-size: 9px;
-      line-height: 1.2;
-      padding: 2px 6px;
-      background: rgba(31, 35, 39, 0.72);
-      color: rgba(214, 220, 225, 0.78);
-      backdrop-filter: blur(6px);
+      font-size: 8px;
+      line-height: 1.15;
+      padding: 1px 5px;
+      background: rgba(16, 19, 23, 0.34);
+      color: rgba(214, 220, 225, 0.52);
+      backdrop-filter: blur(4px);
+      border-top-left-radius: 8px;
+      transition: background 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+      opacity: 0.72;
     }
 
     .results-map-card .leaflet-control-attribution a {
-      color: rgba(152, 215, 255, 0.88);
+      color: rgba(152, 215, 255, 0.62);
+      transition: color 0.18s ease;
+    }
+
+    .results-map-card .leaflet-control-attribution:hover,
+    .results-map-card .leaflet-control-attribution:focus-within {
+      background: rgba(16, 19, 23, 0.52);
+      color: rgba(214, 220, 225, 0.72);
+      opacity: 0.96;
+    }
+
+    .results-map-card .leaflet-control-attribution:hover a,
+    .results-map-card .leaflet-control-attribution:focus-within a {
+      color: rgba(152, 215, 255, 0.84);
     }
 
     .leaflet-popup-content-wrapper,
@@ -9687,7 +9703,7 @@
         <div class="results-map-sidebar-head">
           <div class="results-map-sidebar-head-top">
             <div class="results-map-sidebar-heading">
-              <div class="results-map-sidebar-title">Pinned Store View</div>
+              <div class="results-map-sidebar-title">Mapped Store List</div>
               <div class="results-map-sidebar-subtitle">Tap a store to jump the map and open its stock summary.</div>
             </div>
             ${filterControlsHtml}
