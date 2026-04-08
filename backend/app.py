@@ -553,8 +553,7 @@ def logout():
             user_email=user["email"],
             alert_category="user_action",
         )
-    _clear_user_session()
-    _clear_admin_session()
+    session.clear()
     return jsonify({"success": True})
 
 

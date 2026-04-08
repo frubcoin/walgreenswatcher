@@ -6230,6 +6230,9 @@
     }
 
     async function logoutUser() {
+      if (window.google?.accounts?.id?.disableAutoSelect) {
+        window.google.accounts.id.disableAutoSelect();
+      }
       await apiCall('/api/auth/logout', 'POST', {}, { allowUnauthorized: true, suppressAuthRedirect: true });
       currentUser = null;
       authState = null;
