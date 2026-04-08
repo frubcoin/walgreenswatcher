@@ -8727,11 +8727,19 @@
       });
     }
 
-    function focusResultsMapMarker(locationKey) {
+    function focusResultsMapMarker(locationKey, options = {}) {
       const marker = resultsMapMarkersByKey.get(locationKey);
       if (!resultsMap || !marker) return;
 
-      scrollMobileResultsToMap();
+      const {
+        animate = true,
+        scrollIntoView = true,
+        duration = 0.8
+      } = options;
+
+      if (scrollIntoView) {
+        scrollMobileResultsToMap();
+      }
       resultsMap.invalidateSize();
       const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
       const targetZoom = Math.max(currentZoom, 14);
@@ -8747,12 +8755,12 @@
       });
       if (typeof resultsMap.flyTo === 'function') {
         resultsMap.flyTo(focusTarget, targetZoom, {
-          animate: true,
-          duration: 0.8,
+          animate,
+          duration,
           easeLinearity: 0.25
         });
       } else {
-        resultsMap.setView(focusTarget, targetZoom, { animate: true });
+        resultsMap.setView(focusTarget, targetZoom, { animate });
       }
       setActiveResultsMapItem(locationKey);
     }
@@ -9783,15 +9791,17 @@
       }
 
       if (openFocusedLocation && preferredLocationKey) {
-        const focusedMarker = resultsMapMarkersByKey.get(preferredLocationKey);
-        if (focusedMarker) {
-          resultsMap.whenReady(() => {
+        resultsMap.whenReady(() => {
+          window.requestAnimationFrame(() => {
             window.requestAnimationFrame(() => {
-              setActiveResultsMapItem(selectedKey || preferredLocationKey);
-              focusedMarker.openPopup();
+              focusResultsMapMarker(preferredLocationKey, {
+                animate: false,
+                scrollIntoView: false,
+                duration: 0
+              });
             });
           });
-        }
+        });
       }
 
       observeResultsMapSize();
