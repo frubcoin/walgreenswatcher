@@ -8717,6 +8717,14 @@
       });
     }
 
+    function clearActiveResultsMapSelection({ closePopup = true } = {}) {
+      activeResultsMapKey = null;
+      setActiveResultsMapItem('');
+      if (closePopup && resultsMap?.closePopup) {
+        resultsMap.closePopup();
+      }
+    }
+
     function getInitialMapScrollTarget() {
       return document.querySelector('#results-view-map.active .results-map-shell')
         || document.querySelector('#panel-results .results-shell')
@@ -9732,6 +9740,8 @@
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
 
+      clearActiveResultsMapSelection();
+
       setMapDistanceReference(
         {
           label: 'Current location',
@@ -9753,6 +9763,7 @@
     async function focusSavedMapLocation() {
       const existingReference = mapDistanceReference || loadStoredMapAddressReference();
       if (existingReference && resultsMap) {
+        clearActiveResultsMapSelection();
         setMapDistanceReference(existingReference, { persist: false });
         ensureUserLocationMarker(existingReference.latitude, existingReference.longitude);
         resultsMap.setView([existingReference.latitude, existingReference.longitude], 14, { animate: true });
@@ -9768,6 +9779,7 @@
 
       const savedReference = await ensureSavedMapAddressReference();
       if (!savedReference || !resultsMap) return false;
+      clearActiveResultsMapSelection();
       ensureUserLocationMarker(savedReference.latitude, savedReference.longitude);
       resultsMap.setView([savedReference.latitude, savedReference.longitude], 14, { animate: true });
       hideManualLocationFallback({ preserveQuery: true });
