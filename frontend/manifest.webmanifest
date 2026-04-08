@@ -1,6 +1,6 @@
 {
-  "name": "Frub's Walgreens Watcher",
-  "short_name": "Watcher",
+  "name": "Frub's Walwatch",
+  "short_name": "Walwatch",
   "description": "Hosted Walgreens pickup inventory monitoring with per-user settings, Google sign-in, and Discord alerts.",
   "start_url": "/",
   "scope": "/",
