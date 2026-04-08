@@ -767,7 +767,7 @@
 
     .auth-actions {
       display: grid;
-      grid-template-columns: minmax(0, 340px);
+      grid-template-columns: minmax(0, 320px);
       grid-template-rows: var(--google-signin-slot-height) minmax(var(--install-button-height), auto);
       align-content: start;
       justify-items: start;
@@ -780,22 +780,22 @@
       position: relative;
       width: 100%;
       min-height: var(--google-signin-slot-height);
-      max-width: 340px;
+      max-width: 320px;
       display: flex;
       align-items: center;
       line-height: 0;
-      padding: 0 10px;
+      padding-left: 1px;
     }
 
     #google-signin-button:empty::before,
     #google-signin-button.is-pending::before {
       content: '';
       display: block;
-      width: calc(100% - 20px);
+      width: 100%;
       height: var(--google-signin-slot-height);
       box-sizing: border-box;
       position: absolute;
-      left: 10px;
+      left: 1px;
       top: 0;
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -848,9 +848,9 @@
       align-content: start;
       gap: var(--install-slot-gap);
       justify-items: start;
-      padding: 0 10px;
+      padding-left: 1px;
       min-height: calc(var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
-      max-width: 340px;
+      max-width: 320px;
     }
 
     .auth-install-slot .install-app-btn,
