@@ -792,7 +792,8 @@
       gap: 0;
     }
 
-    .auth-waitlist-switch-btn {
+    .auth-waitlist-switch-btn,
+    .auth-install-slot .install-app-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -809,7 +810,9 @@
     }
 
     .auth-waitlist-switch-btn:hover,
-    .auth-waitlist-switch-btn:focus-visible {
+    .auth-waitlist-switch-btn:focus-visible,
+    .auth-install-slot .install-app-btn:hover,
+    .auth-install-slot .install-app-btn:focus-visible {
       background:
         linear-gradient(180deg, rgba(67, 80, 94, 0.98), rgba(49, 59, 69, 0.98));
       color: #ffffff;
@@ -905,26 +908,8 @@
       min-width: 0 !important;
       height: var(--install-button-height);
       justify-content: center;
-      padding: 8px 16px;
-      background:
-        linear-gradient(180deg, rgba(76, 92, 106, 0.92), rgba(54, 68, 80, 0.96));
-      color: rgba(244, 247, 249, 0.96);
-      border: 1px solid rgba(121, 161, 190, 0.34);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 10px 24px rgba(6, 10, 14, 0.16);
+      padding: 14px 22px;
       text-shadow: 0 1px 0 rgba(0, 0, 0, 0.22);
-    }
-
-    .auth-install-slot .install-app-btn:hover,
-    .auth-install-slot .install-app-btn:focus-visible {
-      background:
-        linear-gradient(180deg, rgba(88, 107, 123, 0.96), rgba(63, 80, 94, 0.98));
-      color: #ffffff;
-      border-color: rgba(150, 195, 228, 0.46);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 14px 28px rgba(6, 10, 14, 0.2);
     }
 
     .auth-install-slot .install-app-btn .btn-svg-icon {
@@ -6933,7 +6918,7 @@
 
       return `
           <div class="map-popup-title">${escapeHtml(location.name)}</div>
-          <div class="map-popup-address">${escapeHtml(location.address)}</div>
+          <div class="map-popup-address">${renderAddressLink(location.address)}</div>
           <div class="map-popup-meta">${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
           <div class="map-popup-products">${productsHtml}</div>
         `;
