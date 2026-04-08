@@ -9545,14 +9545,14 @@
     function renderResultsMap(locations = [], options = {}) {
       const {
         activeLocationKey = '',
-        centerOnReference = false,
+        focusLocationKey = '',
         preserveActiveSelection = true,
         fallbackLocationKey = ''
       } = options;
       const mapElement = document.getElementById('results-map');
       if (!mapElement || typeof L === 'undefined') return;
 
-      const preferredLocationKey = String(activeLocationKey || activeResultsMapKey || '').trim();
+      const preferredLocationKey = String(focusLocationKey || activeLocationKey || activeResultsMapKey || '').trim();
       const preferredLocation = preferredLocationKey
         ? locations.find(location => location.location_key === preferredLocationKey) || null
         : null;
@@ -9588,9 +9588,7 @@
         bounds.push([mapDistanceReference.latitude, mapDistanceReference.longitude]);
       }
 
-      if (centerOnReference && mapDistanceReference) {
-        resultsMap.setView([mapDistanceReference.latitude, mapDistanceReference.longitude], 14);
-      } else if (preferredLocation) {
+      if (preferredLocation) {
         resultsMap.setView([preferredLocation.latitude, preferredLocation.longitude], 14);
       } else if (mapDistanceReference) {
         resultsMap.setView([mapDistanceReference.latitude, mapDistanceReference.longitude], 14);
@@ -9618,7 +9616,10 @@
       const hasActiveFilteredLocation = previousActiveLocationKey
         ? locations.some(location => location.location_key === previousActiveLocationKey)
         : false;
-      const centerOnReference = Boolean(previousActiveLocationKey) && !hasActiveFilteredLocation && Boolean(mapDistanceReference);
+      const closestFilteredLocation = locations[0] || null;
+      const focusLocationKey = hasActiveFilteredLocation
+        ? previousActiveLocationKey
+        : (previousActiveLocationKey && closestFilteredLocation ? closestFilteredLocation.location_key : '');
       const preserveActiveSelection = hasActiveFilteredLocation;
       const fallbackLocationKey = !previousActiveLocationKey && locations.length
         ? locations[0].location_key
@@ -9626,7 +9627,7 @@
 
       renderResultsMap(locations, {
         activeLocationKey: previousActiveLocationKey,
-        centerOnReference,
+        focusLocationKey,
         preserveActiveSelection,
         fallbackLocationKey
       });
