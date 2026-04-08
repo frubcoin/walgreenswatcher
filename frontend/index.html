@@ -3825,14 +3825,9 @@
     .trending-products-highlight {
       display: grid;
       gap: 4px;
-      min-width: 180px;
-      padding: 14px 16px;
-      border-radius: 18px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-        rgba(10, 12, 14, 0.58);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      min-width: 0;
+      justify-items: end;
+      align-content: end;
     }
 
     .trending-products-highlight-value {
@@ -3934,6 +3929,19 @@
       text-transform: uppercase;
       letter-spacing: 1.1px;
       color: rgba(214, 220, 225, 0.58);
+    }
+
+    .trending-product-retailer {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: rgba(244, 247, 249, 0.84);
+    }
+
+    .trending-product-retailer .product-retailer-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
     }
 
     .trending-product-chip {
@@ -7598,6 +7606,7 @@
       list.innerHTML = trendingProductsCache.map(product => {
         const safeId = escapeHtml(product.id || '');
         const safeRetailer = escapeHtml(retailerKey(product.retailer));
+        const safeRetailerLabel = escapeHtml(retailerLabel(product.retailer));
         const safeName = escapeHtml(product.name || 'Unnamed product');
         const safeSourceUrl = sanitizeProductSourceUrl(product.source_url || '');
         const safeImageUrl = sanitizeProductImageUrl(product.image_url || '');
@@ -7619,6 +7628,10 @@
             </div>
             <div class="trending-product-body">
               <div class="trending-product-meta">
+                <span class="trending-product-retailer">
+                  <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailerLabel}" title="${safeRetailerLabel}">
+                  <span>${safeRetailerLabel}</span>
+                </span>
                 <span class="trending-product-chip">${escapeHtml(watcherLabel)}</span>
                 <span>${escapeHtml(lastTrackedLabel)}</span>
               </div>

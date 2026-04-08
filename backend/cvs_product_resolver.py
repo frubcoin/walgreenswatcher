@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import random
 import re
 from html import unescape
-from typing import Dict
+from typing import Any, Dict
 from urllib.parse import unquote, urlparse
 
 import requests
@@ -15,6 +16,10 @@ from config import USER_AGENTS
 
 CVS_PRODUCT_ID_PATTERN = re.compile(r"-prodid-(?P<product_id>\d+)(?:[/?#]|$)", re.IGNORECASE)
 CVS_TITLE_SUFFIX_PATTERN = re.compile(r"\s*-\s*CVS Pharmacy\s*$", re.IGNORECASE)
+CVS_PRODUCT_IMAGE_PATH_PATTERN = re.compile(
+    r"(?P<url>(?:https?:)?//www\.cvs\.com)?(?P<path>/bizcontent/merchandising/productimages/[^\"'<>\s]+?\.(?:jpe?g|png|webp)(?:\?[^\"'<>\s]*)?)",
+    re.IGNORECASE,
+)
 CVS_PRODUCT_TIMEOUT = (8, 15)
 CVS_BOOTSTRAP_TIMEOUT = (5, 8)
 CVS_RESOLVE_ATTEMPTS = 2
@@ -33,6 +38,21 @@ class CvsProductResolver:
         if normalized.startswith("/"):
             return f"https://www.cvs.com{normalized}"
         return normalized
+
+    @staticmethod
+    def _first_non_empty(*values: Any) -> str:
+        for value in values:
+            normalized = str(value or "").strip()
+            if normalized:
+                return normalized
+        return ""
+
+    @staticmethod
+    def _load_json(value: str) -> Any:
+        try:
+            return json.loads(value)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
 
     @classmethod
     def extract_product_id(cls, product_link: str) -> str:
@@ -102,6 +122,60 @@ class CvsProductResolver:
         return slug.title()
 
     @classmethod
+    def _product_schema(cls, soup: BeautifulSoup) -> Dict[str, Any]:
+        for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            data = cls._load_json(script.string or script.get_text(" ", strip=True))
+            candidates = data if isinstance(data, list) else [data]
+            for candidate in candidates:
+                if not isinstance(candidate, dict):
+                    continue
+                schema_type = str(candidate.get("@type", "")).strip().lower()
+                if schema_type == "product" or candidate.get("image") or candidate.get("name"):
+                    return candidate
+        return {}
+
+    @classmethod
+    def _normalize_srcset_candidate(cls, value: str) -> str:
+        candidate = str(value or "").split(",", 1)[0].strip().split(" ", 1)[0].strip()
+        return cls._normalize_url(candidate)
+
+    @classmethod
+    def _extract_image_url(cls, soup: BeautifulSoup, html: str, product_schema: Dict[str, Any]) -> str:
+        schema_image = product_schema.get("image")
+        if isinstance(schema_image, list):
+            for candidate in schema_image:
+                normalized = cls._normalize_url(candidate)
+                if normalized:
+                    return normalized
+        else:
+            normalized = cls._normalize_url(schema_image)
+            if normalized:
+                return normalized
+
+        preload = soup.find("link", attrs={"rel": "preload", "as": "image"})
+        if preload:
+            normalized = cls._first_non_empty(
+                cls._normalize_url(preload.get("href", "")),
+                cls._normalize_srcset_candidate(preload.get("imagesrcset") or preload.get("imageSrcSet") or ""),
+            )
+            if normalized:
+                return normalized
+
+        for image in soup.find_all("img"):
+            for attr in ("src", "data-src", "data-lazy-src", "data-zoom-src", "data-image", "data-srcset"):
+                raw_value = image.get(attr, "")
+                normalized = cls._normalize_srcset_candidate(raw_value) if "srcset" in attr else cls._normalize_url(raw_value)
+                if normalized and "/bizcontent/merchandising/productimages/" in normalized.lower():
+                    return normalized
+
+        normalized_html = unescape((html or "").replace("\\/", "/"))
+        match = CVS_PRODUCT_IMAGE_PATH_PATTERN.search(normalized_html)
+        if match:
+            return cls._normalize_url(match.group("url") or match.group("path") or "")
+
+        return ""
+
+    @classmethod
     def resolve_product_link(cls, product_link: str) -> Dict[str, str]:
         product_link = str(product_link or "").strip()
         if not product_link:
@@ -124,24 +198,28 @@ class CvsProductResolver:
 
         if html:
             soup = BeautifulSoup(html, "lxml")
+            product_schema = cls._product_schema(soup)
             canonical_url = cls._normalize_url(
                 (soup.find("link", rel="canonical") or {}).get("href", "")
             ) or product_link
 
             og_title = unescape((soup.find("meta", property="og:title") or {}).get("content", "")).strip()
             heading = soup.find(["h1", "title"])
-            candidate_name = og_title or (heading.get_text(" ", strip=True) if heading else "")
+            candidate_name = cls._first_non_empty(
+                product_schema.get("name"),
+                og_title,
+                heading.get_text(" ", strip=True) if heading else "",
+            )
             candidate_name = CVS_TITLE_SUFFIX_PATTERN.sub("", candidate_name).strip()
             if candidate_name:
                 name = candidate_name
 
-            image_url = cls._normalize_url(
-                (soup.find("meta", property="og:image") or {}).get("content", "")
+            image_url = cls._first_non_empty(
+                cls._normalize_url(
+                    (soup.find("meta", property="og:image") or {}).get("content", "")
+                ),
+                cls._extract_image_url(soup, html, product_schema),
             )
-            if not image_url:
-                preload = soup.find("link", attrs={"rel": "preload", "as": "image"})
-                if preload:
-                    image_url = cls._normalize_url(preload.get("href", ""))
 
         return {
             "retailer": "cvs",

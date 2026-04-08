@@ -6,6 +6,7 @@ import logging
 import random
 import re
 import time
+import secrets
 from typing import Any, Dict, Iterable, List
 
 import requests
@@ -20,7 +21,10 @@ logger = logging.getLogger(__name__)
 class CvsStockChecker:
     """Check CVS local inventory using the PDP inventory service."""
 
-    INVENTORY_URL = "https://www.cvs.com/REIAGPV3/Inventory/V1/getStoreDetailsAndInventory"
+    INVENTORY_URLS = (
+        "https://www.cvs.com/RETAGPV3/Inventory/V1/getStoreDetailsAndInventory",
+        "https://www.cvs.com/REIAGPV3/Inventory/V1/getStoreDetailsAndInventory",
+    )
 
     def __init__(self) -> None:
         self.progress_callback = None
@@ -79,9 +83,46 @@ class CvsStockChecker:
         return referer, api_key
 
     @staticmethod
-    def _payload_candidates(product_id: str, zip_code: str) -> Iterable[Dict[str, Any]]:
+    def _request_body_header(api_key: str, device_token: str) -> Dict[str, Any]:
+        return {
+            "apiKey": api_key,
+            "channelName": "WEB",
+            "deviceToken": device_token,
+            "deviceType": "DESKTOP",
+            "responseFormat": "JSON",
+            "securityType": "apiKey",
+            "source": "CVS_WEB",
+            "appName": "CVS_WEB",
+            "lineOfBusiness": "RETAIL",
+            "type": "rdp",
+        }
+
+    @classmethod
+    def _payload_candidates(cls, product_id: str, zip_code: str, api_key: str) -> Iterable[Dict[str, Any]]:
+        device_token = secrets.token_hex(8)
+        request_header = cls._request_body_header(api_key, device_token) if api_key else {}
+
+        if request_header:
+            yield {
+                "getStoreDetailsAndInventoryRequest": {
+                    "header": request_header,
+                    "productId": product_id,
+                    "geolatitude": "",
+                    "geolongitude": "",
+                    "addressLine": zip_code,
+                }
+            }
+            yield {
+                "getStoreDetailsAndInventoryRequest": {
+                    "header": request_header,
+                    "productId": product_id,
+                    "addressLine": zip_code,
+                }
+            }
+
         base_variants = [
             {"productId": product_id, "zipCode": zip_code},
+            {"productId": product_id, "addressLine": zip_code},
             {"productId": product_id, "zip": zip_code},
             {"prodId": product_id, "zipCode": zip_code},
             {"itemId": product_id, "zipCode": zip_code},
@@ -101,7 +142,9 @@ class CvsStockChecker:
         response = payload.get("response")
         if not isinstance(response, dict):
             return False
-        locations = response.get("atgResponse")
+        locations = payload.get("atgResponse")
+        if not isinstance(locations, list):
+            locations = response.get("atgResponse")
         return isinstance(locations, list)
 
     def _fetch_inventory_payload(self, product: Dict[str, Any], zip_code: str) -> Dict[str, Any]:
@@ -119,32 +162,34 @@ class CvsStockChecker:
         failures: List[str] = []
 
         try:
-            for payload in self._payload_candidates(product_id, zip_code):
-                try:
-                    response = session.post(
-                        self.INVENTORY_URL,
-                        json=payload,
-                        headers=self._request_headers(referer=referer, api_key=api_key),
-                        timeout=30,
+            for inventory_url in self.INVENTORY_URLS:
+                for payload in self._payload_candidates(product_id, zip_code, api_key):
+                    try:
+                        response = session.post(
+                            inventory_url,
+                            json=payload,
+                            headers=self._request_headers(referer=referer, api_key=api_key),
+                            timeout=30,
+                        )
+                    except requests.RequestException as exc:
+                        failures.append(f"{inventory_url} {type(exc).__name__}: {exc}")
+                        continue
+
+                    try:
+                        data = response.json()
+                    except ValueError:
+                        snippet = response.text[:200].replace("\n", " ")
+                        failures.append(f"{inventory_url} HTTP {response.status_code}: {snippet}")
+                        continue
+
+                    if self._looks_like_inventory_response(data):
+                        return data
+
+                    header = ((data.get("response") or {}).get("header") or {}) if isinstance(data, dict) else {}
+                    failures.append(
+                        f"{inventory_url} HTTP {response.status_code}: "
+                        f"{header.get('statusCode') or 'unknown'} {header.get('statusDesc') or 'unexpected payload'}"
                     )
-                except requests.RequestException as exc:
-                    failures.append(f"{type(exc).__name__}: {exc}")
-                    continue
-
-                try:
-                    data = response.json()
-                except ValueError:
-                    snippet = response.text[:200].replace("\n", " ")
-                    failures.append(f"HTTP {response.status_code}: {snippet}")
-                    continue
-
-                if self._looks_like_inventory_response(data):
-                    return data
-
-                header = ((data.get("response") or {}).get("header") or {}) if isinstance(data, dict) else {}
-                failures.append(
-                    f"HTTP {response.status_code}: {header.get('statusCode') or 'unknown'} {header.get('statusDesc') or 'unexpected payload'}"
-                )
         finally:
             session.close()
 
@@ -190,6 +235,7 @@ class CvsStockChecker:
             return True
         status_fields = (
             store.get("bopStatus"),
+            store.get("bohStatus"),
             store.get("status"),
             (store.get("bopis") or {}).get("status"),
             (store.get("bopus") or {}).get("status"),
@@ -275,7 +321,7 @@ class CvsStockChecker:
                 f"CVS inventory API returned {header.get('statusCode')}: {header.get('statusDesc') or 'Unknown error'}"
             )
 
-        locations = response.get("atgResponse") or []
+        locations = payload.get("atgResponse") or response.get("atgResponse") or []
         total_stores = len(locations)
         availability: Dict[str, bool] = {}
         store_details: Dict[str, Dict[str, Any]] = {}
