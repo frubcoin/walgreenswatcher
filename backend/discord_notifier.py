@@ -298,8 +298,8 @@ class DiscordNotifier:
                     {
                         "name": "Check Summary",
                         "value": f"{total_inventory} total units across {total_store_hits} store hits",
+                        "🔗 [Open map view](https://walgreens.frub.dev/)\n\n",
                         "inline": False,
-                        f"🔗 [Open map view](https://walgreens.frub.dev/)\n\n"
                     },
                 )
 
@@ -344,6 +344,7 @@ class DiscordNotifier:
                             0,
                             {
                                 "name": "Check Summary",
+                                "🔗 [Open map view](https://walgreens.frub.dev/)\n\n",
                                 "value": f"{total_inventory} total units across {total_store_hits} store hits",
                                 "inline": False,
                             },
