@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-SERVICE_NAMES_RAW="${SERVICE_NAMES:-${SERVICE_NAME:-walgreenswatcher gunicorn}}"
+SERVICE_NAMES_RAW="${SERVICE_NAMES:-${SERVICE_NAME:-gunicorn walgreenswatcher}}"
 APP_USER="${APP_USER:-walgreens}"
 VENV_PATH="${VENV_PATH:-}"
 
