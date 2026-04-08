@@ -4260,6 +4260,7 @@
     };
     const RESULTS_MAP_THEME_STORAGE_KEY = 'walgreens_results_map_theme';
     const MAP_ADDRESS_STORAGE_KEY = 'walgreens_saved_map_address';
+    const MAP_ADDRESS_REFERENCE_STORAGE_KEY = 'walgreens_saved_map_address_reference';
     const RESULTS_MAP_THEME_ICONS = {
       dark: '<svg class="results-map-theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Zm0-80q88 0 158-48.5T740-375q-20 5-40 8t-40 3q-123 0-209.5-86.5T364-660q0-20 3-40t8-40q-78 32-126.5 102T200-480q0 116 82 198t198 82Zm-10-270Z"/></svg>',
       light: '<svg class="results-map-theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" aria-hidden="true"><path d="M565-395q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35Zm-226.5 56.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Zm326-268Z"/></svg>'
@@ -5014,6 +5015,7 @@
     let activeResultsMapKey = null;
     let currentResultsMapTheme = loadStoredResultsMapTheme();
     let manualLocationFallbackVisible = false;
+    let mapDistanceReference = loadStoredMapAddressReference();
     let manualLocationQuery = loadStoredMapAddress();
     let manualLocationSuggestions = [];
     let manualLocationHighlightedIndex = -1;
@@ -5323,6 +5325,28 @@
       }
     }
 
+    function normalizeMapAddressReference(reference) {
+      if (!reference || typeof reference !== 'object') return null;
+      const latitude = normalizeCoordinate(reference.latitude);
+      const longitude = normalizeCoordinate(reference.longitude);
+      if (latitude === null || longitude === null) return null;
+      return {
+        label: String(reference.label || '').trim(),
+        latitude,
+        longitude
+      };
+    }
+
+    function loadStoredMapAddressReference() {
+      try {
+        const rawValue = localStorage.getItem(MAP_ADDRESS_REFERENCE_STORAGE_KEY);
+        if (!rawValue) return null;
+        return normalizeMapAddressReference(JSON.parse(rawValue));
+      } catch (error) {
+        return null;
+      }
+    }
+
     function storeMapAddress(address) {
       const normalizedAddress = String(address || '').trim();
       try {
@@ -5334,6 +5358,22 @@
       } catch (error) {
       }
       return normalizedAddress;
+    }
+
+    function setMapDistanceReference(reference, { persist = false } = {}) {
+      const normalizedReference = normalizeMapAddressReference(reference);
+      mapDistanceReference = normalizedReference;
+      if (persist) {
+        try {
+          if (normalizedReference) {
+            localStorage.setItem(MAP_ADDRESS_REFERENCE_STORAGE_KEY, JSON.stringify(normalizedReference));
+          } else {
+            localStorage.removeItem(MAP_ADDRESS_REFERENCE_STORAGE_KEY);
+          }
+        } catch (error) {
+        }
+      }
+      return normalizedReference;
     }
 
     function persistResultsMapTheme(theme) {
@@ -6547,7 +6587,35 @@
       return Number.isFinite(coordinate) ? coordinate : null;
     }
 
-    function buildResultsMapLocations(products = {}) {
+    function calculateDistanceMiles(originLatitude, originLongitude, targetLatitude, targetLongitude) {
+      const toRadians = value => (value * Math.PI) / 180;
+      const earthRadiusMiles = 3958.7613;
+      const latitudeDelta = toRadians(targetLatitude - originLatitude);
+      const longitudeDelta = toRadians(targetLongitude - originLongitude);
+      const a = Math.sin(latitudeDelta / 2) ** 2
+        + Math.cos(toRadians(originLatitude))
+        * Math.cos(toRadians(targetLatitude))
+        * Math.sin(longitudeDelta / 2) ** 2;
+      return 2 * earthRadiusMiles * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function getStoreDistance(store, referenceLocation = null) {
+      const latitude = normalizeCoordinate(store?.latitude);
+      const longitude = normalizeCoordinate(store?.longitude);
+      if (referenceLocation && latitude !== null && longitude !== null) {
+        return calculateDistanceMiles(
+          referenceLocation.latitude,
+          referenceLocation.longitude,
+          latitude,
+          longitude
+        );
+      }
+
+      const fallbackDistance = Number(store?.distance);
+      return Number.isFinite(fallbackDistance) ? fallbackDistance : null;
+    }
+
+    function buildResultsMapLocations(products = {}, referenceLocation = null) {
       const storeMap = new Map();
       let missingCoordinates = 0;
 
@@ -6571,7 +6639,7 @@
               store_id: store.store_id || '',
               name: store.name || 'Walgreens',
               address: store.address || 'Address unavailable',
-              distance: typeof store.distance === 'number' ? store.distance : Number(store.distance),
+              distance: getStoreDistance(store, referenceLocation),
               latitude,
               longitude,
               total_inventory: 0,
@@ -6604,6 +6672,47 @@
         });
 
       return { locations, missingCoordinates };
+    }
+
+    async function resolveMapAddressReference(address, { persist = true } = {}) {
+      const normalizedAddress = String(address || '').trim();
+      if (!normalizedAddress) {
+        return setMapDistanceReference(null, { persist });
+      }
+
+      if (mapDistanceReference && mapDistanceReference.label === normalizedAddress) {
+        return mapDistanceReference;
+      }
+
+      const suggestions = await requestManualLocationSuggestions(normalizedAddress);
+      if (!suggestions.length) {
+        return setMapDistanceReference(null, { persist });
+      }
+
+      return setMapDistanceReference(
+        {
+          label: normalizedAddress,
+          latitude: suggestions[0].latitude,
+          longitude: suggestions[0].longitude
+        },
+        { persist }
+      );
+    }
+
+    async function ensureSavedMapAddressReference() {
+      const savedAddress = loadStoredMapAddress();
+      if (!savedAddress) {
+        setMapDistanceReference(null, { persist: true });
+        return null;
+      }
+      if (mapDistanceReference?.label === savedAddress) {
+        return mapDistanceReference;
+      }
+      try {
+        return await resolveMapAddressReference(savedAddress);
+      } catch (error) {
+        return mapDistanceReference;
+      }
     }
 
     function destroyResultsMap() {
@@ -6889,12 +6998,24 @@
     }
 
     function centerMapOnManualLocation(suggestion) {
-      if (!resultsMap || !suggestion) return;
+      if (!suggestion) return;
 
       manualLocationQuery = storeMapAddress(suggestion.label);
+      setMapDistanceReference(
+        {
+          label: suggestion.label,
+          latitude: suggestion.latitude,
+          longitude: suggestion.longitude
+        },
+        { persist: true }
+      );
       const mapAddressInput = document.getElementById('cfg-map-address');
       if (mapAddressInput) {
         mapAddressInput.value = manualLocationQuery;
+      }
+      hideManualLocationFallback({ preserveQuery: true });
+      if (latestRenderedResults) {
+        renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
       }
       updateUserLocationOnMap({
         coords: {
@@ -6902,7 +7023,6 @@
           longitude: suggestion.longitude
         }
       });
-      hideManualLocationFallback({ preserveQuery: true });
       showToast('Centered map on the entered address', 'success');
     }
 
@@ -7114,24 +7234,28 @@
       return 'Failed to get location';
     }
 
+    function ensureUserLocationMarker(lat, lng) {
+      if (!resultsMap) return;
+      if (userLocationMarker) {
+        userLocationMarker.setLatLng([lat, lng]);
+        return;
+      }
+
+      const userPulseIcon = L.divIcon({
+        className: 'user-location-pulse-wrapper',
+        html: '<div class="user-location-pulse"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      userLocationMarker = L.marker([lat, lng], { icon: userPulseIcon }).addTo(resultsMap);
+    }
+
     function updateUserLocationOnMap(position) {
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
 
       if (!resultsMap) return;
-
-      if (userLocationMarker) {
-        userLocationMarker.setLatLng([lat, lng]);
-      } else {
-        const userPulseIcon = L.divIcon({
-          className: 'user-location-pulse-wrapper',
-          html: '<div class="user-location-pulse"></div>',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7]
-        });
-        userLocationMarker = L.marker([lat, lng], { icon: userPulseIcon }).addTo(resultsMap);
-      }
-
+      ensureUserLocationMarker(lat, lng);
       resultsMap.setView([lat, lng], 14, { animate: true });
     }
 
@@ -7208,6 +7332,11 @@
         return marker;
       });
 
+      if (mapDistanceReference) {
+        ensureUserLocationMarker(mapDistanceReference.latitude, mapDistanceReference.longitude);
+        bounds.push([mapDistanceReference.latitude, mapDistanceReference.longitude]);
+      }
+
       if (bounds.length === 1) {
         resultsMap.setView(bounds[0], 13);
       } else if (bounds.length > 1) {
@@ -7257,7 +7386,7 @@
       const total = checkResult.total_stores_checked || data.total_stores_checked || 0;
       const timestamp = data.timestamp || checkResult.timestamp;
       const productCount = Object.keys(products).length;
-      const mapData = buildResultsMapLocations(products);
+      const mapData = buildResultsMapLocations(products, mapDistanceReference);
 
       if (currentResultsView === 'map' && !mapData.locations.length) {
         currentResultsView = 'cards';
@@ -7351,8 +7480,11 @@
       syncManualLocationSearchUi();
     }
 
-    function setResultsView(view) {
+    async function setResultsView(view) {
       currentResultsView = view === 'map' ? 'map' : 'cards';
+      if (currentResultsView === 'map') {
+        await ensureSavedMapAddressReference();
+      }
       if (!latestRenderedResults) return;
       renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
     }
@@ -7930,6 +8062,9 @@
         mapAddressInput.value = storedMapAddress;
       }
       manualLocationQuery = storedMapAddress;
+      if (storedMapAddress) {
+        await ensureSavedMapAddressReference();
+      }
       syncManualLocationSearchUi();
 
       const data = await apiCall('/api/status');
@@ -7959,6 +8094,14 @@
       const pokemonBackgroundTileSize = normalizePokemonBackgroundTileSize(document.getElementById('cfg-pokemon-bg-size').value);
       manualLocationQuery = mapAddress;
       syncManualLocationSearchUi();
+      let mapAddressResolved = true;
+
+      try {
+        const resolvedReference = await resolveMapAddressReference(mapAddress);
+        mapAddressResolved = !mapAddress || Boolean(resolvedReference);
+      } catch (error) {
+        mapAddressResolved = false;
+      }
 
       const data = {};
       if (zip) data.zipcode = zip;
@@ -7976,10 +8119,21 @@
           tileSize: result.pokemon_background_tile_size ?? pokemonBackgroundTileSize
         });
         document.getElementById('cfg-map-address').value = mapAddress;
-        showToast('Settings saved', 'success');
+        showToast(
+          mapAddress && !mapAddressResolved
+            ? 'Settings saved, but the map address could not be resolved for distance calculations yet'
+            : 'Settings saved',
+          mapAddress && !mapAddressResolved ? 'info' : 'success'
+        );
         await loadStatus();
+        if (latestRenderedResults) {
+          renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
+        }
       } else {
         document.getElementById('cfg-map-address').value = mapAddress;
+        if (latestRenderedResults) {
+          renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
+        }
         showToast('Server settings failed to save, but the map address was stored locally', 'error');
       }
     }
