@@ -7,6 +7,7 @@ import re
 import secrets
 import time
 from typing import Any, Dict, Iterable, List
+from urllib.parse import urlsplit
 
 import requests
 try:
@@ -14,7 +15,7 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
 
-from config import CVS_PROXY_URL, TARGET_ZIP_CODE
+from config import CVS_PROXY_URLS, TARGET_ZIP_CODE
 
 PROGRESS_UI_YIELD_SECONDS = 0.02
 
@@ -48,13 +49,30 @@ class CvsStockChecker:
             self.progress_callback(progress_info)
 
     @staticmethod
-    def _new_session() -> requests.Session:
+    def _proxy_candidates() -> List[str]:
+        proxies = list(CVS_PROXY_URLS)
+        if len(proxies) <= 1:
+            return proxies
+        start = secrets.randbelow(len(proxies))
+        return proxies[start:] + proxies[:start]
+
+    @staticmethod
+    def _proxy_label(proxy_url: str) -> str:
+        parsed = urlsplit(str(proxy_url or "").strip())
+        if not parsed.hostname:
+            return "configured proxy"
+        if parsed.port:
+            return f"{parsed.hostname}:{parsed.port}"
+        return parsed.hostname
+
+    @staticmethod
+    def _new_session(proxy_url: str = "") -> requests.Session:
         if curl_requests is not None:
             session = curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
         else:
             session = requests.Session()
-        if CVS_PROXY_URL:
-            session.proxies.update({"http": CVS_PROXY_URL, "https": CVS_PROXY_URL})
+        if proxy_url:
+            session.proxies.update({"http": proxy_url, "https": proxy_url})
         return session
 
     @staticmethod
@@ -223,87 +241,113 @@ class CvsStockChecker:
         if not product_id:
             raise ValueError("CVS products require a numeric product id")
 
-        session = self._new_session()
-        if CVS_PROXY_URL:
-            logger.info("CVS requests are using proxy routing")
-        referer, api_key = self._bootstrap_session(session, product)
-        api_keys = list(dict.fromkeys(key for key in (api_key, CVS_INVENTORY_PUBLIC_API_KEY) if key))
-        if api_keys:
-            logger.info("CVS inventory will try %s API key candidate(s)", len(api_keys))
-        if not api_key and CVS_INVENTORY_PUBLIC_API_KEY:
-            logger.info("CVS inventory using HAR-derived public API key fallback")
         failures: List[str] = []
+        proxy_candidates = self._proxy_candidates()
+        if proxy_candidates:
+            logger.info("CVS inventory will try %s proxy candidate(s)", len(proxy_candidates))
+        else:
+            proxy_candidates = [""]
 
-        try:
-            for inventory_url in self.INVENTORY_URLS:
-                for api_key_candidate in api_keys:
-                    for payload in self._payload_candidates(product_id, zip_code, api_key_candidate):
-                        for include_api_header in (False, True):
-                            try:
-                                response = session.post(
-                                    inventory_url,
-                                    json=payload,
-                                    headers=self._request_headers(
-                                        referer=referer,
-                                        purpose="inventory",
-                                        api_key=api_key_candidate,
-                                        include_api_header=include_api_header,
-                                    ),
-                                    timeout=30,
-                                )
-                            except Exception as exc:
-                                failures.append(f"{inventory_url} {type(exc).__name__}: {exc}")
-                                logger.warning("CVS inventory request exception for %s: %s", inventory_url, exc)
-                                continue
+        blocked_routes: List[str] = []
+        for proxy_url in proxy_candidates:
+            session = self._new_session(proxy_url)
+            proxy_label = self._proxy_label(proxy_url) if proxy_url else "direct server IP"
+            if proxy_url:
+                logger.info("CVS requests are using proxy routing via %s", proxy_label)
+            proxy_blocked = False
 
-                            try:
-                                data = response.json()
-                            except ValueError:
-                                snippet = response.text[:200].replace("\n", " ")
-                                if self._is_access_denied_response(response.status_code, snippet):
-                                    logger.warning(
-                                        "CVS inventory blocked at edge for %s: HTTP %s %s",
+            try:
+                referer, api_key = self._bootstrap_session(session, product)
+                api_keys = list(dict.fromkeys(key for key in (api_key, CVS_INVENTORY_PUBLIC_API_KEY) if key))
+                if api_keys:
+                    logger.info("CVS inventory will try %s API key candidate(s)", len(api_keys))
+                if not api_key and CVS_INVENTORY_PUBLIC_API_KEY:
+                    logger.info("CVS inventory using HAR-derived public API key fallback")
+
+                for inventory_url in self.INVENTORY_URLS:
+                    if proxy_blocked:
+                        break
+                    for api_key_candidate in api_keys:
+                        if proxy_blocked:
+                            break
+                        for payload in self._payload_candidates(product_id, zip_code, api_key_candidate):
+                            if proxy_blocked:
+                                break
+                            for include_api_header in (False, True):
+                                try:
+                                    response = session.post(
                                         inventory_url,
+                                        json=payload,
+                                        headers=self._request_headers(
+                                            referer=referer,
+                                            purpose="inventory",
+                                            api_key=api_key_candidate,
+                                            include_api_header=include_api_header,
+                                        ),
+                                        timeout=30,
+                                    )
+                                except Exception as exc:
+                                    failures.append(f"{proxy_label} {inventory_url} {type(exc).__name__}: {exc}")
+                                    logger.warning("CVS inventory request exception for %s via %s: %s", inventory_url, proxy_label, exc)
+                                    continue
+
+                                try:
+                                    data = response.json()
+                                except ValueError:
+                                    snippet = response.text[:200].replace("\n", " ")
+                                    if self._is_access_denied_response(response.status_code, snippet):
+                                        logger.warning(
+                                            "CVS inventory blocked at edge for %s via %s: HTTP %s %s",
+                                            inventory_url,
+                                            proxy_label,
+                                            response.status_code,
+                                            snippet,
+                                        )
+                                        blocked_routes.append(proxy_label)
+                                        proxy_blocked = True
+                                        break
+                                    failures.append(f"{proxy_label} {inventory_url} HTTP {response.status_code}: {snippet}")
+                                    logger.warning(
+                                        "CVS inventory non-JSON response from %s via %s: HTTP %s %s",
+                                        inventory_url,
+                                        proxy_label,
                                         response.status_code,
                                         snippet,
                                     )
-                                    raise ValueError(
-                                        "CVS blocked this server or IP from the inventory API "
-                                        "(HTTP 403 Access Denied). The request shape matches the browser, "
-                                        "but CVS is rejecting this host before the API can respond."
-                                    )
-                                failures.append(f"{inventory_url} HTTP {response.status_code}: {snippet}")
-                                logger.warning(
-                                    "CVS inventory non-JSON response from %s: HTTP %s %s",
-                                    inventory_url,
-                                    response.status_code,
-                                    snippet,
-                                )
-                                continue
+                                    continue
 
-                            if self._looks_like_inventory_response(data):
-                                logger.info(
-                                    "CVS inventory response accepted from %s (api_header=%s)",
+                                if self._looks_like_inventory_response(data):
+                                    logger.info(
+                                        "CVS inventory response accepted from %s via %s (api_header=%s)",
+                                        inventory_url,
+                                        proxy_label,
+                                        include_api_header,
+                                    )
+                                    return data
+
+                                header = ((data.get("response") or {}).get("header") or {}) if isinstance(data, dict) else {}
+                                failures.append(
+                                    f"{proxy_label} {inventory_url} HTTP {response.status_code}: "
+                                    f"{header.get('statusCode') or 'unknown'} {header.get('statusDesc') or 'unexpected payload'}"
+                                )
+                                logger.warning(
+                                    "CVS inventory unexpected payload from %s via %s: HTTP %s statusCode=%s statusDesc=%s api_header=%s",
                                     inventory_url,
+                                    proxy_label,
+                                    response.status_code,
+                                    header.get("statusCode") or "unknown",
+                                    header.get("statusDesc") or "unexpected payload",
                                     include_api_header,
                                 )
-                                return data
+            finally:
+                session.close()
 
-                            header = ((data.get("response") or {}).get("header") or {}) if isinstance(data, dict) else {}
-                            failures.append(
-                                f"{inventory_url} HTTP {response.status_code}: "
-                                f"{header.get('statusCode') or 'unknown'} {header.get('statusDesc') or 'unexpected payload'}"
-                            )
-                            logger.warning(
-                                "CVS inventory unexpected payload from %s: HTTP %s statusCode=%s statusDesc=%s api_header=%s",
-                                inventory_url,
-                                response.status_code,
-                                header.get("statusCode") or "unknown",
-                                header.get("statusDesc") or "unexpected payload",
-                                include_api_header,
-                            )
-        finally:
-            session.close()
+        if blocked_routes:
+            unique_blocked_routes = list(dict.fromkeys(blocked_routes))
+            raise ValueError(
+                "CVS blocked every configured route from the inventory API "
+                f"(HTTP 403 Access Denied): {', '.join(unique_blocked_routes)}"
+            )
 
         failure_detail = "; ".join(failures[:4]).strip()
         if failure_detail:
