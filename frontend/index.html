@@ -5271,6 +5271,7 @@
     let resultsMapMarkersByKey = new Map();
     let userLocationMarker = null;
     let resultsMapInvalidateTimer = 0;
+    let resultsMapResizeObserver = null;
     let activeResultsMapKey = null;
     let currentResultsMapTheme = loadStoredResultsMapTheme();
     let manualLocationFallbackVisible = false;
@@ -7105,6 +7106,10 @@
         window.clearTimeout(resultsMapInvalidateTimer);
         resultsMapInvalidateTimer = 0;
       }
+      if (resultsMapResizeObserver) {
+        resultsMapResizeObserver.disconnect();
+        resultsMapResizeObserver = null;
+      }
       resultsMapBaseLayer = null;
       resultsMapMarkers = [];
       resultsMapMarkersByKey = new Map();
@@ -7142,6 +7147,31 @@
         resultsMapInvalidateTimer = 0;
         refresh();
       }, 140);
+    }
+
+    function observeResultsMapSize() {
+      if (!resultsMap || typeof ResizeObserver !== 'function') return;
+
+      if (resultsMapResizeObserver) {
+        resultsMapResizeObserver.disconnect();
+      }
+
+      const observedElements = [
+        document.getElementById('results-map'),
+        document.querySelector('.results-map-card'),
+        document.querySelector('.results-map-shell'),
+        document.getElementById('panel-results')
+      ].filter(Boolean);
+
+      if (!observedElements.length) return;
+
+      resultsMapResizeObserver = new ResizeObserver(() => {
+        scheduleResultsMapInvalidate({ preserveActive: true });
+      });
+
+      observedElements.forEach(element => {
+        resultsMapResizeObserver.observe(element);
+      });
     }
 
     function renderMapPopup(location) {
@@ -7987,6 +8017,7 @@
         resultsMap.setView([33.4484, -112.0740], 10);
       }
 
+      observeResultsMapSize();
       scheduleResultsMapInvalidate({
         preserveActive: true,
         fallbackLocationKey: locations[0]?.location_key || ''
@@ -8484,6 +8515,10 @@
       showToast('App installed', 'success');
     });
 
+    window.addEventListener('resize', () => {
+      scheduleResultsMapInvalidate({ preserveActive: true });
+    }, { passive: true });
+
     function openTab(name) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -8497,6 +8532,9 @@
 
       if (name === 'results') {
         loadStatus();
+        window.requestAnimationFrame(() => {
+          scheduleResultsMapInvalidate({ preserveActive: true });
+        });
       }
       if (name === 'history') {
         loadHistory();
