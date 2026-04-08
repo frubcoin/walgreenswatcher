@@ -1809,6 +1809,15 @@
       line-height: 1;
     }
 
+    .stat-value-copy {
+      font-size: 16px;
+      line-height: 1.18;
+      font-family: 'Rajdhani', sans-serif;
+      letter-spacing: 0.2px;
+      text-transform: none;
+      word-break: break-word;
+    }
+
     .stat-sub {
       font-size: 11px;
       color: var(--text-muted);
@@ -5064,6 +5073,36 @@
           <div class="stat-value" id="stat-success-rate">-</div>
           <div class="stat-sub">Hits vs checks</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-label">Checks Today</div>
+          <div class="stat-value" id="stat-checks-today">-</div>
+          <div class="stat-sub" id="stat-checks-today-sub">Week: -</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Next Check</div>
+          <div class="stat-value stat-value-copy" id="stat-next-check">-</div>
+          <div class="stat-sub" id="stat-next-check-sub">Scheduler inactive</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Location Source</div>
+          <div class="stat-value stat-value-copy" id="stat-location-source">-</div>
+          <div class="stat-sub" id="stat-location-source-sub">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Closest In Stock</div>
+          <div class="stat-value stat-value-copy" id="stat-closest-store">-</div>
+          <div class="stat-sub" id="stat-closest-store-sub">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Most Active</div>
+          <div class="stat-value stat-value-copy" id="stat-most-active">-</div>
+          <div class="stat-sub" id="stat-most-active-sub">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Least Active</div>
+          <div class="stat-value stat-value-copy" id="stat-least-active">-</div>
+          <div class="stat-sub" id="stat-least-active-sub">-</div>
+        </div>
       </div>
 
       <div id="progress-section"
@@ -6668,6 +6707,12 @@
       resetOnboardingSessionState();
       localStorage.removeItem('cached_api_status');
       localStorage.removeItem('cached_api_last_check');
+      applyPokemonBackgroundSettings({
+        enabled: DEFAULT_POKEMON_BACKGROUND_ENABLED,
+        theme: DEFAULT_POKEMON_BACKGROUND_THEME,
+        tileSize: DEFAULT_POKEMON_BACKGROUND_TILE_SIZE,
+        syncControls: false
+      });
       updateCurrentUserDisplay(null);
       setAuthenticatedUi(false);
       const sessionPayload = await apiCall('/api/auth/session', 'GET', null, { allowUnauthorized: true, suppressAuthRedirect: true });
@@ -8188,6 +8233,186 @@
       return parsed ? parsed.toLocaleTimeString(undefined, options) : '';
     }
 
+    function formatRelativeDuration(targetDate) {
+      if (!(targetDate instanceof Date) || Number.isNaN(targetDate.getTime())) return '';
+      const deltaMs = targetDate.getTime() - Date.now();
+      const absMinutes = Math.round(Math.abs(deltaMs) / 60000);
+
+      if (absMinutes < 1) {
+        return deltaMs >= 0 ? 'Any moment' : 'Just passed';
+      }
+
+      if (absMinutes < 60) {
+        return deltaMs >= 0
+          ? `In ${absMinutes} min`
+          : `${absMinutes} min ago`;
+      }
+
+      const hours = Math.floor(absMinutes / 60);
+      const minutes = absMinutes % 60;
+      const hourLabel = `${hours}h`;
+      const minuteLabel = minutes ? ` ${minutes}m` : '';
+      return deltaMs >= 0
+        ? `In ${hourLabel}${minuteLabel}`
+        : `${hourLabel}${minuteLabel} ago`;
+    }
+
+    function shortenLabel(value, maxLength = 28) {
+      const normalized = String(value || '').trim();
+      if (!normalized) return '';
+      return normalized.length > maxLength
+        ? `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`
+        : normalized;
+    }
+
+    function getLocationSourceSummary(status = {}) {
+      if (mapDistanceReference?.label === 'Current location') {
+        return {
+          value: 'Current map location',
+          detail: 'Using your live browser location for distance',
+        };
+      }
+
+      if (mapDistanceReference?.label) {
+        return {
+          value: 'Saved map address',
+          detail: shortenLabel(mapDistanceReference.label, 40) || 'Using your saved local map address',
+        };
+      }
+
+      const zipcode = String(status.current_zipcode || '').trim();
+      if (zipcode) {
+        return {
+          value: 'ZIP',
+          detail: zipcode,
+        };
+      }
+
+      return {
+        value: 'Not set',
+        detail: 'Distances fall back to the latest store snapshot',
+      };
+    }
+
+    function getEffectiveStoreDistance(store) {
+      return getStoreDistance(store, mapDistanceReference);
+    }
+
+    function getClosestInStockStore(productsFound = {}) {
+      const candidates = [];
+
+      Object.values(productsFound || {}).forEach(product => {
+        const stores = Array.isArray(product?.stores) ? product.stores : [];
+        stores.forEach(store => {
+          const distance = getEffectiveStoreDistance(store);
+          if (distance === null) return;
+          candidates.push({
+            name: String(store?.name || 'Walgreens'),
+            address: String(store?.address || '').trim(),
+            distance,
+          });
+        });
+      });
+
+      if (!candidates.length) return null;
+
+      return candidates.sort((a, b) => a.distance - b.distance)[0];
+    }
+
+    function formatNextScheduledCheck(status = {}) {
+      if (!status.is_running) {
+        return {
+          value: 'Off',
+          detail: 'Scheduler inactive',
+        };
+      }
+
+      const intervalMinutes = Math.max(1, Number(status.check_interval_minutes || 0));
+      const lastCheck = parseApiTimestamp(status.last_check);
+      if (!lastCheck) {
+        return {
+          value: 'Queued',
+          detail: `Every ${intervalMinutes} min once the first run lands`,
+        };
+      }
+
+      const nextCheck = new Date(lastCheck.getTime() + intervalMinutes * 60000);
+      return {
+        value: formatLocalTime(nextCheck.toISOString(), {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        }) || 'Queued',
+        detail: formatRelativeDuration(nextCheck),
+      };
+    }
+
+    function applyStatCopy(id, value, detail = '', title = '') {
+      const valueNode = document.getElementById(id);
+      const detailNode = document.getElementById(`${id}-sub`);
+      if (valueNode) {
+        valueNode.textContent = value || '-';
+        valueNode.title = title || value || '';
+      }
+      if (detailNode) {
+        detailNode.textContent = detail || '-';
+        detailNode.title = title || detail || '';
+      }
+    }
+
+    function renderDashboardInsights(status = {}, statistics = {}) {
+      const locationSource = getLocationSourceSummary(status);
+      applyStatCopy(
+        'stat-location-source',
+        locationSource.value,
+        locationSource.detail,
+        locationSource.detail
+      );
+
+      const nextCheck = formatNextScheduledCheck(status);
+      applyStatCopy(
+        'stat-next-check',
+        nextCheck.value,
+        nextCheck.detail,
+        `${nextCheck.value}${nextCheck.detail ? ` • ${nextCheck.detail}` : ''}`
+      );
+
+      const closestStore = getClosestInStockStore(status.last_products_found || {});
+      applyStatCopy(
+        'stat-closest-store',
+        closestStore ? formatDistance(closestStore.distance) : 'No stock',
+        closestStore ? shortenLabel(closestStore.address || closestStore.name, 42) : 'Nothing in stock on the latest scan',
+        closestStore ? `${closestStore.name} • ${closestStore.address}` : 'Nothing in stock on the latest scan'
+      );
+
+      const recentWindow = Number(statistics.recent_scan_window || 0);
+      const mostActive = statistics.most_active_product || null;
+      const leastActive = statistics.least_active_product || null;
+      applyStatCopy(
+        'stat-most-active',
+        mostActive ? shortenLabel(mostActive.name, 26) : 'No data',
+        mostActive ? `${mostActive.recent_hits || 0} hit scan${Number(mostActive.recent_hits || 0) === 1 ? '' : 's'} in last ${recentWindow || 0}` : 'Need recent checks to rank products',
+        mostActive?.name || ''
+      );
+      applyStatCopy(
+        'stat-least-active',
+        leastActive ? shortenLabel(leastActive.name, 26) : 'No data',
+        leastActive ? `${leastActive.recent_hits || 0} hit scan${Number(leastActive.recent_hits || 0) === 1 ? '' : 's'} in last ${recentWindow || 0}` : 'Need recent checks to rank products',
+        leastActive?.name || ''
+      );
+
+      const checksToday = Number(statistics.checks_today || 0);
+      const checksWeek = Number(statistics.checks_this_week || 0);
+      const checksTodayNode = document.getElementById('stat-checks-today');
+      const checksTodaySubNode = document.getElementById('stat-checks-today-sub');
+      if (checksTodayNode) {
+        checksTodayNode.textContent = String(checksToday);
+      }
+      if (checksTodaySubNode) {
+        checksTodaySubNode.textContent = `Week: ${checksWeek}`;
+      }
+    }
+
     function buildDirectionsUrl(address) {
       const normalizedAddress = String(address || '').trim();
       return normalizedAddress
@@ -8210,9 +8435,11 @@
     function nearestStore(stores = []) {
       if (!stores.length) return null;
       return [...stores].sort((a, b) => {
-        const aDistance = typeof a.distance === 'number' ? a.distance : Number.POSITIVE_INFINITY;
-        const bDistance = typeof b.distance === 'number' ? b.distance : Number.POSITIVE_INFINITY;
-        return aDistance - bDistance;
+        const aDistance = getEffectiveStoreDistance(a);
+        const bDistance = getEffectiveStoreDistance(b);
+        const safeADistance = typeof aDistance === 'number' ? aDistance : Number.POSITIVE_INFINITY;
+        const safeBDistance = typeof bDistance === 'number' ? bDistance : Number.POSITIVE_INFINITY;
+        return safeADistance - safeBDistance;
       })[0];
     }
 
@@ -8222,7 +8449,7 @@
       <div class="result-store-index">${index + 1}.</div>
       <div class="result-store-copy">
         ${renderAddressLink(store.address)}
-        <div class="result-store-meta">Qty: <strong>${Number(store.inventory_count || 0)}</strong> | Distance: ${escapeHtml(formatDistance(store.distance))}</div>
+        <div class="result-store-meta">Qty: <strong>${Number(store.inventory_count || 0)}</strong> | Distance: ${escapeHtml(formatDistance(getEffectiveStoreDistance(store)))}</div>
       </div>
     </div>
   `).join('');
@@ -8245,7 +8472,7 @@
       const sourceUrl = sanitizeProductSourceUrl(product.source_url || '');
       const zipDisplay = escapeHtml(configuredZip || 'configured ZIP');
       const nearestAddress = nearest ? renderAddressLink(nearest.address) : 'No stores found';
-      const nearestDistance = nearest ? formatDistance(nearest.distance) : 'Distance unavailable';
+      const nearestDistance = nearest ? formatDistance(getEffectiveStoreDistance(nearest)) : 'Distance unavailable';
 
       return `
     <article class="result-card">
@@ -8674,6 +8901,13 @@
       isStatusRefreshInFlight = true;
 
       try {
+        if (!mapDistanceReference && loadStoredMapAddress()) {
+          try {
+            await ensureSavedMapAddressReference();
+          } catch (error) {
+          }
+        }
+
         const data = await apiCall('/api/status');
         if (!data) {
           return null;
@@ -8700,6 +8934,7 @@
           const rate = statistics.success_rate || 0;
           document.getElementById('stat-success-rate').textContent = (rate % 1 === 0 ? rate : rate.toFixed(1)) + '%';
         }
+        renderDashboardInsights(status, statistics);
         applyPokemonBackgroundSettings({
           enabled: status.pokemon_background_enabled ?? DEFAULT_POKEMON_BACKGROUND_ENABLED,
           theme: status.pokemon_background_theme || DEFAULT_POKEMON_BACKGROUND_THEME,

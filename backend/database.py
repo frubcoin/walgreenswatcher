@@ -534,28 +534,86 @@ class StockDatabase:
         return history
 
     def get_statistics(self, user_id: int) -> Dict[str, Any]:
+        now = datetime.utcnow()
+        checks_today_cutoff = now - timedelta(days=1)
+        checks_week_cutoff = now - timedelta(days=7)
+        recent_scan_window = 50
+
         with self._connect() as conn:
             row = conn.execute(
                 """
                 SELECT
                     COUNT(*) AS total_checks,
                     SUM(CASE WHEN has_stock = 1 THEN 1 ELSE 0 END) AS checks_with_stock,
-                    MAX(timestamp) AS last_check
+                    MAX(timestamp) AS last_check,
+                    SUM(CASE WHEN timestamp >= ? THEN 1 ELSE 0 END) AS checks_today,
+                    SUM(CASE WHEN timestamp >= ? THEN 1 ELSE 0 END) AS checks_this_week
                 FROM check_history
                 WHERE user_id = ?
                 """,
-                (user_id,),
+                (
+                    checks_today_cutoff.isoformat(),
+                    checks_week_cutoff.isoformat(),
+                    user_id,
+                ),
             ).fetchone()
+
+            recent_rows = conn.execute(
+                """
+                SELECT products_found
+                FROM check_history
+                WHERE user_id = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                (user_id, recent_scan_window),
+            ).fetchall()
 
         total_checks = int((row["total_checks"] or 0) if row else 0)
         checks_with_stock = int((row["checks_with_stock"] or 0) if row else 0)
         success_rate = (checks_with_stock / total_checks * 100) if total_checks else 0
+        checks_today = int((row["checks_today"] or 0) if row else 0)
+        checks_this_week = int((row["checks_this_week"] or 0) if row else 0)
+
+        tracked_products = self.list_tracked_products(user_id)
+        recent_product_hits: Dict[str, Dict[str, Any]] = {
+            str(product["id"]): {
+                "id": str(product["id"]),
+                "name": str(product["name"] or product["id"]),
+                "recent_hits": 0,
+            }
+            for product in tracked_products
+        }
+
+        for history_row in recent_rows:
+            products_found = self._decode_json(history_row["products_found"], {})
+            for product_id in products_found.keys():
+                if product_id in recent_product_hits:
+                    recent_product_hits[product_id]["recent_hits"] += 1
+
+        most_active_product = None
+        least_active_product = None
+        if recent_product_hits:
+            activity_values = list(recent_product_hits.values())
+            most_active_product = sorted(
+                activity_values,
+                key=lambda item: (-int(item["recent_hits"]), str(item["name"]).lower(), str(item["id"])),
+            )[0]
+            least_active_product = sorted(
+                activity_values,
+                key=lambda item: (int(item["recent_hits"]), str(item["name"]).lower(), str(item["id"])),
+            )[0]
 
         return {
             "total_checks": total_checks,
             "checks_with_stock": checks_with_stock,
             "success_rate": success_rate,
             "last_check": row["last_check"] if row else None,
+            "checks_today": checks_today,
+            "checks_this_week": checks_this_week,
+            "recent_scan_window": len(recent_rows),
+            "most_active_product": most_active_product,
+            "least_active_product": least_active_product,
         }
 
     def get_global_statistics(self) -> Dict[str, int]:
