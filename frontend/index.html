@@ -1651,6 +1651,13 @@
       justify-content: flex-end;
     }
 
+    .onboarding-inline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
     .onboarding-inline-status {
       min-height: 20px;
       font-size: 13px;
@@ -5905,7 +5912,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">Check Interval</label>
-            <input type="number" class="form-input" id="cfg-interval" min="1" max="1440" step="1" placeholder="60">
+            <input type="number" class="form-input" id="cfg-interval" min="30" max="1440" step="1" placeholder="60">
             <span class="form-hint">Minutes between automatic checks</span>
           </div>
           <div class="form-group">
@@ -6187,6 +6194,7 @@
     let onboardingDraft = null;
     let onboardingFeedback = { message: '', type: 'info' };
     let onboardingBusy = false;
+    let onboardingProductsAddedCount = 0;
     let deferredInstallPrompt = null;
     let installDisplayModeQueries = [];
     let shellScrollbarFrame = 0;
@@ -6796,6 +6804,7 @@
       onboardingDraft = null;
       onboardingFeedback = { message: '', type: 'info' };
       onboardingBusy = false;
+      onboardingProductsAddedCount = 0;
     }
 
     function buildOnboardingDraft() {
@@ -6858,6 +6867,7 @@
       const draft = ensureOnboardingDraft();
       const configuredZip = draft.zipcode || latestStatusSnapshot?.status?.current_zipcode || 'your ZIP code';
       const trackedCount = trackedProductsCache.length || (latestStatusSnapshot?.status?.tracked_products || []).length || 0;
+      const addedProductCount = onboardingProductsAddedCount;
 
       return [
         {
@@ -6908,7 +6918,7 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-interval">Check Interval</label>
-                  <input type="number" class="form-input" id="onboarding-interval" min="1" max="1440" step="1" placeholder="60" value="${escapeHtml(draft.interval)}">
+                  <input type="number" class="form-input" id="onboarding-interval" min="30" max="1440" step="1" placeholder="60" value="${escapeHtml(draft.interval)}">
                   <span class="form-hint">Minutes between automatic checks.</span>
                 </div>
               </div>
@@ -6954,9 +6964,9 @@
         },
         {
           tag: 'Products',
-          title: 'Add the first product you want watched.',
+          title: addedProductCount > 0 ? 'Add more products if you want.' : 'Add the first product you want watched.',
           copy: 'Pick a community suggestion or paste one supported product link and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
-          calloutTitle: 'Add at least one tracked item',
+          calloutTitle: addedProductCount > 0 ? 'Add another product or continue' : 'Add at least one tracked item',
           bullets: [
             'Choose a community suggestion or paste a supported product page URL.',
             'Use a custom name if you want cleaner Discord labels.',
@@ -6967,11 +6977,21 @@
             openTab('settings');
             document.getElementById('new-product-url')?.focus();
           },
-          nextLabel: 'Add product',
+          nextLabel: addedProductCount > 0 ? 'Continue to launch' : 'Add product',
           renderForm: () => `
               <div class="onboarding-form-card">
-                <div class="onboarding-form-card-title">First tracked product</div>
+                <div class="onboarding-form-card-title">${addedProductCount > 0 ? 'Add another tracked product' : 'First tracked product'}</div>
                 <div class="onboarding-form-card-copy">If one of the recent community picks matches what you want, use it to prefill the fields below and keep moving.</div>
+                ${addedProductCount > 0 ? `
+                  <div class="onboarding-form-card">
+                    <div class="onboarding-form-card-title">Add another?</div>
+                    <div class="onboarding-form-card-copy">You added ${addedProductCount} product${addedProductCount === 1 ? '' : 's'} during setup. Paste another link below, or continue to launch when you are ready.</div>
+                    <div class="onboarding-inline-actions">
+                      <button class="btn btn-secondary btn-sm" type="button" data-action="focus-onboarding-product-url">Add another product</button>
+                      <button class="btn btn-primary btn-sm" type="button" data-action="onboarding-continue-products">Continue to launch</button>
+                    </div>
+                  </div>
+                ` : ''}
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-url">Product URL</label>
                   <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a product link" value="${escapeHtml(draft.productUrl)}">
@@ -7106,6 +7126,7 @@
         onboardingStepIndex = 0;
         onboardingDraft = buildOnboardingDraft();
         onboardingFeedback = { message: '', type: 'info' };
+        onboardingProductsAddedCount = 0;
       } else {
         ensureOnboardingDraft();
       }
@@ -7207,6 +7228,10 @@
         renderOnboarding();
         return;
       }
+      if (result === 'stay') {
+        renderOnboarding();
+        return;
+      }
       if (result === 'complete') {
         return;
       }
@@ -7236,8 +7261,8 @@
         return false;
       }
 
-      if (!Number.isFinite(interval) || interval < 1 || interval > 1440) {
-        setOnboardingFeedback('Choose an interval between 1 and 1440 minutes.', 'error');
+      if (!Number.isFinite(interval) || interval < 30 || interval > 1440) {
+        setOnboardingFeedback('Choose an interval between 30 and 1440 minutes.', 'error');
         return false;
       }
 
@@ -7331,12 +7356,33 @@
 
       draft.productUrl = '';
       draft.productName = '';
+      onboardingProductsAddedCount += 1;
+      const onboardingUrlInput = document.getElementById('onboarding-product-url');
+      const onboardingNameInput = document.getElementById('onboarding-product-name');
+      if (onboardingUrlInput) onboardingUrlInput.value = '';
+      if (onboardingNameInput) onboardingNameInput.value = '';
       document.getElementById('new-product-url').value = '';
       document.getElementById('new-product-name').value = '';
       await loadSettings();
       latestStatusSnapshot = await loadStatus();
-      setOnboardingFeedback(`Added ${customName || resolved.name}.`, 'success');
-      return true;
+      setOnboardingFeedback(`Added ${customName || resolved.name}. Add another product or continue to launch.`, 'success');
+      return 'stay';
+    }
+
+    function focusOnboardingProductFields() {
+      syncOnboardingDraftFromCurrentStep();
+      onboardingFeedback = { message: '', type: 'info' };
+      renderOnboarding();
+      window.requestAnimationFrame(() => {
+        const input = document.getElementById('onboarding-product-url');
+        input?.focus();
+        input?.select?.();
+      });
+    }
+
+    function continueOnboardingAfterProducts() {
+      syncOnboardingDraftFromCurrentStep();
+      goToOnboardingStep(1);
     }
 
     function useOnboardingTrendingProduct(sourceElement) {
@@ -9105,6 +9151,12 @@
           return;
         case 'onboarding-back':
           goToOnboardingStep(-1);
+          return;
+        case 'focus-onboarding-product-url':
+          focusOnboardingProductFields();
+          return;
+        case 'onboarding-continue-products':
+          continueOnboardingAfterProducts();
           return;
         case 'onboarding-jump':
           handleOnboardingAction();
