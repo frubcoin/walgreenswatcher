@@ -37,7 +37,6 @@ class CvsStockChecker:
 
     INVENTORY_URLS = (
         "https://www.cvs.com/RETAGPV3/Inventory/V1/getStoreDetailsAndInventory",
-        "https://www.cvs.com/REIAGPV3/Inventory/V1/getStoreDetailsAndInventory",
     )
 
     def __init__(self) -> None:
@@ -229,7 +228,19 @@ class CvsStockChecker:
 
     @staticmethod
     def _is_access_denied_response(status_code: int, snippet: str) -> bool:
-        return int(status_code or 0) == 403 and "access denied" in str(snippet or "").lower()
+        if int(status_code or 0) != 403:
+            return False
+        normalized = str(snippet or "").lower()
+        return any(
+            marker in normalized
+            for marker in (
+                "access denied",
+                "<html",
+                "noindex",
+                "forbidden",
+                "request unsuccessful",
+            )
+        )
 
     def _fetch_inventory_payload(self, product: Dict[str, Any], zip_code: str) -> Dict[str, Any]:
         product_id = str(
