@@ -168,7 +168,8 @@
       position: fixed;
       inset: 0;
       pointer-events: none;
-      z-index: 10; /* Put grain on top for depth */
+      z-index: 10;
+      /* Put grain on top for depth */
       background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9Im4iPgogICAgICA8ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC43OCIgbnVtT2N0YXZlcz0iMyIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPgogICAgPC9maWx0ZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNuKSIgb3BhY2l0eT0iMC4wNSIvPgo8L3N2Zz4=');
       opacity: 0.35;
       mix-blend-mode: overlay;
@@ -2352,7 +2353,8 @@
     .map-locate-btn img {
       width: 22px;
       height: 22px;
-      filter: invert(1) brightness(2); /* Make the black icon white */
+      filter: invert(1) brightness(2);
+      /* Make the black icon white */
     }
 
     .user-location-pulse {
@@ -2375,8 +2377,15 @@
     }
 
     @keyframes pulse-ring-user {
-      0% { transform: scale(0.7); opacity: 0.8; }
-      100% { transform: scale(2.5); opacity: 0; }
+      0% {
+        transform: scale(0.7);
+        opacity: 0.8;
+      }
+
+      100% {
+        transform: scale(2.5);
+        opacity: 0;
+      }
     }
 
     .results-map-sidebar {
@@ -6642,7 +6651,7 @@
                 <div class="results-map-card">
                   <div class="results-map-canvas" id="results-map"></div>
                   <button class="map-locate-btn" type="button" data-action="show-my-location" title="Show my location">
-                    <img src="/location.png" alt="Locate me">
+                    <img src="/location.svg" alt="Locate me">
                   </button>
                 </div>
                 <aside class="results-map-sidebar">
