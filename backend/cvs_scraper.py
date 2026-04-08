@@ -14,7 +14,7 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
 
-from config import TARGET_ZIP_CODE
+from config import CVS_PROXY_URL, TARGET_ZIP_CODE
 
 PROGRESS_UI_YIELD_SECONDS = 0.02
 
@@ -50,8 +50,12 @@ class CvsStockChecker:
     @staticmethod
     def _new_session() -> requests.Session:
         if curl_requests is not None:
-            return curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
-        return requests.Session()
+            session = curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
+        else:
+            session = requests.Session()
+        if CVS_PROXY_URL:
+            session.proxies.update({"http": CVS_PROXY_URL, "https": CVS_PROXY_URL})
+        return session
 
     @staticmethod
     def _request_headers(
@@ -220,6 +224,8 @@ class CvsStockChecker:
             raise ValueError("CVS products require a numeric product id")
 
         session = self._new_session()
+        if CVS_PROXY_URL:
+            logger.info("CVS requests are using proxy routing")
         referer, api_key = self._bootstrap_session(session, product)
         api_keys = list(dict.fromkeys(key for key in (api_key, CVS_INVENTORY_PUBLIC_API_KEY) if key))
         if api_keys:

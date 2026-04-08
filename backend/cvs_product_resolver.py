@@ -17,7 +17,7 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
 
-from config import USER_AGENTS
+from config import CVS_PROXY_URL, USER_AGENTS
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,12 @@ class CvsProductResolver:
     @staticmethod
     def _new_session() -> requests.Session:
         if curl_requests is not None:
-            return curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
-        return requests.Session()
+            session = curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
+        else:
+            session = requests.Session()
+        if CVS_PROXY_URL:
+            session.proxies.update({"http": CVS_PROXY_URL, "https": CVS_PROXY_URL})
+        return session
 
     @staticmethod
     def _normalize_url(url: str) -> str:
