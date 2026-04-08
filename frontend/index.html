@@ -6066,8 +6066,14 @@
       message: 'Enter an address, city, or ZIP to center the map.',
       tone: 'muted'
     };
+    const DASHBOARD_ROUTE_PATH = '/dashboard';
+
+    function normalizeRoutePath(pathname = window.location.pathname) {
+      return String(pathname || '').replace(/\/+$/, '') || '/';
+    }
+
     function getInitialTabName(pathname = window.location.pathname) {
-      const normalizedPath = String(pathname || '').replace(/\/+$/, '') || '/';
+      const normalizedPath = normalizeRoutePath(pathname);
       if (normalizedPath === '/settings' || normalizedPath === '/trending') {
         return 'settings';
       }
@@ -6077,7 +6083,37 @@
       return 'results';
     }
 
-    const INITIAL_ROUTE_PATH = window.location.pathname.replace(/\/+$/, '') || '/';
+    function getDirectLinkedTabName(pathname = window.location.pathname) {
+      const normalizedPath = normalizeRoutePath(pathname);
+      if (normalizedPath === '/settings' || normalizedPath === '/trending') {
+        return 'settings';
+      }
+      if (normalizedPath === '/history') {
+        return 'history';
+      }
+      if (normalizedPath === '/map') {
+        return 'results';
+      }
+      return '';
+    }
+
+    function clearDirectLinkRoute() {
+      if (!window.history?.replaceState) return;
+      const currentUrl = new URL(window.location.href);
+      if (normalizeRoutePath(currentUrl.pathname) === DASHBOARD_ROUTE_PATH) return;
+      currentUrl.pathname = DASHBOARD_ROUTE_PATH;
+      currentUrl.search = '';
+      currentUrl.hash = '';
+      window.history.replaceState({}, '', currentUrl);
+    }
+
+    function syncDashboardRouteForTab(tabName) {
+      const directLinkedTab = getDirectLinkedTabName();
+      if (!directLinkedTab || directLinkedTab === tabName) return;
+      clearDirectLinkRoute();
+    }
+
+    const INITIAL_ROUTE_PATH = normalizeRoutePath(window.location.pathname);
     const INITIAL_TAB_NAME = getInitialTabName(INITIAL_ROUTE_PATH);
     let pendingInitialMapScroll = INITIAL_ROUTE_PATH === '/map';
     let pendingInitialTrendingScroll = INITIAL_ROUTE_PATH === '/trending';
@@ -9267,6 +9303,9 @@
 
       if (currentResultsView === 'map' && !mapData.locations.length) {
         currentResultsView = 'cards';
+        if (normalizeRoutePath(window.location.pathname) === '/map') {
+          clearDirectLinkRoute();
+        }
       }
 
       const cardsHtml = Object.entries(products).map(([, product]) => renderResultCard(product, configuredZip)).join('');
@@ -9366,6 +9405,9 @@
 
     async function setResultsView(view) {
       currentResultsView = view === 'map' ? 'map' : 'cards';
+      if (currentResultsView !== 'map' && normalizeRoutePath(window.location.pathname) === '/map') {
+        clearDirectLinkRoute();
+      }
       if (currentResultsView === 'map') {
         await ensureSavedMapAddressReference();
       }
@@ -9967,6 +10009,7 @@
       document.getElementById(`tab-${name}`).classList.add('active');
       document.getElementById(`panel-${name}`).classList.add('active');
       currentTab = name;
+      syncDashboardRouteForTab(name);
       const settingsButton = document.getElementById('settings-btn');
       if (settingsButton) {
         settingsButton.style.display = name === 'settings' ? 'none' : '';
@@ -10203,6 +10246,9 @@
         lastResultsSignature = '';
         latestRenderedResults = null;
         destroyResultsMap();
+        if (normalizeRoutePath(window.location.pathname) === '/map') {
+          clearDirectLinkRoute();
+        }
         document.getElementById('results-container').innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">?</div>
@@ -10228,6 +10274,9 @@
       if (Object.keys(products).length === 0) {
         latestRenderedResults = null;
         destroyResultsMap();
+        if (normalizeRoutePath(window.location.pathname) === '/map') {
+          clearDirectLinkRoute();
+        }
         document.getElementById('results-container').innerHTML = `
       <div class="empty-state">
       <div class="empty-icon"><img src="/out-of-stock.webp" alt="Out of stock"></div>
