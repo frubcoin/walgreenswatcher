@@ -5579,7 +5579,7 @@
                 frontend can point at different environments.</li>
               <li><strong>Why this stack:</strong> Lightweight to host, easy to debug, and fast to ship without needing
                 a frontend framework bundle.</li>
-              <li><strong>Brand marks:</strong> Walgreens, Best Buy, CVS, Discord, Google, OpenStreetMap, and other
+              <li><strong>Brand marks:</strong> Walgreens, Best Buy, Discord, Google, OpenStreetMap, and other
                 service names or logos remain the property of their respective owners and are shown only to identify
                 integrations, retailers, or data sources.</li>
             </ul>
@@ -5857,13 +5857,13 @@
           <div id="products-list"></div>
           <div class="tracked-products-controls">
             <div class="form-group">
-              <input type="url" class="form-input" id="new-product-url" placeholder="Paste a Walgreens or CVS product link">
+              <input type="url" class="form-input" id="new-product-url" placeholder="Paste a product link">
             </div>
             <div class="form-group" style="margin-top:10px;">
               <input type="text" class="form-input" id="new-product-name"
                 placeholder="Optional custom name (e.g., Pokemon Booster Bundle)">
             </div>
-            <div class="form-hint" style="margin-bottom:12px;">Paste a Walgreens or CVS product link
+            <div class="form-hint" style="margin-bottom:12px;">Paste a supported product link
               and the app will extract
               the product metadata and image automatically. If you enter a custom name, that label will be
               used everywhere in the app and Discord alerts.</div>
@@ -6741,10 +6741,10 @@
         {
           tag: 'Products',
           title: 'Add the first product you want watched.',
-          copy: 'Paste one Walgreens or CVS product link and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
+          copy: 'Paste one supported product link and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
           calloutTitle: 'Add at least one tracked item',
           bullets: [
-            'Paste a Walgreens or CVS product page URL.',
+            'Paste a supported product page URL.',
             'Use a custom name if you want cleaner Discord labels.',
             `You currently have ${trackedCount} tracked product${trackedCount === 1 ? '' : 's'} saved.`
           ],
@@ -6759,7 +6759,7 @@
                 <div class="onboarding-form-card-title">First tracked product</div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-url">Product URL</label>
-                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a Walgreens or CVS product link" value="${escapeHtml(draft.productUrl)}">
+                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a product link" value="${escapeHtml(draft.productUrl)}">
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-name">Custom Name</label>
@@ -7091,7 +7091,7 @@
           setOnboardingFeedback('You already have a tracked product, so we can move on.', 'success');
           return true;
         }
-        setOnboardingFeedback('Paste a Walgreens or CVS product link before continuing.', 'error');
+        setOnboardingFeedback('Paste a product link before continuing.', 'error');
         return false;
       }
 
@@ -10024,7 +10024,7 @@
       const customName = document.getElementById('new-product-name').value.trim();
 
       if (!url) {
-        showToast('Paste a Walgreens or CVS product link first', 'error');
+        showToast('Paste a product link first', 'error');
         return;
       }
 

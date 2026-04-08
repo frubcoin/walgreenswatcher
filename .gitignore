@@ -9,3 +9,5 @@ __pycache__/
 /backend/__pycache__
 /backend/__pycache__
 tmp-inline-check.js
+/.venv-scrapling
+/.venv-zendriver

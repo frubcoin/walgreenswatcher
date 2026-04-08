@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
+import os
 import re
 import secrets
+import shutil
 import time
 from typing import Any, Dict, Iterable, List
 from urllib.parse import urlsplit
@@ -14,6 +18,12 @@ try:
     from curl_cffi import requests as curl_requests
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
+try:
+    import zendriver as zd
+    from zendriver import cdp as zendriver_cdp
+except ImportError:  # pragma: no cover - optional runtime dependency
+    zd = None
+    zendriver_cdp = None
 
 from config import CVS_PROXY_URLS, TARGET_ZIP_CODE
 
@@ -136,6 +146,163 @@ class CvsStockChecker:
                 return str(match.group(1) or "").strip()
         return ""
 
+    @staticmethod
+    def _zendriver_browser_executable_path() -> str | None:
+        configured_path = os.getenv("CVS_ZENDRIVER_BROWSER_EXECUTABLE_PATH", "").strip()
+        if configured_path:
+            return configured_path
+
+        for candidate in (
+            shutil.which("google-chrome"),
+            shutil.which("google-chrome-stable"),
+            shutil.which("chromium"),
+            shutil.which("chromium-browser"),
+            shutil.which("chrome"),
+            shutil.which("msedge"),
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        ):
+            if candidate and os.path.exists(candidate):
+                return candidate
+        return None
+
+    @staticmethod
+    def _run_async(coro: Any) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(coro)
+
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+
+    @staticmethod
+    def _remote_value(result: Any) -> Any:
+        if isinstance(result, tuple) and result:
+            first = result[0]
+            return getattr(first, "value", None)
+        return getattr(result, "value", None)
+
+    @classmethod
+    def _zendriver_payload(cls, product_id: str, zip_code: str, api_key: str) -> Dict[str, Any]:
+        return {
+            "getStoreDetailsAndInventoryRequest": {
+                "header": cls._request_body_header(api_key, secrets.token_hex(8)),
+                "productId": product_id,
+                "addressLine": zip_code,
+            }
+        }
+
+    @classmethod
+    async def _fetch_inventory_payload_via_zendriver_async(
+        cls,
+        *,
+        product_id: str,
+        zip_code: str,
+        referer: str,
+        api_key: str,
+    ) -> Dict[str, Any]:
+        if zd is None or zendriver_cdp is None:
+            raise RuntimeError("zendriver is not installed")
+
+        browser_kwargs: Dict[str, Any] = {
+            "headless": True,
+            "sandbox": True,
+        }
+        browser_executable_path = cls._zendriver_browser_executable_path()
+        if browser_executable_path:
+            browser_kwargs["browser_executable_path"] = browser_executable_path
+
+        browser = await zd.start(**browser_kwargs)
+        try:
+            page = await browser.get(referer)
+            await page.sleep(8)
+            payload = cls._zendriver_payload(product_id, zip_code, api_key)
+            request_args = json.dumps(
+                {
+                    "url": cls.INVENTORY_URLS[0],
+                    "headers": {
+                        "accept": "application/json",
+                        "content-type": "application/json",
+                        "x-api-key": api_key,
+                    },
+                    "payload": payload,
+                }
+            )
+            script = """
+            (async () => {
+              const requestArgs = %s;
+              try {
+                const response = await fetch(requestArgs.url, {
+                  method: 'POST',
+                  headers: requestArgs.headers,
+                  body: JSON.stringify(requestArgs.payload),
+                  credentials: 'include'
+                });
+                const text = await response.text();
+                let jsonBody = null;
+                try {
+                  jsonBody = JSON.parse(text);
+                } catch (parseError) {
+                  jsonBody = null;
+                }
+                return {
+                  status: response.status,
+                  text,
+                  jsonBody,
+                };
+              } catch (error) {
+                return {
+                  status: 0,
+                  text: String(error || 'unknown browser fetch error'),
+                  jsonBody: null,
+                };
+              }
+            })()
+            """ % request_args
+            result = await page.send(
+                zendriver_cdp.runtime.evaluate(
+                    expression=script,
+                    await_promise=True,
+                    return_by_value=True,
+                )
+            )
+            response_value = cls._remote_value(result) or {}
+            data = response_value.get("jsonBody")
+            if cls._looks_like_inventory_response(data):
+                logger.info("CVS inventory response accepted from browser page context via zendriver")
+                return data
+
+            snippet = str(response_value.get("text") or "")[:200].replace("\n", " ")
+            raise ValueError(
+                "zendriver browser-context inventory request failed with "
+                f"HTTP {response_value.get('status') or 'unknown'}: {snippet}"
+            )
+        finally:
+            await browser.stop()
+
+    def _fetch_inventory_payload_via_zendriver(
+        self,
+        *,
+        product_id: str,
+        zip_code: str,
+        referer: str,
+        api_key: str,
+    ) -> Dict[str, Any]:
+        return self._run_async(
+            self._fetch_inventory_payload_via_zendriver_async(
+                product_id=product_id,
+                zip_code=zip_code,
+                referer=referer,
+                api_key=api_key,
+            )
+        )
+
     def _bootstrap_session(self, session: requests.Session, product: Dict[str, Any]) -> tuple[str, str]:
         referer = str(product.get("source_url", "")).strip() or "https://www.cvs.com/"
         api_key = ""
@@ -253,6 +420,22 @@ class CvsStockChecker:
             raise ValueError("CVS products require a numeric product id")
 
         failures: List[str] = []
+        referer = str(product.get("source_url", "")).strip() or "https://www.cvs.com/"
+        api_key_candidates = list(dict.fromkeys(key for key in (CVS_INVENTORY_PUBLIC_API_KEY,) if key))
+
+        if api_key_candidates:
+            try:
+                logger.info("CVS inventory attempting zendriver browser-context fetch")
+                return self._fetch_inventory_payload_via_zendriver(
+                    product_id=product_id,
+                    zip_code=zip_code,
+                    referer=referer,
+                    api_key=api_key_candidates[0],
+                )
+            except Exception as exc:
+                failures.append(f"zendriver browser context {type(exc).__name__}: {exc}")
+                logger.warning("CVS zendriver inventory attempt failed: %s", exc)
+
         proxy_candidates = self._proxy_candidates()
         if proxy_candidates:
             logger.info("CVS inventory will try %s proxy candidate(s)", len(proxy_candidates))
