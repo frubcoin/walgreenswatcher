@@ -2871,20 +2871,20 @@
       color: var(--text-muted);
     }
 
-    .results-map-filter-select {
+    .results-map-filter-select-trigger {
       width: 100%;
       min-width: 0;
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       border-radius: 14px;
       border: 1px solid rgba(72, 156, 212, 0.28);
       background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.03)),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='rgba(244,247,249,0.82)' d='M6 7.4.6 2l1.4-1.4L6 4.6 10 .6 11.4 2z'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px,
         rgba(17, 20, 24, 0.88);
       color: var(--text-primary);
-      padding: 11px 40px 11px 14px;
+      padding: 11px 14px;
       font: inherit;
       font-size: 14px;
       line-height: 1.2;
@@ -2892,19 +2892,18 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.04),
         0 8px 18px rgba(0, 0, 0, 0.16);
       transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, transform 0.18s ease;
-      color-scheme: dark;
       cursor: pointer;
+      text-align: left;
     }
 
-    .results-map-filter-select:hover {
+    .results-map-filter-select-trigger:hover {
       border-color: rgba(72, 156, 212, 0.38);
       background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.035)),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='rgba(244,247,249,0.92)' d='M6 7.4.6 2l1.4-1.4L6 4.6 10 .6 11.4 2z'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px,
         rgba(19, 23, 27, 0.94);
     }
 
-    .results-map-filter-select:focus {
+    .results-map-filter-select-trigger:focus-visible {
       outline: none;
       border-color: var(--accent-soft-border);
       box-shadow:
@@ -2914,10 +2913,81 @@
       transform: translateY(-1px);
     }
 
-    .results-map-filter-select option,
-    .results-map-filter-select optgroup {
-      background: #23282d;
+    .results-map-filter-select-trigger.is-open {
+      border-color: rgba(72, 156, 212, 0.42);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 0 0 3px rgba(72, 156, 212, 0.1),
+        0 12px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .results-map-filter-select-value {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-primary);
+    }
+
+    .results-map-filter-select-chevron {
+      flex: 0 0 auto;
+      width: 10px;
+      height: 10px;
+      border-right: 2px solid rgba(244, 247, 249, 0.82);
+      border-bottom: 2px solid rgba(244, 247, 249, 0.82);
+      transform: translateY(-2px) rotate(45deg);
+      transition: transform 0.18s ease, border-color 0.18s ease;
+    }
+
+    .results-map-filter-select-trigger.is-open .results-map-filter-select-chevron {
+      transform: translateY(2px) rotate(-135deg);
+    }
+
+    .results-map-filter-menu {
+      display: grid;
+      gap: 6px;
+      padding: 8px;
+      border-radius: 14px;
+      border: 1px solid rgba(72, 156, 212, 0.18);
+      background: rgba(18, 21, 25, 0.96);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.03),
+        0 16px 30px rgba(0, 0, 0, 0.24);
+      max-height: 220px;
+      overflow: auto;
+    }
+
+    .results-map-filter-menu[hidden] {
+      display: none;
+    }
+
+    .results-map-filter-option {
+      width: 100%;
+      text-align: left;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 10px 12px;
+      font: inherit;
+      font-size: 13px;
+      line-height: 1.3;
+      cursor: pointer;
+      transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+    }
+
+    .results-map-filter-option:hover,
+    .results-map-filter-option:focus-visible {
+      outline: none;
+      background: rgba(72, 156, 212, 0.12);
+      color: var(--text-primary);
+      transform: translateY(-1px);
+    }
+
+    .results-map-filter-option.is-selected {
+      background: rgba(72, 156, 212, 0.2);
       color: #f4f7f9;
+      box-shadow: inset 0 0 0 1px rgba(72, 156, 212, 0.18);
     }
 
     .results-map-filter-summary {
@@ -6256,6 +6326,7 @@
     let currentResultsMapTheme = loadStoredResultsMapTheme();
     let currentResultsMapProductFilter = '';
     let resultsMapProductFilterOpen = false;
+    let resultsMapProductMenuOpen = false;
     let manualLocationFallbackVisible = false;
     let mapDistanceReference = loadStoredMapAddressReference();
     let manualLocationQuery = loadStoredMapAddress();
@@ -9719,13 +9790,22 @@
 
       const filterPanelHtml = hasFilterControl && resultsMapProductFilterOpen ? `
         <div class="results-map-filter-row">
-          <label class="results-map-filter-label" for="results-map-product-filter">Filter by product</label>
-          <select class="results-map-filter-select" id="results-map-product-filter">
-            <option value="">All products</option>
+          <div class="results-map-filter-label">Filter by product</div>
+          <button
+            class="results-map-filter-select-trigger ${resultsMapProductMenuOpen ? 'is-open' : ''}"
+            type="button"
+            data-action="toggle-results-map-product-menu"
+            aria-haspopup="listbox"
+            aria-expanded="${resultsMapProductMenuOpen ? 'true' : 'false'}">
+            <span class="results-map-filter-select-value">${escapeHtml(currentResultsMapProductFilter || 'All products')}</span>
+            <span class="results-map-filter-select-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="results-map-filter-menu" role="listbox" ${resultsMapProductMenuOpen ? '' : 'hidden'}>
+            <button class="results-map-filter-option ${!currentResultsMapProductFilter ? 'is-selected' : ''}" type="button" data-action="set-results-map-product-filter" data-product-filter-value="" role="option" aria-selected="${!currentResultsMapProductFilter ? 'true' : 'false'}">All products</button>
             ${productOptions.map(productName => `
-              <option value="${escapeHtml(productName)}"${productName === currentResultsMapProductFilter ? ' selected' : ''}>${escapeHtml(productName)}</option>
+              <button class="results-map-filter-option ${productName === currentResultsMapProductFilter ? 'is-selected' : ''}" type="button" data-action="set-results-map-product-filter" data-product-filter-value="${escapeHtml(productName)}" role="option" aria-selected="${productName === currentResultsMapProductFilter ? 'true' : 'false'}">${escapeHtml(productName)}</button>
             `).join('')}
-          </select>
+          </div>
           <div class="results-map-filter-summary">
             Showing ${filteredLocations.length} of ${locations.length} pinned store${locations.length === 1 ? '' : 's'}${currentResultsMapProductFilter ? ` for ${escapeHtml(currentResultsMapProductFilter)}` : ''}.
           </div>
