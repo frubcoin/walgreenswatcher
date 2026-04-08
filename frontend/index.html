@@ -2874,18 +2874,50 @@
     .results-map-filter-select {
       width: 100%;
       min-width: 0;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.05);
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      border-radius: 14px;
+      border: 1px solid rgba(72, 156, 212, 0.28);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.03)),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='rgba(244,247,249,0.82)' d='M6 7.4.6 2l1.4-1.4L6 4.6 10 .6 11.4 2z'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px,
+        rgba(17, 20, 24, 0.88);
       color: var(--text-primary);
-      padding: 10px 12px;
+      padding: 11px 40px 11px 14px;
       font: inherit;
+      font-size: 14px;
+      line-height: 1.2;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 8px 18px rgba(0, 0, 0, 0.16);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, transform 0.18s ease;
+      color-scheme: dark;
+      cursor: pointer;
+    }
+
+    .results-map-filter-select:hover {
+      border-color: rgba(72, 156, 212, 0.38);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.035)),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='rgba(244,247,249,0.92)' d='M6 7.4.6 2l1.4-1.4L6 4.6 10 .6 11.4 2z'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px,
+        rgba(19, 23, 27, 0.94);
     }
 
     .results-map-filter-select:focus {
       outline: none;
       border-color: var(--accent-soft-border);
-      box-shadow: 0 0 0 3px rgba(72, 156, 212, 0.14);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 0 0 3px rgba(72, 156, 212, 0.14),
+        0 10px 20px rgba(0, 0, 0, 0.18);
+      transform: translateY(-1px);
+    }
+
+    .results-map-filter-select option,
+    .results-map-filter-select optgroup {
+      background: #23282d;
+      color: #f4f7f9;
     }
 
     .results-map-filter-summary {
