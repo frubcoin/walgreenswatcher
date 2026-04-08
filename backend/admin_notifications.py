@@ -55,7 +55,14 @@ class AdminAlertService:
     def _is_discord_webhook(url: str) -> bool:
         parsed = urlparse(url)
         host = str(parsed.netloc or "").lower()
-        return host in {"discord.com", "www.discord.com", "discordapp.com", "www.discordapp.com"}
+        return host in {
+            "discord.com",
+            "www.discord.com",
+            "canary.discord.com",
+            "ptb.discord.com",
+            "discordapp.com",
+            "www.discordapp.com",
+        }
 
     @staticmethod
     def _discord_embed_color(category: str) -> int:
