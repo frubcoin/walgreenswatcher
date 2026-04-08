@@ -282,7 +282,7 @@ class DiscordNotifier:
             description_prefix = (
                 f"Near ZIP {configured_zip}\n"
                 f"{store_count} stores in stock | {total_units} total units\n\n"
-                f"🔗 [Open map view](https://walgreens.frub.dev/)\n\n"
+                f"🗺️ [Open map view](https://walgreens.frub.dev/map)\n\n"
             )
 
             base_fields = [

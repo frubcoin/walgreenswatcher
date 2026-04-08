@@ -8127,6 +8127,28 @@
       });
     }
 
+    function isMobileSignedInDashboard() {
+      return !document.body.classList.contains('auth-gate-active')
+        && Boolean(window.matchMedia?.('(max-width: 640px)').matches);
+    }
+
+    function scrollMobileResultsToMap() {
+      if (!isMobileSignedInDashboard()) return;
+
+      const target = document.querySelector('#results-view-map.active .results-map-card')
+        || document.querySelector('#panel-results .results-map-card');
+      if (!target) return;
+
+      window.requestAnimationFrame(() => {
+        target.scrollIntoView({
+          block: 'start',
+          inline: 'nearest',
+          behavior: 'smooth'
+        });
+        queueShellScrollbarUpdate();
+      });
+    }
+
     function createResultsMapMarkerIcon(location) {
       const markerClasses = [
         'results-store-marker',
@@ -8151,6 +8173,7 @@
       const marker = resultsMapMarkersByKey.get(locationKey);
       if (!resultsMap || !marker) return;
 
+      scrollMobileResultsToMap();
       resultsMap.invalidateSize();
       const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
       const targetZoom = Math.max(currentZoom, 14);
@@ -9143,7 +9166,7 @@
       const absMinutes = Math.round(Math.abs(deltaMs) / 60000);
 
       if (absMinutes < 1) {
-        return deltaMs >= 0 ? 'Any moment' : 'Just passed';
+        return deltaMs >= 0 ? 'Just now' : 'Just passed';
       }
 
       if (absMinutes < 60) {
