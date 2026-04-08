@@ -162,33 +162,34 @@
       will-change: transform;
     }
 
-    /* Grain Overlay */
+    /* Global Noise Overlay */
     body::after {
       content: '';
       position: fixed;
       inset: 0;
-      background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9Im4iPgogICAgICA8ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC43OCIgbnVtT2N0YXZlcz0iMyIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPgogICAgPC9maWx0ZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNuKSIgb3BhY2l0eT0iMC4wNSIvPgo8L3N2Zz4=');
-      opacity: 0.4;
       pointer-events: none;
-      z-index: 1;
+      z-index: 10; /* Put grain on top for depth */
+      background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9Im4iPgogICAgICA8ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC43OCIgbnVtT2N0YXZlcz0iMyIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPgogICAgPC9maWx0ZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNuKSIgb3BhY2l0eT0iMC4wNSIvPgo8L3N2Zz4=');
+      opacity: 0.35;
+      mix-blend-mode: overlay;
     }
 
-    body::after {
-      content: '';
+    /* Pokemon Background Layer */
+    .pokemon-bg-overlay {
       position: fixed;
       inset: 0;
       pointer-events: none;
       z-index: 0;
-      background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9Im5vaXNlIj4KICAgICAgPGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuOSIgbnVtT2N0YXZlcz0iNCIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPgogICAgICA8ZmVDb2xvck1hdHJpeCB0eXBlPSJzYXR1cmF0ZSIgdmFsdWVzPSIwIi8+CiAgICA8L2ZpbHRlcj4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI25vaXNlKSIgb3BhY2l0eT0iMC4xIi8+Cjwvc3ZnPg=='), var(--pokemon-bg-image);
-      background-position: 0 0, top left;
-      background-repeat: repeat, repeat;
-      background-size: 100px 100px, var(--pokemon-bg-size);
+      background-image: var(--pokemon-bg-image);
+      background-position: top left;
+      background-repeat: repeat;
+      background-size: var(--pokemon-bg-size);
       opacity: 0;
       transition: opacity 0.2s ease;
     }
 
-    html.pokemon-bg-enabled body::after,
-    body.pokemon-bg-enabled::after {
+    html.pokemon-bg-enabled .pokemon-bg-overlay,
+    body.pokemon-bg-enabled .pokemon-bg-overlay {
       opacity: var(--pokemon-bg-opacity);
     }
 
@@ -3812,6 +3813,7 @@
 </head>
 
 <body class="auth-gate-active app-booting">
+  <div class="pokemon-bg-overlay"></div>
 
   <div id="page-loader">
     <div class="lds-spinner">
