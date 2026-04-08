@@ -2282,7 +2282,6 @@
     }
 
     .results-map-card {
-      height: 100%;
       display: flex;
       flex-direction: column;
       position: relative;
@@ -5271,6 +5270,7 @@
     let resultsMapMarkers = [];
     let resultsMapMarkersByKey = new Map();
     let userLocationMarker = null;
+    let resultsMapInvalidateTimer = 0;
     let activeResultsMapKey = null;
     let currentResultsMapTheme = loadStoredResultsMapTheme();
     let manualLocationFallbackVisible = false;
@@ -5692,6 +5692,7 @@
           resultsMap.removeLayer(resultsMapBaseLayer);
         }
         resultsMapBaseLayer = getResultsMapTileLayer(normalizedTheme).addTo(resultsMap);
+        scheduleResultsMapInvalidate({ preserveActive: true });
       }
 
       updateResultsMapThemeControlState(normalizedTheme);
@@ -7100,6 +7101,10 @@
     }
 
     function destroyResultsMap() {
+      if (resultsMapInvalidateTimer) {
+        window.clearTimeout(resultsMapInvalidateTimer);
+        resultsMapInvalidateTimer = 0;
+      }
       resultsMapBaseLayer = null;
       resultsMapMarkers = [];
       resultsMapMarkersByKey = new Map();
@@ -7111,6 +7116,32 @@
       if (!resultsMap) return;
       resultsMap.remove();
       resultsMap = null;
+    }
+
+    function scheduleResultsMapInvalidate(options = {}) {
+      const { preserveActive = true, fallbackLocationKey = '' } = options;
+      if (!resultsMap) return;
+
+      const refresh = () => {
+        if (!resultsMap) return;
+        resultsMap.invalidateSize();
+        if (preserveActive && resultsMapMarkers.length) {
+          setActiveResultsMapItem(activeResultsMapKey || fallbackLocationKey || resultsMapMarkers[0]?.options?.locationKey || '');
+        }
+      };
+
+      window.requestAnimationFrame(() => {
+        refresh();
+        window.requestAnimationFrame(refresh);
+      });
+
+      if (resultsMapInvalidateTimer) {
+        window.clearTimeout(resultsMapInvalidateTimer);
+      }
+      resultsMapInvalidateTimer = window.setTimeout(() => {
+        resultsMapInvalidateTimer = 0;
+        refresh();
+      }, 140);
     }
 
     function renderMapPopup(location) {
@@ -7952,14 +7983,10 @@
         resultsMap.setView([33.4484, -112.0740], 10);
       }
 
-      setTimeout(() => {
-        if (resultsMap) {
-          resultsMap.invalidateSize();
-          if (locations.length) {
-            setActiveResultsMapItem(activeResultsMapKey || locations[0].location_key);
-          }
-        }
-      }, 0);
+      scheduleResultsMapInvalidate({
+        preserveActive: true,
+        fallbackLocationKey: locations[0]?.location_key || ''
+      });
     }
 
     function renderResultsMapList(locations = []) {
