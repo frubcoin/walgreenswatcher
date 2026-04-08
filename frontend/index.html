@@ -5717,17 +5717,6 @@
         }
       } catch (e) { }
 
-      if (!themeToApply) {
-        const statusData = JSON.parse(localStorage.getItem('cached_api_status'));
-        if (statusData && statusData.status) {
-          themeToApply = {
-            enabled: statusData.status.pokemon_background_enabled ?? DEFAULT_POKEMON_BACKGROUND_ENABLED,
-            theme: statusData.status.pokemon_background_theme || DEFAULT_POKEMON_BACKGROUND_THEME,
-            tileSize: statusData.status.pokemon_background_tile_size ?? DEFAULT_POKEMON_BACKGROUND_TILE_SIZE
-          };
-        }
-      }
-
       if (themeToApply) {
         // Wait for body to be available before setting classes/images if this runs purely in head
         const tryApply = () => {
@@ -6432,6 +6421,10 @@
 
     const INITIAL_ROUTE_PATH = normalizeRoutePath(window.location.pathname);
     const INITIAL_TAB_NAME = getInitialTabName(INITIAL_ROUTE_PATH);
+    const LEGACY_STATUS_CACHE_KEY = 'cached_api_status';
+    const LEGACY_LAST_CHECK_CACHE_KEY = 'cached_api_last_check';
+    const USER_STATUS_CACHE_KEY_PREFIX = 'cached_api_status_user_';
+    const USER_LAST_CHECK_CACHE_KEY_PREFIX = 'cached_api_last_check_user_';
     let pendingInitialMapScroll = INITIAL_ROUTE_PATH === '/map';
     let pendingInitialTrendingScroll = INITIAL_ROUTE_PATH === '/trending';
     let trackedProductsCache = [];
@@ -6469,6 +6462,99 @@
       const normalized = String(value || '').trim();
       if (!normalized) return '';
       return normalized.replace(/\/+$/, '');
+    }
+
+    function getUserScopedCacheKey(prefix, user = currentUser) {
+      const userId = user && typeof user === 'object' ? user.id : user;
+      if (userId === undefined || userId === null || userId === '') return '';
+      return `${prefix}${userId}`;
+    }
+
+    function clearLegacySessionCaches() {
+      localStorage.removeItem(LEGACY_STATUS_CACHE_KEY);
+      localStorage.removeItem(LEGACY_LAST_CHECK_CACHE_KEY);
+    }
+
+    function clearUserSessionCaches(user = currentUser) {
+      const statusKey = getUserScopedCacheKey(USER_STATUS_CACHE_KEY_PREFIX, user);
+      const lastCheckKey = getUserScopedCacheKey(USER_LAST_CHECK_CACHE_KEY_PREFIX, user);
+      if (statusKey) {
+        localStorage.removeItem(statusKey);
+      }
+      if (lastCheckKey) {
+        localStorage.removeItem(lastCheckKey);
+      }
+    }
+
+    function writeUserScopedCache(prefix, value, user = currentUser) {
+      const cacheKey = getUserScopedCacheKey(prefix, user);
+      if (!cacheKey) return;
+      localStorage.setItem(cacheKey, JSON.stringify(value));
+    }
+
+    function readUserScopedCache(prefix, user = currentUser) {
+      const cacheKey = getUserScopedCacheKey(prefix, user);
+      if (!cacheKey) return null;
+
+      try {
+        return JSON.parse(localStorage.getItem(cacheKey));
+      } catch (error) {
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+    }
+
+    function resetAuthenticatedAppDataView() {
+      latestStatusSnapshot = null;
+      latestRenderedResults = null;
+      lastResultsSignature = '';
+      trackedProductsCache = [];
+      editingProductId = null;
+      destroyResultsMap();
+
+      const resultsContainer = document.getElementById('results-container');
+      if (resultsContainer) {
+        resultsContainer.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">?</div>
+        <div class="empty-title">No checks yet</div>
+        <div class="empty-text">Click <strong>Check Now</strong> or start the scheduler.</div>
+      </div>`;
+      }
+
+      const historyContainer = document.getElementById('history-container');
+      if (historyContainer) {
+        historyContainer.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">?</div>
+              <div class="empty-title">No history found</div>
+              <div class="empty-text">Check results will appear here after they run.</div>
+            </div>`;
+      }
+
+      const statStatus = document.getElementById('stat-status');
+      const statStatusSub = document.getElementById('stat-status-sub');
+      const statProducts = document.getElementById('stat-products');
+      const statProductsSub = document.getElementById('stat-products-sub');
+      const statSuccessRate = document.getElementById('stat-success-rate');
+      const statLastCheck = document.getElementById('stat-lastcheck');
+
+      if (statStatus) statStatus.textContent = 'Stopped';
+      if (statStatusSub) statStatusSub.innerHTML = `No Discord webhooks configured<span class="stat-sub-detail">${escapeHtml(formatIntervalLabel(60))}</span>`;
+      if (statProducts) statProducts.textContent = '0';
+      if (statProductsSub) statProductsSub.textContent = '0 in stock last check';
+      if (statSuccessRate) statSuccessRate.textContent = '0%';
+      if (statLastCheck) {
+        statLastCheck.textContent = '-';
+        statLastCheck.title = '';
+      }
+
+      const zipInput = document.getElementById('cfg-zip');
+      const intervalInput = document.getElementById('cfg-interval');
+      if (zipInput) zipInput.value = '';
+      if (intervalInput) intervalInput.value = '60';
+      renderDiscordDestinationRows([]);
+      renderTrackedProducts([]);
     }
 
     function setBootLoaderPreference(shouldUseLoader) {
@@ -7818,9 +7904,11 @@
     }
 
     async function hydrateAuthenticatedSession(sessionPayload = null) {
+      const previousUserId = currentUser?.id ?? null;
       const payload = sessionPayload || await apiCall('/api/auth/session', 'GET', null, { allowUnauthorized: true });
       authState = payload;
       currentUser = payload?.user || null;
+      const currentUserId = currentUser?.id ?? null;
       const isWaitlisted = payload?.access_state === 'waitlisted';
       resetOnboardingSessionState();
       updateCurrentUserDisplay(currentUser);
@@ -7828,6 +7916,9 @@
       if (!currentUser) {
         setBootLoaderPreference(false);
         stopStatusPolling();
+        clearUserSessionCaches(previousUserId);
+        clearLegacySessionCaches();
+        resetAuthenticatedAppDataView();
         if (isWaitlisted) {
           startAuthStatePolling();
         } else {
@@ -7855,6 +7946,10 @@
 
       setBootLoaderPreference(true);
       stopAuthStatePolling();
+      if (previousUserId && previousUserId !== currentUserId) {
+        resetAuthenticatedAppDataView();
+      }
+      renderCachedStateForUser(currentUser);
       setAuthenticatedUi(true);
       setAuthGateMode('signin');
       updateAuthStatus('');
@@ -7872,20 +7967,21 @@
     }
 
     async function logoutUser() {
+      const userId = currentUser?.id ?? null;
       if (window.google?.accounts?.id?.disableAutoSelect) {
         window.google.accounts.id.disableAutoSelect();
       }
       await apiCall('/api/auth/logout', 'POST', {}, { allowUnauthorized: true, suppressAuthRedirect: true });
+      clearUserSessionCaches(userId);
+      clearLegacySessionCaches();
       currentUser = null;
       authState = null;
-      latestStatusSnapshot = null;
       setBootLoaderPreference(false);
       stopStatusPolling();
       stopAuthStatePolling();
       closeOnboarding(false);
       resetOnboardingSessionState();
-      localStorage.removeItem('cached_api_status');
-      localStorage.removeItem('cached_api_last_check');
+      resetAuthenticatedAppDataView();
       applyPokemonBackgroundSettings({
         enabled: DEFAULT_POKEMON_BACKGROUND_ENABLED,
         theme: DEFAULT_POKEMON_BACKGROUND_THEME,
@@ -10422,30 +10518,35 @@
   `;
     }
 
-    function renderCachedState() {
-      try {
-        const statusData = JSON.parse(localStorage.getItem('cached_api_status'));
-        if (statusData && statusData.status) {
-          applyPokemonBackgroundSettings({
-            enabled: statusData.status.pokemon_background_enabled ?? DEFAULT_POKEMON_BACKGROUND_ENABLED,
-            theme: statusData.status.pokemon_background_theme || DEFAULT_POKEMON_BACKGROUND_THEME,
-            tileSize: statusData.status.pokemon_background_tile_size ?? DEFAULT_POKEMON_BACKGROUND_TILE_SIZE,
-            syncControls: false
-          });
-        }
+    function renderCachedStateForUser(user = currentUser) {
+      clearLegacySessionCaches();
+      resetAuthenticatedAppDataView();
 
-        const checkData = JSON.parse(localStorage.getItem('cached_api_last_check'));
-        if (checkData) {
-          const products = checkData.products_found || {};
-          if (Object.keys(products).length > 0) {
-            const configuredZip = statusData?.status?.current_zipcode || '';
-            renderResultsContent(checkData, configuredZip);
-            lastResultsSignature = buildResultsSignature(checkData);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to render cache', e);
+      const statusData = readUserScopedCache(USER_STATUS_CACHE_KEY_PREFIX, user);
+      const checkData = readUserScopedCache(USER_LAST_CHECK_CACHE_KEY_PREFIX, user);
+      let hasCachedState = false;
+
+      if (statusData && statusData.status) {
+        hasCachedState = true;
+        applyPokemonBackgroundSettings({
+          enabled: statusData.status.pokemon_background_enabled ?? DEFAULT_POKEMON_BACKGROUND_ENABLED,
+          theme: statusData.status.pokemon_background_theme || DEFAULT_POKEMON_BACKGROUND_THEME,
+          tileSize: statusData.status.pokemon_background_tile_size ?? DEFAULT_POKEMON_BACKGROUND_TILE_SIZE,
+          syncControls: false
+        });
       }
+
+      if (checkData) {
+        const products = checkData.products_found || {};
+        if (Object.keys(products).length > 0) {
+          hasCachedState = true;
+          const configuredZip = statusData?.status?.current_zipcode || '';
+          renderResultsContent(checkData, configuredZip);
+          lastResultsSignature = buildResultsSignature(checkData);
+        }
+      }
+
+      return hasCachedState;
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -10456,7 +10557,7 @@
       initializeShellScrollbar();
       ensureOnboardingModalRoot();
       ensureTechStackModalRoot();
-      renderCachedState();
+      clearLegacySessionCaches();
       initializePokemonBackgroundControls();
       if (window.matchMedia) {
         installDisplayModeQueries = [
@@ -10808,10 +10909,14 @@
         const r = await fetch(apiUrl(url), opts);
         if (r.status === 401) {
           if (!options.allowUnauthorized && !options.suppressAuthRedirect) {
+            const userId = currentUser?.id ?? null;
+            clearUserSessionCaches(userId);
+            clearLegacySessionCaches();
             currentUser = null;
             authState = null;
             stopStatusPolling();
             stopAuthStatePolling();
+            resetAuthenticatedAppDataView();
             updateCurrentUserDisplay(null);
             setAuthenticatedUi(false);
             const sessionPayload = await apiCall('/api/auth/session', 'GET', null, {
@@ -10882,7 +10987,7 @@
           return null;
         }
         latestStatusSnapshot = data;
-        localStorage.setItem('cached_api_status', JSON.stringify(data));
+        writeUserScopedCache(USER_STATUS_CACHE_KEY_PREFIX, data);
         const status = data.status || {};
         const trackedProducts = status.tracked_products || [];
         const lastProductsFound = status.last_products_found || {};
@@ -10966,7 +11071,7 @@
         return;
       }
 
-      localStorage.setItem('cached_api_last_check', JSON.stringify(data));
+      writeUserScopedCache(USER_LAST_CHECK_CACHE_KEY_PREFIX, data);
 
       const resultsSignature = buildResultsSignature(data);
       if (resultsSignature === lastResultsSignature) {

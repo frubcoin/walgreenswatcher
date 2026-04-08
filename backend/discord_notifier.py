@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Union
 
@@ -20,6 +20,14 @@ logger = logging.getLogger(__name__)
 class DiscordNotifier:
     """Send notifications to Discord via webhook."""
 
+    ALLOWED_WEBHOOK_HOSTS = {
+        "discord.com",
+        "www.discord.com",
+        "canary.discord.com",
+        "ptb.discord.com",
+        "discordapp.com",
+        "www.discordapp.com",
+    }
     EMBED_TOTAL_LIMIT = 6000
     EMBED_DESCRIPTION_LIMIT = 4096
     EMBED_TITLE_LIMIT = 256
@@ -46,6 +54,22 @@ class DiscordNotifier:
         return "".join(ch for ch in text if ch.isdigit())
 
     @classmethod
+    def _is_allowed_webhook_url(cls, value: Any) -> bool:
+        """Allow only HTTPS Discord webhook endpoints."""
+        normalized = str(value or "").strip()
+        if not normalized:
+            return False
+
+        parsed = urlparse(normalized)
+        host = str(parsed.netloc or "").lower()
+        path = str(parsed.path or "")
+        is_discord_host = parsed.scheme == "https" and host in cls.ALLOWED_WEBHOOK_HOSTS
+        is_webhook_path = path.startswith("/api/webhooks/") or (
+            path.startswith("/api/v") and "/webhooks/" in path
+        )
+        return bool(is_discord_host and is_webhook_path)
+
+    @classmethod
     def _normalize_destinations(
         cls, webhook_value: Optional[Union[str, Sequence[Union[str, Dict[str, Any]]]]]
     ) -> List[Dict[str, str]]:
@@ -69,6 +93,9 @@ class DiscordNotifier:
                 role_id = ""
 
             if not url or url in seen:
+                continue
+            if not cls._is_allowed_webhook_url(url):
+                logger.warning("Ignoring non-Discord webhook destination")
                 continue
             seen.add(url)
             destination = {"url": url}

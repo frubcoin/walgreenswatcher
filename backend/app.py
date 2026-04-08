@@ -241,8 +241,19 @@ def _clear_waitlist_session() -> None:
     session.pop(WAITLIST_SESSION_KEY, None)
 
 
-def _session_admin_authenticated() -> bool:
-    return bool(session.get(ADMIN_SESSION_KEY))
+def _session_admin_authenticated(user: Optional[Dict[str, Any]] = None) -> bool:
+    stored_user_id = session.get(ADMIN_SESSION_KEY)
+    if isinstance(stored_user_id, bool) or stored_user_id in (None, ""):
+        return False
+
+    user = user or _session_user()
+    if user is None:
+        return False
+
+    try:
+        return int(stored_user_id) == int(user["id"])
+    except (TypeError, ValueError, KeyError):
+        return False
 
 
 def _clear_admin_session() -> None:
@@ -253,11 +264,9 @@ def _admin_panel_configured() -> bool:
     return bool(ADMIN_PANEL_PASSWORD)
 
 
-def _start_user_session(user: Dict[str, Any], *, preserve_admin_authenticated: bool = False) -> None:
+def _start_user_session(user: Dict[str, Any]) -> None:
     session.clear()
     session.permanent = True
-    if preserve_admin_authenticated:
-        session[ADMIN_SESSION_KEY] = True
     session["user_id"] = int(user["id"])
 
 
@@ -359,7 +368,8 @@ def require_admin(func):
         if access_denied_reason:
             _transition_denied_user_session(user)
             return jsonify({"error": access_denied_reason}), 403
-        if not _session_admin_authenticated():
+        if not _session_admin_authenticated(user):
+            _clear_admin_session()
             return jsonify({"error": "Admin authentication required"}), 401
         return func(*args, **kwargs)
 
@@ -446,12 +456,15 @@ def _public_admin_payload() -> Dict[str, Any]:
     if user and access_denied_reason:
         _transition_denied_user_session(user)
         user = None
+    password_authenticated = bool(user) and _session_admin_authenticated(user)
+    if user and not password_authenticated and session.get(ADMIN_SESSION_KEY) not in (None, ""):
+        _clear_admin_session()
 
     return {
-        "authenticated": bool(user) and _session_admin_authenticated(),
+        "authenticated": password_authenticated,
         "configured": _admin_panel_configured(),
         "google_authenticated": bool(user),
-        "password_authenticated": bool(user) and _session_admin_authenticated(),
+        "password_authenticated": password_authenticated,
         "google_client_id": GOOGLE_CLIENT_ID or "",
         "access_denied_reason": access_denied_reason or "",
         "user": _serialized_user(user),
@@ -822,8 +835,7 @@ def google_sign_in():
         payload["error"] = payload.get("access_denied_reason") or access_denied_reason
         return jsonify(payload), 403
 
-    was_admin_authenticated = _session_admin_authenticated()
-    _start_user_session(user, preserve_admin_authenticated=was_admin_authenticated)
+    _start_user_session(user)
 
     scheduler = _current_scheduler(user)
     scheduler.refresh_from_db()
@@ -879,7 +891,7 @@ def admin_login():
     if not secrets.compare_digest(password, ADMIN_PANEL_PASSWORD):
         return jsonify({"error": "Invalid admin password"}), 401
 
-    session[ADMIN_SESSION_KEY] = True
+    session[ADMIN_SESSION_KEY] = int(user["id"])
     _record_audit_event(
         "admin.login",
         f"Admin panel unlocked by {user['email']}",
@@ -892,7 +904,7 @@ def admin_login():
 @app.route("/api/admin/logout", methods=["POST"])
 def admin_logout():
     user = _session_user()
-    if _session_admin_authenticated():
+    if _session_admin_authenticated(user):
         _record_audit_event(
             "admin.logout",
             f"Admin panel locked by {(user or {}).get('email') or 'unknown user'}",
