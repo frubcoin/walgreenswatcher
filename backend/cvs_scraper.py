@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import random
 import re
 import secrets
 import time
@@ -15,12 +14,21 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
 
-from config import TARGET_ZIP_CODE, USER_AGENTS
+from config import TARGET_ZIP_CODE
 
 PROGRESS_UI_YIELD_SECONDS = 0.02
 
 logger = logging.getLogger(__name__)
 CURL_IMPERSONATION_TARGET = "chrome"
+CVS_INVENTORY_PUBLIC_API_KEY = "a2ff75c6-2da7-4299-929d-d670d827ab4a"
+CVS_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/141.0.0.0 Safari/537.36"
+)
+CVS_BROWSER_SEC_CH_UA = '"Chromium";v="141", "Not?A_Brand";v="8"'
+CVS_BROWSER_SEC_CH_UA_MOBILE = "?0"
+CVS_BROWSER_SEC_CH_UA_PLATFORM = '"Windows"'
 
 
 class CvsStockChecker:
@@ -46,20 +54,51 @@ class CvsStockChecker:
         return requests.Session()
 
     @staticmethod
-    def _request_headers(*, referer: str, api_key: str = "") -> Dict[str, str]:
+    def _request_headers(
+        *,
+        referer: str,
+        purpose: str,
+        api_key: str = "",
+        include_api_header: bool = False,
+    ) -> Dict[str, str]:
         headers = {
-            "User-Agent": random.choice(USER_AGENTS),
-            "Accept": "application/json, text/plain, */*",
+            "User-Agent": CVS_BROWSER_USER_AGENT,
             "Accept-Language": "en-US,en;q=0.9",
-            "Content-Type": "application/json",
-            "Origin": "https://www.cvs.com",
-            "Referer": referer,
             "Pragma": "no-cache",
             "Cache-Control": "no-cache",
-            "X-Requested-With": "XMLHttpRequest",
-            "devicetype": "desktop",
+            "Sec-CH-UA": CVS_BROWSER_SEC_CH_UA,
+            "Sec-CH-UA-Mobile": CVS_BROWSER_SEC_CH_UA_MOBILE,
+            "Sec-CH-UA-Platform": CVS_BROWSER_SEC_CH_UA_PLATFORM,
         }
-        if api_key:
+        if purpose == "document":
+            headers.update(
+                {
+                    "Accept": (
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                        "image/avif,image/webp,image/apng,*/*;q=0.8"
+                    ),
+                    "Referer": "https://www.cvs.com/",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Site": "same-origin" if referer != "https://www.cvs.com/" else "none",
+                    "Upgrade-Insecure-Requests": "1",
+                }
+            )
+            return headers
+
+        headers.update(
+            {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Origin": "https://www.cvs.com",
+                "Referer": referer,
+                "Priority": "u=1, i",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+            }
+        )
+        if include_api_header and api_key:
             headers["x-api-key"] = api_key
         return headers
 
@@ -79,11 +118,14 @@ class CvsStockChecker:
     def _bootstrap_session(self, session: requests.Session, product: Dict[str, Any]) -> tuple[str, str]:
         referer = str(product.get("source_url", "")).strip() or "https://www.cvs.com/"
         api_key = ""
-        for url in ("https://www.cvs.com/", referer):
+        bootstrap_urls = [referer]
+        if referer != "https://www.cvs.com/":
+            bootstrap_urls.append("https://www.cvs.com/")
+        for url in bootstrap_urls:
             try:
                 response = session.get(
                     url,
-                    headers=self._request_headers(referer=referer),
+                    headers=self._request_headers(referer=referer, purpose="document"),
                     timeout=30,
                 )
                 if response.status_code >= 400:
@@ -175,52 +217,69 @@ class CvsStockChecker:
 
         session = self._new_session()
         referer, api_key = self._bootstrap_session(session, product)
+        api_keys = list(dict.fromkeys(key for key in (api_key, CVS_INVENTORY_PUBLIC_API_KEY) if key))
+        if api_keys:
+            logger.info("CVS inventory will try %s API key candidate(s)", len(api_keys))
+        if not api_key and CVS_INVENTORY_PUBLIC_API_KEY:
+            logger.info("CVS inventory using HAR-derived public API key fallback")
         failures: List[str] = []
 
         try:
             for inventory_url in self.INVENTORY_URLS:
-                for payload in self._payload_candidates(product_id, zip_code, api_key):
-                    try:
-                        response = session.post(
-                            inventory_url,
-                            json=payload,
-                            headers=self._request_headers(referer=referer, api_key=api_key),
-                            timeout=30,
-                        )
-                    except requests.RequestException as exc:
-                        failures.append(f"{inventory_url} {type(exc).__name__}: {exc}")
-                        logger.warning("CVS inventory request exception for %s: %s", inventory_url, exc)
-                        continue
+                for api_key_candidate in api_keys:
+                    for payload in self._payload_candidates(product_id, zip_code, api_key_candidate):
+                        for include_api_header in (False, True):
+                            try:
+                                response = session.post(
+                                    inventory_url,
+                                    json=payload,
+                                    headers=self._request_headers(
+                                        referer=referer,
+                                        purpose="inventory",
+                                        api_key=api_key_candidate,
+                                        include_api_header=include_api_header,
+                                    ),
+                                    timeout=30,
+                                )
+                            except Exception as exc:
+                                failures.append(f"{inventory_url} {type(exc).__name__}: {exc}")
+                                logger.warning("CVS inventory request exception for %s: %s", inventory_url, exc)
+                                continue
 
-                    try:
-                        data = response.json()
-                    except ValueError:
-                        snippet = response.text[:200].replace("\n", " ")
-                        failures.append(f"{inventory_url} HTTP {response.status_code}: {snippet}")
-                        logger.warning(
-                            "CVS inventory non-JSON response from %s: HTTP %s %s",
-                            inventory_url,
-                            response.status_code,
-                            snippet,
-                        )
-                        continue
+                            try:
+                                data = response.json()
+                            except ValueError:
+                                snippet = response.text[:200].replace("\n", " ")
+                                failures.append(f"{inventory_url} HTTP {response.status_code}: {snippet}")
+                                logger.warning(
+                                    "CVS inventory non-JSON response from %s: HTTP %s %s",
+                                    inventory_url,
+                                    response.status_code,
+                                    snippet,
+                                )
+                                continue
 
-                    if self._looks_like_inventory_response(data):
-                        logger.info("CVS inventory response accepted from %s", inventory_url)
-                        return data
+                            if self._looks_like_inventory_response(data):
+                                logger.info(
+                                    "CVS inventory response accepted from %s (api_header=%s)",
+                                    inventory_url,
+                                    include_api_header,
+                                )
+                                return data
 
-                    header = ((data.get("response") or {}).get("header") or {}) if isinstance(data, dict) else {}
-                    failures.append(
-                        f"{inventory_url} HTTP {response.status_code}: "
-                        f"{header.get('statusCode') or 'unknown'} {header.get('statusDesc') or 'unexpected payload'}"
-                    )
-                    logger.warning(
-                        "CVS inventory unexpected payload from %s: HTTP %s statusCode=%s statusDesc=%s",
-                        inventory_url,
-                        response.status_code,
-                        header.get("statusCode") or "unknown",
-                        header.get("statusDesc") or "unexpected payload",
-                    )
+                            header = ((data.get("response") or {}).get("header") or {}) if isinstance(data, dict) else {}
+                            failures.append(
+                                f"{inventory_url} HTTP {response.status_code}: "
+                                f"{header.get('statusCode') or 'unknown'} {header.get('statusDesc') or 'unexpected payload'}"
+                            )
+                            logger.warning(
+                                "CVS inventory unexpected payload from %s: HTTP %s statusCode=%s statusDesc=%s api_header=%s",
+                                inventory_url,
+                                response.status_code,
+                                header.get("statusCode") or "unknown",
+                                header.get("statusDesc") or "unexpected payload",
+                                include_api_header,
+                            )
         finally:
             session.close()
 
