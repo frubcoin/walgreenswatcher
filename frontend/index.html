@@ -3596,18 +3596,12 @@
       background: rgba(227, 24, 55, 0.24);
     }
 
-
-.site-footer > * {
-  width: 100%;
-  text-align: center;
-}
     .site-footer {
       position: fixed;
       left: 50%;
       bottom: calc(10px + env(safe-area-inset-bottom, 0px));
       transform: translateX(-50%);
-        width: 100%;
-  text-align: center;
+      width: min(calc(100% - 32px), 920px);
       padding: 0 16px;
       display: flex;
       align-items: center;
@@ -3617,7 +3611,6 @@
       color: var(--footer-text);
       z-index: 3;
       text-align: center;
-      
       pointer-events: auto;
       font-size: 11px;
       line-height: 1.4;
@@ -3637,8 +3630,6 @@
       white-space: normal;
     }
 
-
-
     .site-footer-link {
 
       pointer-events: auto;
@@ -3656,7 +3647,6 @@
       opacity: 0.92;
     }
 
-    
     .site-footer-link:hover,
     .site-footer-link:focus-visible {
       opacity: 1;
