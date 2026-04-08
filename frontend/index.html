@@ -6492,6 +6492,68 @@
       }
     }
 
+    const GEOLOCATION_HIGH_ACCURACY_OPTIONS = Object.freeze({
+      enableHighAccuracy: true,
+      timeout: 8000,
+      maximumAge: 0
+    });
+
+    const GEOLOCATION_FALLBACK_OPTIONS = Object.freeze({
+      enableHighAccuracy: false,
+      timeout: 12000,
+      maximumAge: 300000
+    });
+
+    function requestCurrentPosition(options) {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+    }
+
+    function getGeolocationErrorMessage(error, fallbackAttempted = false) {
+      if (!error || typeof error.code !== 'number') {
+        return 'Failed to get location';
+      }
+
+      if (error.code === error.PERMISSION_DENIED) {
+        return 'Permission denied. Please enable location services.';
+      }
+
+      if (error.code === error.TIMEOUT) {
+        return fallbackAttempted
+          ? 'Location request timed out. Try again or use a less restrictive browser location setting.'
+          : 'Location request timed out. Retrying with a faster fallback...';
+      }
+
+      if (error.code === error.POSITION_UNAVAILABLE) {
+        return fallbackAttempted
+          ? 'Your location is unavailable right now. Please try again.'
+          : 'Precise location is unavailable. Retrying with a broader estimate...';
+      }
+      return 'Failed to get location';
+    }
+
+    function updateUserLocationOnMap(position) {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      if (!resultsMap) return;
+
+      if (userLocationMarker) {
+        userLocationMarker.setLatLng([lat, lng]);
+      } else {
+        const userPulseIcon = L.divIcon({
+          className: 'user-location-pulse-wrapper',
+          html: '<div class="user-location-pulse"></div>',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+        userLocationMarker = L.marker([lat, lng], { icon: userPulseIcon }).addTo(resultsMap);
+      }
+
+      resultsMap.setView([lat, lng], 14, { animate: true });
+    }
+
     async function handleShowMyLocation() {
       if (!navigator.geolocation) {
         showToast('Location services are not supported by your browser', 'error');
@@ -6500,44 +6562,33 @@
 
       showToast('Finding your location...', 'info');
 
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
+      try {
+        const position = await requestCurrentPosition(GEOLOCATION_HIGH_ACCURACY_OPTIONS);
+        updateUserLocationOnMap(position);
+        showToast('Located', 'success');
+        return;
+      } catch (error) {
+        const canRetry =
+          error &&
+          (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE);
 
-          if (!resultsMap) return;
-
-          if (userLocationMarker) {
-            userLocationMarker.setLatLng([lat, lng]);
-          } else {
-            const userPulseIcon = L.divIcon({
-              className: 'user-location-pulse-wrapper',
-              html: '<div class="user-location-pulse"></div>',
-              iconSize: [14, 14],
-              iconAnchor: [7, 7]
-            });
-            userLocationMarker = L.marker([lat, lng], { icon: userPulseIcon }).addTo(resultsMap);
-          }
-
-          resultsMap.setView([lat, lng], 14, { animate: true });
-          showToast('Located', 'success');
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-          let msg = 'Failed to get location';
-          if (error.code === error.PERMISSION_DENIED) {
-            msg = 'Permission denied. Please enable location services.';
-          } else if (error.code === error.TIMEOUT) {
-            msg = 'Location request timed out. Try again.';
-          }
-          showToast(msg, 'error');
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 0
+        if (!canRetry) {
+          console.warn('Geolocation error:', error);
+          showToast(getGeolocationErrorMessage(error, true), 'error');
+          return;
         }
-      );
+
+        showToast(getGeolocationErrorMessage(error), 'info');
+      }
+
+      try {
+        const fallbackPosition = await requestCurrentPosition(GEOLOCATION_FALLBACK_OPTIONS);
+        updateUserLocationOnMap(fallbackPosition);
+        showToast('Located using an approximate location', 'success');
+      } catch (fallbackError) {
+        console.warn('Geolocation fallback error:', fallbackError);
+        showToast(getGeolocationErrorMessage(fallbackError, true), 'error');
+      }
     }
 
     function renderResultsMap(locations = []) {
