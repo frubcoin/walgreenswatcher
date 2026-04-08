@@ -12,9 +12,21 @@ const state = {
 };
 
 let bannerTimer = 0;
+let csrfToken = null;
 
 function apiUrl(path) {
   return path.startsWith('http') ? path : `${apiBase}${path}`;
+}
+
+function updateCsrfToken(nextToken) {
+  const normalized = String(nextToken || '').trim();
+  if (normalized) {
+    csrfToken = normalized;
+  }
+}
+
+function updateCsrfTokenFromPayload(payload) {
+  updateCsrfToken(payload?.csrf_token);
 }
 
 function escapeHtml(value) {
@@ -109,16 +121,25 @@ function scrollToPanel(panelId) {
 }
 
 async function apiRequest(path, method = 'GET', body = null) {
+  const normalizedMethod = String(method || 'GET').toUpperCase();
   const response = await fetch(apiUrl(path), {
-    method,
+    method: normalizedMethod,
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(
+        ['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod) && csrfToken
+          ? { 'X-CSRF-Token': csrfToken }
+          : {}
+      )
+    },
     body: body ? JSON.stringify(body) : null
   });
 
   let payload = null;
   try {
     payload = await response.json();
+    updateCsrfTokenFromPayload(payload);
   } catch (error) {
   }
 

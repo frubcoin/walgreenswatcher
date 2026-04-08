@@ -67,6 +67,7 @@ CORS(
     app,
     resources={r"/api/*": {"origins": CORS_ALLOWED_ORIGINS}},
     supports_credentials=True,
+    allow_headers=["Content-Type", "X-CSRF-Token"],
 )
 
 db = StockDatabase()
@@ -77,6 +78,7 @@ SERVICE_UPTIME_HEARTBEAT_SECONDS = 30
 _uptime_tracker_started = False
 ADMIN_SESSION_KEY = "admin_authenticated"
 WAITLIST_SESSION_KEY = "waitlisted_user_id"
+CSRF_SESSION_KEY = "csrf_token"
 _system_stats_lock = threading.Lock()
 _last_cpu_snapshot: Optional[tuple[float, float]] = None
 _last_network_snapshot: Optional[Dict[str, float]] = None
@@ -260,6 +262,64 @@ def _clear_admin_session() -> None:
     session.pop(ADMIN_SESSION_KEY, None)
 
 
+def _get_or_create_csrf_token() -> str:
+    token = str(session.get(CSRF_SESSION_KEY) or "").strip()
+    if token:
+        return token
+
+    token = secrets.token_urlsafe(32)
+    session[CSRF_SESSION_KEY] = token
+    return token
+
+
+def _normalized_origin(value: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+
+    parsed = urlparse(normalized)
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def _allowed_api_origins() -> set[str]:
+    origins = {_normalized_origin(origin) for origin in CORS_ALLOWED_ORIGINS}
+    current_origin = _normalized_origin(request.host_url)
+    if current_origin:
+        origins.add(current_origin)
+    return {origin for origin in origins if origin}
+
+
+def _request_origin_allowed() -> bool:
+    origin = _normalized_origin(request.headers.get("Origin", ""))
+    if origin:
+        return origin in _allowed_api_origins()
+
+    referer = _normalized_origin(request.headers.get("Referer", ""))
+    if referer:
+        return referer in _allowed_api_origins()
+
+    return False
+
+
+@app.before_request
+def enforce_api_csrf() -> Optional[Response]:
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return None
+    if not request.path.startswith("/api/"):
+        return None
+    if not _request_origin_allowed():
+        return jsonify({"error": "Invalid request origin"}), 403
+
+    expected = str(session.get(CSRF_SESSION_KEY) or "").strip()
+    provided = str(request.headers.get("X-CSRF-Token") or "").strip()
+    if not expected or not provided or not secrets.compare_digest(expected, provided):
+        return jsonify({"error": "CSRF validation failed"}), 403
+
+    return None
+
+
 def _admin_panel_configured() -> bool:
     return bool(ADMIN_PANEL_PASSWORD)
 
@@ -441,6 +501,7 @@ def _public_auth_payload(user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "google_client_id": GOOGLE_CLIENT_ID or "",
         "google_allowlist_enabled": True,
         "admin_panel_configured": _admin_panel_configured(),
+        "csrf_token": _get_or_create_csrf_token(),
         "access_denied_reason": access_denied_reason,
         "access_state": access_state,
         "user": _serialized_user(user),
@@ -466,6 +527,7 @@ def _public_admin_payload() -> Dict[str, Any]:
         "google_authenticated": bool(user),
         "password_authenticated": password_authenticated,
         "google_client_id": GOOGLE_CLIENT_ID or "",
+        "csrf_token": _get_or_create_csrf_token(),
         "access_denied_reason": access_denied_reason or "",
         "user": _serialized_user(user),
     }

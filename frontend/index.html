@@ -6496,6 +6496,7 @@
     let editingProductId = null;
     let currentUser = null;
     let authState = null;
+    let csrfToken = null;
     let statusRefreshTimer = null;
     let authStateRefreshTimer = null;
     let authSessionRefreshInFlight = false;
@@ -6547,6 +6548,17 @@
       if (lastCheckKey) {
         localStorage.removeItem(lastCheckKey);
       }
+    }
+
+    function updateCsrfToken(nextToken) {
+      const normalized = String(nextToken || '').trim();
+      if (normalized) {
+        csrfToken = normalized;
+      }
+    }
+
+    function updateCsrfTokenFromPayload(payload) {
+      updateCsrfToken(payload?.csrf_token);
     }
 
     function writeUserScopedCache(prefix, value, user = currentUser) {
@@ -7948,10 +7960,14 @@
         const authResponse = await fetch(apiUrl('/api/auth/google'), {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+          },
           body: JSON.stringify({ credential: response.credential })
         });
         result = await authResponse.json();
+        updateCsrfTokenFromPayload(result);
         const isWaitlisted = result?.access_state === 'waitlisted';
         if ((!authResponse.ok && !isWaitlisted) || (!result?.authenticated && !isWaitlisted)) {
           const message = result?.error || 'Google sign-in failed. Check your backend Google client ID and allowed origins.';
@@ -7969,6 +7985,7 @@
     async function hydrateAuthenticatedSession(sessionPayload = null) {
       const previousUserId = currentUser?.id ?? null;
       const payload = sessionPayload || await apiCall('/api/auth/session', 'GET', null, { allowUnauthorized: true });
+      updateCsrfTokenFromPayload(payload);
       authState = payload;
       currentUser = payload?.user || null;
       const currentUserId = currentUser?.id ?? null;
@@ -11042,10 +11059,18 @@
 
     async function apiCall(url, method = 'GET', data = null, options = {}) {
       try {
+        const normalizedMethod = String(method || 'GET').toUpperCase();
         const opts = {
-          method,
+          method: normalizedMethod,
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json',
+            ...(
+              ['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod) && csrfToken
+                ? { 'X-CSRF-Token': csrfToken }
+                : {}
+            )
+          }
         };
         if (data) opts.body = JSON.stringify(data);
         const r = await fetch(apiUrl(url), opts);
@@ -11077,12 +11102,15 @@
           let errorMessage = `HTTP ${r.status}`;
           try {
             const errorData = await r.json();
+            updateCsrfTokenFromPayload(errorData);
             errorMessage = errorData.error || errorData.message || errorMessage;
           } catch (e) {
           }
           throw new Error(errorMessage);
         }
-        return await r.json();
+        const payload = await r.json();
+        updateCsrfTokenFromPayload(payload);
+        return payload;
       } catch (e) {
         console.error(`API error (${url}):`, e);
         if (!options.silent) {
