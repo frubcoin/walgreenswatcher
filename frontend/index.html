@@ -9672,6 +9672,8 @@
       const {
         activeLocationKey = '',
         focusLocationKey = '',
+        selectedLocationKey = '',
+        openFocusedLocation = false,
         preserveActiveSelection = true,
         fallbackLocationKey = ''
       } = options;
@@ -9679,6 +9681,7 @@
       if (!mapElement || typeof L === 'undefined') return;
 
       const preferredLocationKey = String(focusLocationKey || activeLocationKey || activeResultsMapKey || '').trim();
+      const selectedKey = String(selectedLocationKey || preferredLocationKey || '').trim();
       const preferredLocation = preferredLocationKey
         ? locations.find(location => location.location_key === preferredLocationKey) || null
         : null;
@@ -9715,7 +9718,15 @@
       }
 
       if (preferredLocation) {
-        resultsMap.setView([preferredLocation.latitude, preferredLocation.longitude], 14);
+        const targetZoom = 14;
+        const preferredLatLng = L.latLng(preferredLocation.latitude, preferredLocation.longitude);
+        const focusTarget = getResultsMapFramedLatLng(preferredLatLng, targetZoom, {
+          mobileRatio: 0.24,
+          desktopRatio: 0.18,
+          minOffset: 48,
+          maxOffset: 120
+        });
+        resultsMap.setView(focusTarget, targetZoom, { animate: openFocusedLocation });
       } else if (mapDistanceReference) {
         resultsMap.setView([mapDistanceReference.latitude, mapDistanceReference.longitude], 14);
       } else if (locations.length) {
@@ -9728,11 +9739,27 @@
         resultsMap.setView([33.4484, -112.0740], 10);
       }
 
+      if (selectedKey) {
+        setActiveResultsMapItem(selectedKey);
+      }
+
+      if (openFocusedLocation && preferredLocationKey) {
+        const focusedMarker = resultsMapMarkersByKey.get(preferredLocationKey);
+        if (focusedMarker) {
+          resultsMap.whenReady(() => {
+            window.requestAnimationFrame(() => {
+              setActiveResultsMapItem(selectedKey || preferredLocationKey);
+              focusedMarker.openPopup();
+            });
+          });
+        }
+      }
+
       observeResultsMapSize();
       scheduleResultsMapInvalidate({
         preserveActive: preserveActiveSelection,
         fallbackLocationKey: preserveActiveSelection
-          ? (preferredLocation?.location_key || fallbackLocationKey || locations[0]?.location_key || '')
+          ? (selectedKey || preferredLocation?.location_key || fallbackLocationKey || locations[0]?.location_key || '')
           : ''
       });
     }
@@ -9746,7 +9773,11 @@
       const focusLocationKey = hasActiveFilteredLocation
         ? previousActiveLocationKey
         : (previousActiveLocationKey && closestFilteredLocation ? closestFilteredLocation.location_key : '');
-      const preserveActiveSelection = hasActiveFilteredLocation;
+      const selectedLocationKey = hasActiveFilteredLocation
+        ? previousActiveLocationKey
+        : (previousActiveLocationKey && closestFilteredLocation ? closestFilteredLocation.location_key : '');
+      const shouldOpenFocusedLocation = Boolean(previousActiveLocationKey) && !hasActiveFilteredLocation && Boolean(closestFilteredLocation);
+      const preserveActiveSelection = Boolean(selectedLocationKey);
       const fallbackLocationKey = !previousActiveLocationKey && locations.length
         ? locations[0].location_key
         : '';
@@ -9754,6 +9785,8 @@
       renderResultsMap(locations, {
         activeLocationKey: previousActiveLocationKey,
         focusLocationKey,
+        selectedLocationKey,
+        openFocusedLocation: shouldOpenFocusedLocation,
         preserveActiveSelection,
         fallbackLocationKey
       });
