@@ -3700,6 +3700,7 @@
       .auth-feature-grid,
       .auth-note-list {
         width: 100%;
+        justify-content: center;
       }
 
       .auth-panel-card {
@@ -4837,7 +4838,8 @@
           <div class="auth-panel-card">
             <div id="auth-signin-content">
               <div class="auth-panel-title">Sign in with Google to join the waitlist</div>
-              <div class="auth-panel-copy">First-time users will get a short setup guide after approval. (app installation
+              <div class="auth-panel-copy">First-time users will get a short setup guide after approval. (app
+                installation
                 optional)</div>
               <div class="auth-actions">
                 <div id="google-signin-button" aria-live="polite"></div>
@@ -4849,12 +4851,14 @@
                     </svg>
                     Install App
                   </button>
-                  <div class="auth-install-copy install-app-copy" hidden>Optional: install it for faster access from your
+                  <div class="auth-install-copy install-app-copy" hidden>Optional: install it for faster access from
+                    your
                     desktop or home screen.</div>
                 </div>
               </div>
               <ul class="auth-note-list">
-                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Product info
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Product
+                    info
                     auto resolved from links.</span></li>
                 <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Discord
                     webhooks with configurable role notifications.</span></li>
@@ -4864,19 +4868,25 @@
               <div class="auth-legal-note">By continuing, you agree to the <a class="inline-legal-link" href="/terms"
                   target="_blank" rel="noopener noreferrer">Terms</a> and acknowledge the <a class="inline-legal-link"
                   href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and <a
-                  class="inline-legal-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>.
+                  class="inline-legal-link" href="/disclosures" target="_blank"
+                  rel="noopener noreferrer">Disclosures</a>.
               </div>
             </div>
             <div id="auth-waitlist-card" class="auth-waitlist-card" hidden>
               <div class="auth-panel-title">Added to the waitlist</div>
-              <div class="auth-panel-copy" id="auth-waitlist-copy">Your sign-in has been received and is waiting on admin review.</div>
+              <div class="auth-panel-copy" id="auth-waitlist-copy">Your sign-in has been received and is waiting on
+                admin review.</div>
               <ul class="auth-note-list">
-                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">An admin has to approve your Google account before the dashboard unlocks.</span></li>
-                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">After approval, your next visit will open the first-time setup guide automatically.</span></li>
-                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Need to switch accounts? Sign out here and use a different Google login.</span></li>
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">An admin
+                    has to approve your Google account before the dashboard unlocks.</span></li>
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">After
+                    approval, your next visit will open the first-time setup guide automatically.</span></li>
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Need to
+                    switch accounts? Sign out here and use a different Google login.</span></li>
               </ul>
               <div class="auth-actions">
-                <button class="btn btn-secondary auth-waitlist-switch-btn" type="button" data-action="logout">Use a different Google account</button>
+                <button class="btn btn-secondary auth-waitlist-switch-btn" type="button" data-action="logout">Use a
+                  different Google account</button>
               </div>
             </div>
             <div id="auth-status-text" class="auth-status"></div>
@@ -5182,11 +5192,15 @@
           <div class="form-group">
             <label class="form-label" for="cfg-map-address">Saved Map Address</label>
             <div class="settings-map-address-field">
-              <input type="text" class="form-input" id="cfg-map-address" maxlength="180" placeholder="Enter address, city, or ZIP" autocomplete="street-address" spellcheck="false">
-              <div class="settings-map-address-status map-location-search-status" id="settings-map-address-status" data-tone="muted" aria-live="polite"></div>
-              <div class="settings-map-address-results map-location-search-results" id="settings-map-address-results" hidden></div>
+              <input type="text" class="form-input" id="cfg-map-address" maxlength="180"
+                placeholder="Enter address, city, or ZIP" autocomplete="street-address" spellcheck="false">
+              <div class="settings-map-address-status map-location-search-status" id="settings-map-address-status"
+                data-tone="muted" aria-live="polite"></div>
+              <div class="settings-map-address-results map-location-search-results" id="settings-map-address-results"
+                hidden></div>
             </div>
-            <span class="form-hint">Used only for the map view when live location fails or when you want a quick saved place. Stored in this browser only.</span>
+            <span class="form-hint">Used only for the map view when live location fails or when you want a quick saved
+              place. Stored in this browser only.</span>
           </div>
         </div>
 
