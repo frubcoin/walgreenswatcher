@@ -382,11 +382,37 @@ def _admin_overview_payload() -> Dict[str, Any]:
     settings["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
         settings.get("admin_webhook_destinations")
     )
+    users = db.list_users_for_admin()
+    events = db.list_audit_events(limit=200)
+    global_statistics = db.get_global_statistics()
+    service_uptime = db.get_service_uptime_stats()
     return {
         "settings": settings,
         "authorized_google_emails": db.list_authorized_google_emails(),
-        "users": db.list_users_for_admin(),
-        "events": db.list_audit_events(limit=100),
+        "users": users,
+        "events": events,
+        "platform": {
+            "global_statistics": global_statistics,
+            "service_uptime": service_uptime,
+            "totals": {
+                "users": len(users),
+                "banned_users": sum(1 for user in users if user.get("is_banned")),
+                "authorized_users": sum(1 for user in users if user.get("is_authorized_email")),
+                "scheduler_enabled_users": sum(1 for user in users if user.get("scheduler_enabled")),
+                "alert_webhooks": len(settings.get("admin_webhook_destinations") or []),
+                "audit_events": len(events),
+                "login_denials": sum(
+                    1
+                    for event in events
+                    if str(event.get("event_type") or "").startswith("auth.login_denied")
+                ),
+                "new_users": sum(
+                    1
+                    for event in events
+                    if str(event.get("event_type") or "") == "auth.user_created"
+                ),
+            },
+        },
     }
 
 
@@ -1042,6 +1068,31 @@ def unban_user(user_id: int):
         target_user=updated_user,
     )
     return jsonify({"user": updated_user, "users": db.list_users_for_admin()})
+
+
+@app.route("/api/admin/users/<int:user_id>/stop-scheduler", methods=["POST"])
+@require_admin
+def stop_user_scheduler(user_id: int):
+    admin_user = _session_user()
+    target_user = db.get_user_by_id(user_id)
+    if target_user is None:
+        return jsonify({"error": "User not found"}), 404
+
+    scheduler = scheduler_manager.get_or_create(user_id)
+    was_running = scheduler.is_running
+    if was_running:
+        scheduler.stop()
+    else:
+        db.update_user_settings(user_id, {"scheduler_enabled": False})
+
+    _record_audit_event(
+        "admin.scheduler_stopped",
+        f"Scheduler stopped for {target_user['email']}",
+        actor_user=admin_user,
+        target_user=target_user,
+        metadata={"was_running": was_running},
+    )
+    return jsonify({"success": True, "users": db.list_users_for_admin()})
 
 
 @app.route("/api/health", methods=["GET"])
