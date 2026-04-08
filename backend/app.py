@@ -689,6 +689,7 @@ def admin_login():
         "admin.login",
         f"Admin panel unlocked by {user['email']}",
         actor_user=user,
+        alert_category="user_action",
     )
     return jsonify(_public_admin_payload())
 
@@ -702,6 +703,7 @@ def admin_logout():
             f"Admin panel locked by {(user or {}).get('email') or 'unknown user'}",
             actor_user=user,
             user_email=str((user or {}).get("email") or ""),
+            alert_category="user_action",
         )
     _clear_admin_session()
     return jsonify({"success": True})
@@ -1065,6 +1067,7 @@ def update_admin_settings():
             "alert_new_users": settings.get("alert_new_users"),
             "alert_user_actions": settings.get("alert_user_actions"),
         },
+        alert_category="user_action",
     )
     return jsonify({"settings": settings})
 
@@ -1089,6 +1092,7 @@ def add_authorized_email():
         f"Authorized Google email added: {entry['email']}",
         actor_user=admin_user,
         metadata={"email": entry["email"], "note": entry.get("note", "")},
+        alert_category="user_action",
     )
     return jsonify(
         {
@@ -1116,6 +1120,7 @@ def remove_authorized_email():
         f"Authorized Google email removed: {email.strip().lower()}",
         actor_user=admin_user,
         metadata={"email": email.strip().lower()},
+        alert_category="user_action",
     )
     return jsonify({"authorized_google_emails": db.list_authorized_google_emails()})
 
@@ -1142,6 +1147,7 @@ def ban_user(user_id: int):
         actor_user=admin_user,
         target_user=updated_user,
         metadata={"reason": reason},
+        alert_category="user_action",
     )
     return jsonify({"user": updated_user, "users": db.list_users_for_admin()})
 
@@ -1163,6 +1169,7 @@ def unban_user(user_id: int):
         f"User unbanned: {updated_user['email']}",
         actor_user=admin_user,
         target_user=updated_user,
+        alert_category="user_action",
     )
     return jsonify({"user": updated_user, "users": db.list_users_for_admin()})
 
@@ -1188,6 +1195,7 @@ def stop_user_scheduler(user_id: int):
         actor_user=admin_user,
         target_user=target_user,
         metadata={"was_running": was_running},
+        alert_category="user_action",
     )
     return jsonify({"success": True, "users": db.list_users_for_admin()})
 
