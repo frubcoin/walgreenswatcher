@@ -6937,8 +6937,20 @@
 
       resultsMap.invalidateSize();
       const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
-      resultsMap.setView(marker.getLatLng(), Math.max(currentZoom, 14), { animate: true });
-      marker.openPopup();
+      const targetZoom = Math.max(currentZoom, 14);
+      const targetLatLng = marker.getLatLng();
+      resultsMap.once('moveend', () => {
+        marker.openPopup();
+      });
+      if (typeof resultsMap.flyTo === 'function') {
+        resultsMap.flyTo(targetLatLng, targetZoom, {
+          animate: true,
+          duration: 0.8,
+          easeLinearity: 0.25
+        });
+      } else {
+        resultsMap.setView(targetLatLng, targetZoom, { animate: true });
+      }
       setActiveResultsMapItem(locationKey);
     }
 
