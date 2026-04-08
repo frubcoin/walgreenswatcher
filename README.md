@@ -81,6 +81,35 @@ Run the following command from the root directory:
 python backend/app.py
 ```
 
+### Try Scrapy + Impersonation for CVS Inventory
+If you want to test CVS inventory calls through Scrapy with browser impersonation:
+
+```powershell
+python backend/cvs_inventory_spider.py --product-id skittles-original-candy-sharing-size --zip 85209
+```
+
+Notes:
+- This uses `scrapy-impersonate` (`ImpersonateRequest`) and prints matching in-stock stores as JSON lines.
+- `--product-id` should match the CVS PDP slug/id part used under `/shop/...`.
+- You can test full browser mode with `--engine playwright` after installing browser binaries:
+  - `pip install -r backend/requirements.txt`
+  - `playwright install chromium`
+- Install deps first with `pip install -r backend/requirements.txt` if you have not already.
+
+### Decodo Web Scraping API Local Test
+To test CVS inventory via Decodo Web Scraping API (instead of raw proxy requests):
+
+```powershell
+$env:DECODO_BASIC_TOKEN="YOUR_BASIC_TOKEN"
+$env:DECODO_PROXY_POOL="premium"        # optional, defaults to premium
+$env:DECODO_DEVICE_TYPE="desktop_chrome" # optional
+# Optional sticky session for multi-step consistency:
+# $env:DECODO_SESSION_ID="cvs-318928-1"
+python backend/decodo_cvs_inventory_test.py --product-id 318928 --zip 85208 --poll-seconds 60
+```
+
+The script prints Decodo status fields plus whether an inventory response block was returned.
+
 You'll see output like:
 ```
 ==================================================

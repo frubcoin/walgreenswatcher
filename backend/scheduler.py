@@ -11,7 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import DEFAULT_CHECK_INTERVAL_MINUTES, DEFAULT_TRACKED_PRODUCTS, TARGET_ZIP_CODE
 
-from cvs_scraper import CvsBlockedError, CvsStockChecker
+from cvs_scraper import CvsBlockedError, CvsDisabledError, CvsStockChecker
 from database import StockDatabase
 from discord_notifier import DiscordNotifier
 from walgreens_scraper import WalgreensStockChecker
@@ -514,6 +514,18 @@ class StockCheckScheduler:
                             product_index=index,
                             product_total=len(product_specs),
                         )
+                    except CvsDisabledError as exc:
+                        logger.info(
+                            "CVS inventory skipped for user %s product %s: %s",
+                            self.user_id,
+                            product_display_name,
+                            exc,
+                        )
+                        product_result = {
+                            "availability": {},
+                            "stores": {},
+                            "location_ids": [],
+                        }
                     except CvsBlockedError as exc:
                         logger.warning(
                             "CVS inventory blocked for user %s product %s: %s",

@@ -46,6 +46,10 @@ class CvsBlockedError(ValueError):
     """Raised when CVS edge blocks every configured route."""
 
 
+class CvsDisabledError(ValueError):
+    """Raised when CVS checks are disabled by configuration."""
+
+
 class CvsStockChecker:
     """Check CVS local inventory using the PDP inventory service."""
 
@@ -485,6 +489,8 @@ class CvsStockChecker:
         )
 
     def _fetch_inventory_payload(self, product: Dict[str, Any], zip_code: str) -> Dict[str, Any]:
+        if self._env_bool("CVS_DISABLED", False):
+            raise CvsDisabledError("CVS checks are disabled by CVS_DISABLED")
         product_id = str(
             product.get("product_id")
             or product.get("article_id")
