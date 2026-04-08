@@ -148,9 +148,12 @@ class AdminAlertService:
         category: str,
         event: Dict[str, Any],
         respect_preferences: bool = True,
+        destinations: Optional[Sequence[Union[str, Dict[str, Any]]]] = None,
     ) -> Dict[str, Any]:
         settings = self.db.get_admin_settings()
-        destinations = self.normalize_destinations(settings.get("admin_webhook_destinations"))
+        normalized_destinations = self.normalize_destinations(
+            settings.get("admin_webhook_destinations") if destinations is None else destinations
+        )
         result: Dict[str, Any] = {
             "category": category,
             "attempted": 0,
@@ -158,7 +161,7 @@ class AdminAlertService:
             "destinations": [],
             "skipped_reason": "",
         }
-        if not destinations:
+        if not normalized_destinations:
             result["skipped_reason"] = "No admin webhook destinations configured"
             return result
 
@@ -170,9 +173,9 @@ class AdminAlertService:
             return result
 
         payload = self._build_payload(category=category, event=event)
-        result["attempted"] = len(destinations)
+        result["attempted"] = len(normalized_destinations)
 
-        for destination in destinations:
+        for destination in normalized_destinations:
             url = destination["url"]
             try:
                 if self._is_discord_webhook(url):
@@ -191,7 +194,12 @@ class AdminAlertService:
         result = self.deliver_event(category=category, event=event, respect_preferences=True)
         return bool(result.get("delivered"))
 
-    def send_test_alert(self, *, actor_user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def send_test_alert(
+        self,
+        *,
+        actor_user: Optional[Dict[str, Any]] = None,
+        destinations: Optional[Sequence[Union[str, Dict[str, Any]]]] = None,
+    ) -> Dict[str, Any]:
         actor_user = actor_user or {}
         event = {
             "event_type": "admin.webhook_test",
@@ -209,4 +217,9 @@ class AdminAlertService:
                 "note": "Manual webhook test triggered from the admin panel",
             },
         }
-        return self.deliver_event(category="user_action", event=event, respect_preferences=False)
+        return self.deliver_event(
+            category="user_action",
+            event=event,
+            respect_preferences=False,
+            destinations=destinations,
+        )

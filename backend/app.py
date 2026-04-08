@@ -1254,7 +1254,12 @@ def update_admin_settings():
 @require_admin
 def test_admin_webhook():
     admin_user = _session_user()
-    result = admin_alerts.send_test_alert(actor_user=admin_user)
+    data = request.json or {}
+    destinations = None
+    if "admin_webhook_destinations" in data:
+        destinations = admin_alerts.normalize_destinations(data.get("admin_webhook_destinations"))
+
+    result = admin_alerts.send_test_alert(actor_user=admin_user, destinations=destinations)
     _record_audit_event(
         "admin.webhook_tested",
         "Admin webhook test triggered",
@@ -1268,7 +1273,18 @@ def test_admin_webhook():
     if result.get("skipped_reason"):
         return jsonify({"error": result["skipped_reason"], "result": result}), 400
     if not result.get("delivered"):
-        return jsonify({"error": "Webhook test did not deliver to any destination", "result": result}), 502
+        failed_destinations = [
+            item for item in result.get("destinations", []) if not item.get("delivered")
+        ]
+        first_failure = failed_destinations[0] if failed_destinations else {}
+        failure_detail = str(first_failure.get("error") or "").strip()
+        status_code = first_failure.get("status_code")
+        if not failure_detail and status_code:
+            failure_detail = f"Destination returned HTTP {status_code}"
+        error_message = "Webhook test did not deliver to any destination"
+        if failure_detail:
+            error_message = f"{error_message}: {failure_detail}"
+        return jsonify({"error": error_message, "result": result}), 502
     return jsonify({"result": result})
 
 

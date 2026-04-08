@@ -47,37 +47,76 @@
       <section class="auth-gate app-window panel" id="admin-auth-panel">
         <div class="auth-copy">
           <p class="eyebrow">Admin Access</p>
-          <h2>Sign in, then unlock admin</h2>
+          <h2>Unlock admin</h2>
           <p id="admin-auth-copy">Sign in with an approved Google account first, then enter the server-side admin
             password to unlock moderation controls.</p>
+        </div>
+
+        <div class="auth-progress" aria-label="Admin unlock progress">
+          <article class="auth-progress-item" id="auth-progress-google" data-state="pending">
+            <span class="step-index">01</span>
+            <div class="auth-progress-copy">
+              <strong>Google account</strong>
+              <p>Verify an approved identity.</p>
+            </div>
+            <span class="auth-progress-status" id="auth-progress-google-status">Waiting</span>
+          </article>
+          <article class="auth-progress-item" id="auth-progress-password" data-state="pending">
+            <span class="step-index">02</span>
+            <div class="auth-progress-copy">
+              <strong>Admin password</strong>
+              <p>Unlock the moderation surface.</p>
+            </div>
+            <span class="auth-progress-status" id="auth-progress-password-status">Locked</span>
+          </article>
+          <article class="auth-progress-item" id="auth-progress-access" data-state="pending">
+            <span class="step-index">03</span>
+            <div class="auth-progress-copy">
+              <strong>Admin session</strong>
+              <p>Open the dashboard for this browser session.</p>
+            </div>
+            <span class="auth-progress-status" id="auth-progress-access-status">Closed</span>
+          </article>
         </div>
 
         <div class="auth-grid">
           <section class="panel panel-soft auth-step">
             <div class="auth-step-head">
-              <span class="step-index">01</span>
-              <div>
-                <h3>Google Identity</h3>
-                <p id="admin-google-copy">Use one of the approved Google emails for this app.</p>
+              <div class="auth-step-heading">
+                <span class="step-index">01</span>
+                <div>
+                  <h3>Google Identity</h3>
+                  <p id="admin-google-copy">Use one of the approved Google emails for this app.</p>
+                </div>
               </div>
+              <span class="auth-step-state" id="admin-google-step-state" data-state="pending">Waiting</span>
             </div>
             <div class="signed-in-card" id="admin-google-user-card" hidden>
-              <div class="signed-in-label">Signed in as</div>
+              <div class="signed-in-label">Verified account</div>
               <div class="signed-in-name" id="admin-google-user-name"></div>
               <div class="signed-in-email" id="admin-google-user-email"></div>
             </div>
             <div class="google-slot is-pending" id="admin-google-button"></div>
             <div class="google-status" id="admin-google-status" aria-live="polite"></div>
-            <button class="button button-muted" id="google-signout-button" type="button" hidden>Sign Out Google</button>
+            <div class="auth-step-actions">
+              <button class="button button-muted" id="google-signout-button" type="button" hidden>Use Different Google Account</button>
+            </div>
           </section>
 
-          <section class="panel panel-soft auth-step">
+          <section class="panel panel-soft auth-step auth-step-password" id="admin-password-step" data-state="locked">
             <div class="auth-step-head">
-              <span class="step-index">02</span>
-              <div>
-                <h3>Admin Password</h3>
-                <p>Available only after Google sign-in succeeds.</p>
+              <div class="auth-step-heading">
+                <span class="step-index">02</span>
+                <div>
+                  <h3>Admin Password</h3>
+                  <p id="admin-password-copy">Available only after Google sign-in succeeds.</p>
+                </div>
               </div>
+              <span class="auth-step-state" id="admin-password-step-state" data-state="locked">Locked</span>
+            </div>
+            <div class="password-state-card" id="admin-password-state-card">
+              <div class="password-state-title" id="admin-password-state-title">Waiting on Google sign-in</div>
+              <div class="password-state-copy" id="admin-password-state-copy">Once Google verification succeeds, enter the server-side admin password to unlock this browser session.</div>
             </div>
             <form id="admin-login-form" class="stack">
               <label class="field">
@@ -85,6 +124,7 @@
                 <input id="admin-password" name="password" type="password" autocomplete="current-password"
                   placeholder="Admin password" required>
               </label>
+              <p class="field-help" id="admin-password-help">Google verification must complete before password unlock is available.</p>
               <button class="button button-primary" id="admin-password-submit" type="submit">Unlock Admin</button>
             </form>
           </section>

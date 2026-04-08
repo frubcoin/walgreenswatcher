@@ -2478,6 +2478,19 @@
       display: none;
     }
 
+    .settings-map-address-field {
+      position: relative;
+    }
+
+    .settings-map-address-status {
+      margin-top: 8px;
+    }
+
+    .settings-map-address-results {
+      margin-top: 8px;
+      max-height: 200px;
+    }
+
     .map-location-suggestion {
       width: 100%;
       text-align: left;
@@ -4590,7 +4603,7 @@
               <div class="auth-metric">
                 <div class="auth-metric-value">24/7</div>
                 <div class="auth-metric-label">Monitoring</div>
-                <div class="auth-metric-meta" id="auth-service-uptime">Tracking uptime...</div>
+                <div class="auth-metric-meta" id="auth-service-uptime">Loading uptime...</div>
               </div>
               <div class="auth-metric">
                 <div class="auth-metric-value">Live</div>
@@ -4650,7 +4663,7 @@
                 <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Discord
                     webhooks with configurable role notifications.</span></li>
                 <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Beat
-                    everyone else to the product.</span></li>
+                    everyone else to the products you want most.</span></li>
               </ul>
               <div class="auth-legal-note">By continuing, you agree to the <a class="inline-legal-link" href="/terms"
                   target="_blank" rel="noopener noreferrer">Terms</a> and acknowledge the <a class="inline-legal-link"
@@ -4942,7 +4955,11 @@
         <div class="settings-grid">
           <div class="form-group">
             <label class="form-label" for="cfg-map-address">Saved Map Address</label>
-            <input type="text" class="form-input" id="cfg-map-address" maxlength="180" placeholder="Enter address, city, or ZIP">
+            <div class="settings-map-address-field">
+              <input type="text" class="form-input" id="cfg-map-address" maxlength="180" placeholder="Enter address, city, or ZIP" autocomplete="street-address" spellcheck="false">
+              <div class="settings-map-address-status map-location-search-status" id="settings-map-address-status" data-tone="muted" aria-live="polite"></div>
+              <div class="settings-map-address-results map-location-search-results" id="settings-map-address-results" hidden></div>
+            </div>
             <span class="form-hint">Used only for the map view when live location fails or when you want a quick saved place. Stored in this browser only.</span>
           </div>
         </div>
@@ -5078,6 +5095,14 @@
     let manualLocationAutocompleteTimer = 0;
     let manualLocationAutocompleteController = null;
     let manualLocationAutocompleteRequestId = 0;
+    let settingsMapAddressSuggestions = [];
+    let settingsMapAddressHighlightedIndex = -1;
+    let settingsMapAddressAutocompleteBusy = false;
+    let settingsMapAddressAutocompleteTimer = 0;
+    let settingsMapAddressStatus = {
+      message: 'Type at least 3 characters for address suggestions.',
+      tone: 'muted'
+    };
     let manualLocationStatus = {
       message: 'Enter an address, city, or ZIP to center the map.',
       tone: 'muted'
@@ -5144,7 +5169,7 @@
 
       const totalChecks = Number(stats?.total_checks || 0);
       const successfulChecks = Number(stats?.successful_checks || 0);
-      const uptimeLabel = String(stats?.service_uptime?.label || 'Tracking uptime...');
+      const uptimeLabel = String(stats?.service_uptime?.label || 'Loading uptime...');
       checksNode.textContent = formatCompactNumber(totalChecks);
       successesNode.textContent = `${formatCompactNumber(successfulChecks)} successful stock checks recorded`;
       uptimeNode.textContent = uptimeLabel;
@@ -5714,6 +5739,7 @@
       return {
         zipcode: document.getElementById('cfg-zip')?.value.trim() || status.current_zipcode || '',
         interval: String(document.getElementById('cfg-interval')?.value || status.check_interval_minutes || 60),
+        mapAddress: document.getElementById('cfg-map-address')?.value.trim() || loadStoredMapAddress(),
         webhookUrl: primaryDestination.url || '',
         webhookRoleId: primaryDestination.role_id || '',
         productUrl: '',
@@ -5742,6 +5768,7 @@
       const draft = ensureOnboardingDraft();
       const zipInput = document.getElementById('onboarding-zip');
       const intervalInput = document.getElementById('onboarding-interval');
+      const mapAddressInput = document.getElementById('onboarding-map-address');
       const webhookInput = document.getElementById('onboarding-webhook-url');
       const webhookRoleInput = document.getElementById('onboarding-webhook-role');
       const productUrlInput = document.getElementById('onboarding-product-url');
@@ -5751,6 +5778,7 @@
 
       if (zipInput) draft.zipcode = zipInput.value.trim();
       if (intervalInput) draft.interval = intervalInput.value.trim();
+      if (mapAddressInput) draft.mapAddress = mapAddressInput.value.trim();
       if (webhookInput) draft.webhookUrl = webhookInput.value.trim();
       if (webhookRoleInput) draft.webhookRoleId = webhookRoleInput.value.replace(/[^\d]/g, '');
       if (productUrlInput) draft.productUrl = productUrlInput.value.trim();
@@ -5793,6 +5821,8 @@
           bullets: [
             'Use a real ZIP code instead of the placeholder.',
             'Pick an interval that matches how often you want checks to run.',
+            'The saved map address is only used by map view for distance and recentering.',
+            'That map address stays in this browser only and is not stored on our servers.',
             'Discord is optional, but helpful if you want alerts outside the browser.'
           ],
           actionLabel: 'Use full settings page',
@@ -5813,6 +5843,15 @@
                   <label class="form-label" for="onboarding-interval">Check Interval</label>
                   <input type="number" class="form-input" id="onboarding-interval" min="1" max="1440" step="1" placeholder="60" value="${escapeHtml(draft.interval)}">
                   <span class="form-hint">Minutes between automatic checks.</span>
+                </div>
+              </div>
+              <div class="onboarding-form-card">
+                <div class="onboarding-form-card-title">Saved map address</div>
+                <div class="onboarding-form-card-copy">Optional. This is only used in map view to recenter the map and calculate distances from a saved place when you want something other than live browser location.</div>
+                <div class="form-group">
+                  <label class="form-label" for="onboarding-map-address">Map View Address</label>
+                  <input type="text" class="form-input" id="onboarding-map-address" maxlength="180" placeholder="Enter address, city, or ZIP" autocomplete="street-address" spellcheck="false" value="${escapeHtml(draft.mapAddress || '')}">
+                  <span class="form-hint">Stored locally in this browser only. It is not saved to our servers.</span>
                 </div>
               </div>
               <div class="onboarding-form-card">
@@ -5894,6 +5933,7 @@
               <div class="onboarding-summary">
                 <div class="onboarding-summary-row"><span>ZIP code</span><strong>${escapeHtml(configuredZip)}</strong></div>
                 <div class="onboarding-summary-row"><span>Check interval</span><strong>${escapeHtml(draft.interval || '60')} min</strong></div>
+                <div class="onboarding-summary-row"><span>Map view address</span><strong>${draft.mapAddress ? 'Saved locally' : 'Add later'}</strong></div>
                 <div class="onboarding-summary-row"><span>Discord</span><strong>${draft.webhookUrl ? 'Configured' : 'Add later'}</strong></div>
                 <div class="onboarding-summary-row"><span>Tracked products</span><strong>${trackedCount}</strong></div>
               </div>
@@ -6111,7 +6151,9 @@
       const draft = ensureOnboardingDraft();
       const zip = draft.zipcode.trim();
       const interval = Number(draft.interval);
+      const mapAddress = storeMapAddress(draft.mapAddress || '');
       const destinations = [];
+      let mapAddressResolved = true;
 
       if (!/^\d{5}(?:-\d{4})?$/.test(zip)) {
         setOnboardingFeedback('Enter a valid 5-digit ZIP code before continuing.', 'error');
@@ -6138,6 +6180,13 @@
         destinations.push(destination);
       }
 
+      try {
+        const resolvedReference = await resolveMapAddressReference(mapAddress);
+        mapAddressResolved = !mapAddress || Boolean(resolvedReference);
+      } catch (error) {
+        mapAddressResolved = false;
+      }
+
       const result = await apiCall('/api/configure', 'POST', {
         zipcode: zip,
         check_interval_minutes: interval,
@@ -6151,10 +6200,26 @@
 
       document.getElementById('cfg-zip').value = zip;
       document.getElementById('cfg-interval').value = interval;
+      document.getElementById('cfg-map-address').value = mapAddress;
+      setSettingsMapAddressStatus(
+        mapAddress && mapAddressResolved
+          ? 'Saved locally for map view in this browser.'
+          : mapAddress
+            ? 'Saved locally, but this address still needs a more exact match for map distance calculations.'
+            : 'Type at least 3 characters for address suggestions.',
+        mapAddress && !mapAddressResolved ? 'info' : 'success'
+      );
+      syncSettingsMapAddressUi();
+      manualLocationQuery = mapAddress;
       renderDiscordDestinationRows(destinations);
       await loadSettings();
       latestStatusSnapshot = await loadStatus();
-      setOnboardingFeedback('Settings saved. Next we will add your first product.', 'success');
+      setOnboardingFeedback(
+        mapAddress && !mapAddressResolved
+          ? 'Settings saved. Your map-view address was stored locally, but it still needs a more exact match for distance calculations.'
+          : 'Settings saved. Next we will add your first product.',
+        mapAddress && !mapAddressResolved ? 'info' : 'success'
+      );
       return true;
     }
 
@@ -6732,10 +6797,12 @@
     function getStoreDistance(store, referenceLocation = null) {
       const latitude = normalizeCoordinate(store?.latitude);
       const longitude = normalizeCoordinate(store?.longitude);
-      if (referenceLocation && latitude !== null && longitude !== null) {
+      const referenceLatitude = normalizeCoordinate(referenceLocation?.latitude);
+      const referenceLongitude = normalizeCoordinate(referenceLocation?.longitude);
+      if (referenceLatitude !== null && referenceLongitude !== null && latitude !== null && longitude !== null) {
         return calculateDistanceMiles(
-          referenceLocation.latitude,
-          referenceLocation.longitude,
+          referenceLatitude,
+          referenceLongitude,
           latitude,
           longitude
         );
@@ -6940,6 +7007,49 @@
         `).join('');
     }
 
+    function setSettingsMapAddressStatus(message = '', tone = 'muted') {
+      settingsMapAddressStatus = {
+        message: String(message || ''),
+        tone: String(tone || 'muted')
+      };
+    }
+
+    function renderSettingsMapAddressSuggestionsHtml() {
+      return settingsMapAddressSuggestions.map((suggestion, index) => `
+          <button
+            class="map-location-suggestion ${index === settingsMapAddressHighlightedIndex ? 'is-active' : ''}"
+            type="button"
+            data-action="select-settings-map-address-suggestion"
+            data-suggestion-index="${index}">
+            <span class="map-location-suggestion-label">${escapeHtml(suggestion.label)}</span>
+          </button>
+        `).join('');
+    }
+
+    function syncSettingsMapAddressUi(options = {}) {
+      const { focusInput = false } = options;
+      const input = document.getElementById('cfg-map-address');
+      const status = document.getElementById('settings-map-address-status');
+      const results = document.getElementById('settings-map-address-results');
+
+      if (status) {
+        status.textContent = settingsMapAddressStatus.message;
+        status.dataset.tone = settingsMapAddressStatus.tone || 'muted';
+      }
+
+      if (results) {
+        const hasSuggestions = settingsMapAddressSuggestions.length > 0;
+        results.hidden = !hasSuggestions;
+        results.innerHTML = hasSuggestions ? renderSettingsMapAddressSuggestionsHtml() : '';
+      }
+
+      if (input && focusInput) {
+        window.requestAnimationFrame(() => {
+          input.focus({ preventScroll: true });
+        });
+      }
+    }
+
     function syncManualLocationSearchUi(options = {}) {
       const { focusInput = false } = options;
       const { panel, toggle, input, status, results, submit } = getManualLocationSearchElements();
@@ -7127,6 +7237,88 @@
       syncManualLocationSearchUi();
     }
 
+    async function loadSettingsMapAddressSuggestions(query) {
+      const normalizedQuery = String(query || '').trim();
+
+      if (normalizedQuery.length < 3) {
+        settingsMapAddressSuggestions = [];
+        settingsMapAddressHighlightedIndex = -1;
+        settingsMapAddressAutocompleteBusy = false;
+        setSettingsMapAddressStatus('Type at least 3 characters for address suggestions.');
+        syncSettingsMapAddressUi();
+        return [];
+      }
+
+      settingsMapAddressAutocompleteBusy = true;
+      setSettingsMapAddressStatus('Searching addresses...', 'info');
+      syncSettingsMapAddressUi();
+
+      try {
+        const suggestions = await requestManualLocationSuggestions(normalizedQuery);
+        settingsMapAddressSuggestions = suggestions;
+        settingsMapAddressHighlightedIndex = suggestions.length ? 0 : -1;
+        setSettingsMapAddressStatus(
+          suggestions.length
+            ? 'Choose a suggestion to save this map location.'
+            : 'No matches yet. Try a street, city, or ZIP.',
+          suggestions.length ? 'info' : 'error'
+        );
+        return suggestions;
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          return [];
+        }
+
+        console.warn('Settings address lookup error:', error);
+        settingsMapAddressSuggestions = [];
+        settingsMapAddressHighlightedIndex = -1;
+        setSettingsMapAddressStatus('Could not load address suggestions right now.', 'error');
+        return [];
+      } finally {
+        settingsMapAddressAutocompleteBusy = false;
+        syncSettingsMapAddressUi();
+      }
+    }
+
+    function queueSettingsMapAddressAutocomplete(query) {
+      const normalizedQuery = String(query || '');
+
+      if (settingsMapAddressAutocompleteTimer) {
+        window.clearTimeout(settingsMapAddressAutocompleteTimer);
+        settingsMapAddressAutocompleteTimer = 0;
+      }
+
+      if (normalizedQuery.trim().length < 3) {
+        settingsMapAddressSuggestions = [];
+        settingsMapAddressHighlightedIndex = -1;
+        settingsMapAddressAutocompleteBusy = false;
+        setSettingsMapAddressStatus('Type at least 3 characters for address suggestions.');
+        syncSettingsMapAddressUi();
+        return;
+      }
+
+      settingsMapAddressSuggestions = [];
+      settingsMapAddressHighlightedIndex = -1;
+      setSettingsMapAddressStatus('Searching addresses...', 'info');
+      settingsMapAddressAutocompleteTimer = window.setTimeout(() => {
+        settingsMapAddressAutocompleteTimer = 0;
+        void loadSettingsMapAddressSuggestions(normalizedQuery);
+      }, 280);
+      syncSettingsMapAddressUi();
+    }
+
+    function clearSettingsMapAddressSuggestions() {
+      if (settingsMapAddressAutocompleteTimer) {
+        window.clearTimeout(settingsMapAddressAutocompleteTimer);
+        settingsMapAddressAutocompleteTimer = 0;
+      }
+      settingsMapAddressSuggestions = [];
+      settingsMapAddressHighlightedIndex = -1;
+      settingsMapAddressAutocompleteBusy = false;
+      setSettingsMapAddressStatus('Type at least 3 characters for address suggestions.');
+      syncSettingsMapAddressUi();
+    }
+
     function centerMapOnManualLocation(suggestion) {
       if (!suggestion) return;
 
@@ -7156,10 +7348,43 @@
       showToast('Centered map on the entered address', 'success');
     }
 
+    function applySettingsMapAddressSuggestion(suggestion) {
+      if (!suggestion) return;
+
+      const normalizedLabel = storeMapAddress(suggestion.label);
+      setMapDistanceReference(
+        {
+          label: normalizedLabel,
+          latitude: suggestion.latitude,
+          longitude: suggestion.longitude
+        },
+        { persist: true }
+      );
+      manualLocationQuery = normalizedLabel;
+      const input = document.getElementById('cfg-map-address');
+      if (input) {
+        input.value = normalizedLabel;
+      }
+      settingsMapAddressSuggestions = [];
+      settingsMapAddressHighlightedIndex = -1;
+      setSettingsMapAddressStatus('Saved for map view in this browser.', 'success');
+      syncSettingsMapAddressUi();
+      if (latestRenderedResults && currentResultsView === 'map') {
+        renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
+      }
+      showToast('Saved map address updated', 'success');
+    }
+
     function selectManualLocationSuggestionByIndex(index) {
       const suggestion = manualLocationSuggestions[index];
       if (!suggestion) return;
       centerMapOnManualLocation(suggestion);
+    }
+
+    function selectSettingsMapAddressSuggestionByIndex(index) {
+      const suggestion = settingsMapAddressSuggestions[index];
+      if (!suggestion) return;
+      applySettingsMapAddressSuggestion(suggestion);
     }
 
     async function submitManualLocationSearch() {
@@ -7251,6 +7476,9 @@
           return;
         case 'select-manual-location-suggestion':
           selectManualLocationSuggestionByIndex(Number(actionElement.dataset.suggestionIndex || -1));
+          return;
+        case 'select-settings-map-address-suggestion':
+          selectSettingsMapAddressSuggestionByIndex(Number(actionElement.dataset.suggestionIndex || -1));
           return;
         case 'show-my-location':
           await handleShowMyLocation();
@@ -7383,6 +7611,19 @@
     function updateUserLocationOnMap(position) {
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
+
+      setMapDistanceReference(
+        {
+          label: 'Current location',
+          latitude: lat,
+          longitude: lng
+        },
+        { persist: false }
+      );
+
+      if (latestRenderedResults && currentResultsView === 'map') {
+        renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
+      }
 
       if (!resultsMap) return;
       ensureUserLocationMarker(lat, lng);
@@ -7872,6 +8113,40 @@
         }
       }
 
+      if (event.target instanceof HTMLInputElement && event.target.id === 'cfg-map-address') {
+        if (event.key === 'ArrowDown' && settingsMapAddressSuggestions.length) {
+          event.preventDefault();
+          settingsMapAddressHighlightedIndex = (settingsMapAddressHighlightedIndex + 1) % settingsMapAddressSuggestions.length;
+          syncSettingsMapAddressUi();
+          return;
+        }
+
+        if (event.key === 'ArrowUp' && settingsMapAddressSuggestions.length) {
+          event.preventDefault();
+          settingsMapAddressHighlightedIndex = settingsMapAddressHighlightedIndex <= 0
+            ? settingsMapAddressSuggestions.length - 1
+            : settingsMapAddressHighlightedIndex - 1;
+          syncSettingsMapAddressUi();
+          return;
+        }
+
+        if (event.key === 'Enter' && settingsMapAddressSuggestions.length) {
+          event.preventDefault();
+          const suggestionIndex = settingsMapAddressHighlightedIndex >= 0 ? settingsMapAddressHighlightedIndex : 0;
+          selectSettingsMapAddressSuggestionByIndex(suggestionIndex);
+          return;
+        }
+
+        if (event.key === 'Escape' && settingsMapAddressSuggestions.length) {
+          event.preventDefault();
+          settingsMapAddressSuggestions = [];
+          settingsMapAddressHighlightedIndex = -1;
+          setSettingsMapAddressStatus('Type at least 3 characters for address suggestions.');
+          syncSettingsMapAddressUi();
+          return;
+        }
+      }
+
       if (event.key !== 'Escape') return;
       const techStackModal = document.getElementById('tech-stack-modal');
       if (techStackModal && !techStackModal.hidden) {
@@ -7886,8 +8161,13 @@
 
     document.addEventListener('input', event => {
       if (!(event.target instanceof HTMLInputElement)) return;
-      if (event.target.id !== 'manual-location-input') return;
-      handleManualLocationInput(event.target.value);
+      if (event.target.id === 'manual-location-input') {
+        handleManualLocationInput(event.target.value);
+        return;
+      }
+      if (event.target.id === 'cfg-map-address') {
+        queueSettingsMapAddressAutocomplete(event.target.value);
+      }
     });
 
     document.addEventListener('click', async event => {
@@ -7912,6 +8192,17 @@
         manualLocationSuggestions = [];
         manualLocationHighlightedIndex = -1;
         syncManualLocationSearchUi();
+      }
+
+      if (
+        settingsMapAddressSuggestions.length &&
+        event.target instanceof Element &&
+        !event.target.closest('.settings-map-address-field')
+      ) {
+        settingsMapAddressSuggestions = [];
+        settingsMapAddressHighlightedIndex = -1;
+        setSettingsMapAddressStatus('Type at least 3 characters for address suggestions.');
+        syncSettingsMapAddressUi();
       }
 
       const onboardingModal = document.getElementById('onboarding-modal');
@@ -8206,6 +8497,12 @@
       if (mapAddressInput) {
         mapAddressInput.value = storedMapAddress;
       }
+      setSettingsMapAddressStatus(
+        storedMapAddress
+          ? 'Saved locally for map view in this browser.'
+          : 'Type at least 3 characters for address suggestions.'
+      );
+      syncSettingsMapAddressUi();
       manualLocationQuery = storedMapAddress;
       if (storedMapAddress) {
         await ensureSavedMapAddressReference();
@@ -8264,6 +8561,15 @@
           tileSize: result.pokemon_background_tile_size ?? pokemonBackgroundTileSize
         });
         document.getElementById('cfg-map-address').value = mapAddress;
+        setSettingsMapAddressStatus(
+          mapAddress && mapAddressResolved
+            ? 'Saved locally for map view in this browser.'
+            : mapAddress
+              ? 'Saved, but this address still needs a more exact match for map distance calculations.'
+              : 'Type at least 3 characters for address suggestions.',
+          mapAddress && !mapAddressResolved ? 'info' : 'success'
+        );
+        syncSettingsMapAddressUi();
         showToast(
           mapAddress && !mapAddressResolved
             ? 'Settings saved, but the map address could not be resolved for distance calculations yet'
@@ -8276,6 +8582,13 @@
         }
       } else {
         document.getElementById('cfg-map-address').value = mapAddress;
+        setSettingsMapAddressStatus(
+          mapAddress
+            ? 'Saved locally, but server settings failed to save.'
+            : 'Type at least 3 characters for address suggestions.',
+          mapAddress ? 'info' : 'muted'
+        );
+        syncSettingsMapAddressUi();
         if (latestRenderedResults) {
           renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
         }

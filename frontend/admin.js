@@ -7,7 +7,8 @@ const state = {
   overview: null,
   userSearch: '',
   userFilter: 'all',
-  eventFilter: 'all'
+  eventFilter: 'all',
+  activeReviewKey: ''
 };
 
 let bannerTimer = 0;
@@ -74,6 +75,32 @@ function showBanner(message, tone = 'info') {
   }, 4200);
 }
 
+function setUserFilter(filter) {
+  state.userFilter = filter || 'all';
+  const select = document.getElementById('user-filter-select');
+  if (select) {
+    select.value = state.userFilter;
+  }
+  if (state.overview) {
+    renderUsers(state.overview.users || []);
+  }
+}
+
+function setEventFilter(filter) {
+  state.eventFilter = filter || 'all';
+  const select = document.getElementById('event-filter-select');
+  if (select) {
+    select.value = state.eventFilter;
+  }
+  if (state.overview) {
+    renderEvents(state.overview.events || []);
+  }
+}
+
+function scrollToPanel(panelId) {
+  document.getElementById(panelId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function apiRequest(path, method = 'GET', body = null) {
   const response = await fetch(apiUrl(path), {
     method,
@@ -92,6 +119,7 @@ async function apiRequest(path, method = 'GET', body = null) {
     const message = payload?.error || `Request failed (${response.status})`;
     const err = new Error(message);
     err.status = response.status;
+    err.payload = payload;
     throw err;
   }
 
@@ -102,6 +130,12 @@ function setGoogleStatus(message, tone = 'info') {
   const element = document.getElementById('admin-google-status');
   element.textContent = message || '';
   element.dataset.tone = tone;
+}
+
+function setStateBadge(element, label, state) {
+  if (!element) return;
+  element.textContent = label;
+  element.dataset.state = state;
 }
 
 function isUserNew(user) {
@@ -124,11 +158,32 @@ function setSessionUi(session) {
   const googleEmail = document.getElementById('admin-google-user-email');
   const googleCopy = document.getElementById('admin-google-copy');
   const googleSignoutButton = document.getElementById('google-signout-button');
+  const googleStepState = document.getElementById('admin-google-step-state');
+  const passwordStep = document.getElementById('admin-password-step');
+  const passwordCopy = document.getElementById('admin-password-copy');
+  const passwordStepState = document.getElementById('admin-password-step-state');
+  const passwordStateTitle = document.getElementById('admin-password-state-title');
+  const passwordStateCopy = document.getElementById('admin-password-state-copy');
+  const passwordHelp = document.getElementById('admin-password-help');
   const passwordInput = document.getElementById('admin-password');
   const passwordSubmit = document.getElementById('admin-password-submit');
+  const progressGoogle = document.getElementById('auth-progress-google');
+  const progressGoogleStatus = document.getElementById('auth-progress-google-status');
+  const progressPassword = document.getElementById('auth-progress-password');
+  const progressPasswordStatus = document.getElementById('auth-progress-password-status');
+  const progressAccess = document.getElementById('auth-progress-access');
+  const progressAccessStatus = document.getElementById('auth-progress-access-status');
+
+  const setProgressState = (element, statusElement, state, label) => {
+    if (element) {
+      element.dataset.state = state;
+    }
+    setStateBadge(statusElement, label, state);
+  };
 
   if (!session.configured) {
     authPanel.hidden = false;
+    authPanel.dataset.stage = 'unconfigured';
     dashboard.hidden = true;
     logoutButton.hidden = true;
     sessionChip.textContent = 'Admin password missing';
@@ -137,6 +192,18 @@ function setSessionUi(session) {
     googleSignoutButton.hidden = true;
     passwordInput.disabled = true;
     passwordSubmit.disabled = true;
+    passwordSubmit.textContent = 'Unavailable';
+    passwordInput.placeholder = 'Admin password unavailable';
+    passwordCopy.textContent = 'Available only after Google sign-in succeeds.';
+    passwordStateTitle.textContent = 'Admin password not configured';
+    passwordStateCopy.textContent = 'The backend needs ADMIN_PANEL_PASSWORD before this panel can be unlocked.';
+    passwordHelp.textContent = 'Add ADMIN_PANEL_PASSWORD on the server, then refresh this page.';
+    passwordStep.dataset.state = 'blocked';
+    setStateBadge(googleStepState, 'Blocked', 'blocked');
+    setStateBadge(passwordStepState, 'Blocked', 'blocked');
+    setProgressState(progressGoogle, progressGoogleStatus, 'blocked', 'Blocked');
+    setProgressState(progressPassword, progressPasswordStatus, 'blocked', 'Blocked');
+    setProgressState(progressAccess, progressAccessStatus, 'blocked', 'Unavailable');
     setGoogleStatus('Admin password is not configured on the backend.', 'error');
     return;
   }
@@ -145,20 +212,57 @@ function setSessionUi(session) {
   const fullyAuthenticated = Boolean(session.authenticated);
 
   authPanel.hidden = fullyAuthenticated;
+  authPanel.dataset.stage = fullyAuthenticated ? 'unlocked' : googleAuthenticated ? 'google-verified' : 'locked';
   dashboard.hidden = !fullyAuthenticated;
   logoutButton.hidden = !googleAuthenticated;
 
   if (fullyAuthenticated) {
     sessionChip.textContent = `Admin unlocked | ${session.user.email}`;
     authCopy.textContent = 'Admin access is active for this session.';
+    passwordCopy.textContent = 'Server-side password accepted for this Google session.';
+    passwordStateTitle.textContent = 'Admin access is active';
+    passwordStateCopy.textContent = 'This browser session is unlocked. Sign out when you are done moderating.';
+    passwordHelp.textContent = 'Admin unlock stays active until you sign out or the session expires.';
+    passwordStep.dataset.state = 'complete';
+    setStateBadge(googleStepState, 'Verified', 'complete');
+    setStateBadge(passwordStepState, 'Accepted', 'complete');
+    setProgressState(progressGoogle, progressGoogleStatus, 'complete', 'Verified');
+    setProgressState(progressPassword, progressPasswordStatus, 'complete', 'Accepted');
+    setProgressState(progressAccess, progressAccessStatus, 'complete', 'Open');
+    passwordSubmit.textContent = 'Admin Unlocked';
+    passwordInput.placeholder = 'Admin password accepted';
     setGoogleStatus('Google verified and admin password accepted.', 'success');
   } else if (googleAuthenticated) {
     sessionChip.textContent = `Google verified | ${session.user.email}`;
     authCopy.textContent = 'Google sign-in is complete. Enter the admin password to unlock admin access.';
+    passwordCopy.textContent = 'Enter the server-side admin password to unlock the admin workspace.';
+    passwordStateTitle.textContent = 'Ready for password unlock';
+    passwordStateCopy.textContent = 'Google verification is complete. Enter the admin password for this browser session.';
+    passwordHelp.textContent = 'Only approved Google accounts can reach this step.';
+    passwordStep.dataset.state = 'active';
+    setStateBadge(googleStepState, 'Verified', 'complete');
+    setStateBadge(passwordStepState, 'Ready', 'active');
+    setProgressState(progressGoogle, progressGoogleStatus, 'complete', 'Verified');
+    setProgressState(progressPassword, progressPasswordStatus, 'active', 'Ready');
+    setProgressState(progressAccess, progressAccessStatus, 'pending', 'Waiting');
+    passwordSubmit.textContent = 'Unlock Admin';
+    passwordInput.placeholder = 'Enter admin password';
     setGoogleStatus('Google sign-in complete. Continue with the admin password.', 'success');
   } else {
     sessionChip.textContent = 'Locked';
     authCopy.textContent = 'Sign in with an approved Google account first, then enter the server-side admin password to unlock moderation controls.';
+    passwordCopy.textContent = 'Available only after Google sign-in succeeds.';
+    passwordStateTitle.textContent = 'Waiting on Google sign-in';
+    passwordStateCopy.textContent = 'Use an approved Google account first. The password step stays locked until identity verification succeeds.';
+    passwordHelp.textContent = 'Google verification must complete before password unlock is available.';
+    passwordStep.dataset.state = 'locked';
+    setStateBadge(googleStepState, 'Waiting', session.access_denied_reason ? 'error' : 'pending');
+    setStateBadge(passwordStepState, 'Locked', 'blocked');
+    setProgressState(progressGoogle, progressGoogleStatus, session.access_denied_reason ? 'error' : 'pending', session.access_denied_reason ? 'Denied' : 'Waiting');
+    setProgressState(progressPassword, progressPasswordStatus, 'blocked', 'Locked');
+    setProgressState(progressAccess, progressAccessStatus, 'blocked', 'Closed');
+    passwordSubmit.textContent = 'Sign In First';
+    passwordInput.placeholder = 'Google sign-in required first';
     if (session.access_denied_reason) {
       setGoogleStatus(session.access_denied_reason, 'error');
     } else if (!session.google_client_id) {
@@ -182,7 +286,7 @@ function setSessionUi(session) {
 
   googleSignoutButton.hidden = !googleAuthenticated;
   passwordInput.disabled = !googleAuthenticated;
-  passwordSubmit.disabled = !googleAuthenticated;
+  passwordSubmit.disabled = !googleAuthenticated || fullyAuthenticated;
 }
 
 function renderPlatformSnapshot(platform) {
@@ -268,42 +372,52 @@ function renderPlatformSnapshot(platform) {
 
 function buildAttentionItems(overview) {
   const users = overview?.users || [];
+  const events = overview?.events || [];
   const totals = overview?.platform?.totals || {};
   const unauthorizedUsers = users.filter(user => !user.is_authorized_email);
   const runningUnauthorized = unauthorizedUsers.filter(user => user.scheduler_enabled);
   const recentlyJoined = users.filter(user => isUserNew(user));
+  const deniedEvents = events.filter(event => String(event.event_type || '').startsWith('auth.login_denied'));
 
   const items = [];
 
   if (runningUnauthorized.length) {
     items.push({
+      key: 'scheduler-review',
       title: `${runningUnauthorized.length} scheduler account${runningUnauthorized.length === 1 ? '' : 's'} need approval review`,
       body: 'These users still have schedulers enabled while their email is waiting for approval.',
-      tone: 'warning'
+      tone: 'warning',
+      actionable: true
     });
   }
 
   if (totals.login_denials) {
     items.push({
+      key: 'login-denials',
       title: `${totals.login_denials} recent login denial${totals.login_denials === 1 ? '' : 's'}`,
       body: 'Review the event stream to confirm whether they were expected approval or ban decisions.',
-      tone: 'danger'
+      tone: 'danger',
+      actionable: deniedEvents.length > 0
     });
   }
 
   if (recentlyJoined.length) {
     items.push({
+      key: 'new-users',
       title: `${recentlyJoined.length} new user${recentlyJoined.length === 1 ? '' : 's'} in the last 72 hours`,
       body: 'Verify their access posture and decide whether they should remain on the platform.',
-      tone: 'success'
+      tone: 'success',
+      actionable: true
     });
   }
 
   if (!items.length) {
     items.push({
+      key: 'clear',
       title: 'No active operator queue',
       body: 'Nothing urgent is standing out right now. The platform appears stable.',
-      tone: 'success'
+      tone: 'success',
+      actionable: false
     });
   }
 
@@ -314,7 +428,7 @@ function renderAttentionQueue(overview) {
   const items = buildAttentionItems(overview);
   const container = document.getElementById('attention-list');
   container.innerHTML = items.map(item => `
-    <article class="attention-item">
+    <article class="attention-item ${item.actionable ? 'is-actionable' : ''}" ${item.actionable ? 'tabindex="0" role="button"' : ''} data-action="${item.actionable ? 'open-review-item' : ''}" data-review-key="${escapeHtml(item.key || '')}">
       <div class="tag-row">
         <span class="chip ${item.tone === 'danger' ? 'chip-danger' : item.tone === 'warning' ? 'chip-warning' : 'chip-success'}">${escapeHtml(item.tone)}</span>
       </div>
@@ -322,6 +436,175 @@ function renderAttentionQueue(overview) {
       <p>${escapeHtml(item.body)}</p>
     </article>
   `).join('');
+}
+
+function closeReviewModal() {
+  state.activeReviewKey = '';
+  const modal = document.getElementById('review-modal');
+  if (modal) {
+    modal.hidden = true;
+  }
+  document.body.style.overflow = '';
+}
+
+function renderReviewItems(items = []) {
+  const container = document.getElementById('review-modal-list');
+  if (!container) return;
+
+  if (!items.length) {
+    container.innerHTML = '<div class="empty-state">Nothing actionable is in this queue right now.</div>';
+    return;
+  }
+
+  container.innerHTML = items.map(item => `
+    <article class="review-modal-item">
+      <div class="review-modal-item-head">
+        <div>
+          <strong>${escapeHtml(item.title || 'Item')}</strong>
+          ${item.meta ? `<div class="review-modal-item-meta">${escapeHtml(item.meta)}</div>` : ''}
+        </div>
+        ${item.tag ? `<span class="chip ${item.tagTone || ''}">${escapeHtml(item.tag)}</span>` : ''}
+      </div>
+      ${item.copy ? `<div class="review-modal-item-copy">${escapeHtml(item.copy)}</div>` : ''}
+      ${item.actions?.length ? `<div class="review-modal-item-actions">${item.actions.map(action => `
+        <button
+          class="button ${action.buttonClass || 'button-muted'} button-compact"
+          type="button"
+          data-action="${escapeHtml(action.action || '')}"
+          ${action.email ? `data-email="${escapeHtml(action.email)}"` : ''}
+          ${Number.isFinite(action.userId) ? `data-user-id="${escapeHtml(String(action.userId))}"` : ''}
+          ${action.reasonInputId ? `data-reason-input-id="${escapeHtml(action.reasonInputId)}"` : ''}
+        >${escapeHtml(action.label || 'Open')}</button>
+      `).join('')}</div>` : ''}
+    </article>
+  `).join('');
+}
+
+function getReviewModalConfig(reviewKey) {
+  const overview = state.overview || {};
+  const users = overview.users || [];
+  const events = overview.events || [];
+  const unauthorizedUsers = users.filter(user => !user.is_authorized_email);
+  const runningUnauthorized = unauthorizedUsers.filter(user => user.scheduler_enabled);
+  const recentlyJoined = users.filter(user => isUserNew(user));
+  const deniedEvents = events.filter(event => String(event.event_type || '').startsWith('auth.login_denied')).slice(0, 8);
+
+  if (reviewKey === 'scheduler-review') {
+    return {
+      kicker: 'Pending scheduler review',
+      title: 'Approval review for active schedulers',
+      copy: 'These accounts are still running scheduled checks while waiting for approval. You can approve them, stop the scheduler, or jump into the filtered users view.',
+      items: runningUnauthorized.map(user => ({
+        title: user.name || user.email,
+        meta: `${user.email} | ${formatInterval(user.check_interval_minutes || 60)} | ZIP ${user.current_zipcode || 'None'}`,
+        copy: `${user.tracked_product_count || 0} tracked product${Number(user.tracked_product_count || 0) === 1 ? '' : 's'} | Last login ${formatDateTime(user.last_login_at)}`,
+        tag: 'Scheduler on',
+        tagTone: 'chip-warning',
+        actions: [
+          { label: 'Approve user', action: 'authorize-user-email', email: user.email, buttonClass: 'button-success' },
+          { label: 'Stop scheduler', action: 'stop-user-scheduler', userId: Number(user.id), buttonClass: 'button-warning' }
+        ]
+      })),
+      footerActions: [
+        { label: 'Open pending users', action: 'open-review-filter', target: 'users', filter: 'unauthorized', buttonClass: 'button-primary' }
+      ]
+    };
+  }
+
+  if (reviewKey === 'login-denials') {
+    return {
+      kicker: 'Access review',
+      title: 'Recent login denials',
+      copy: 'These recent denials usually mean someone hit the approval gate, a ban, or a bad session state. Open the filtered audit feed to investigate the full timeline.',
+      items: deniedEvents.map(event => ({
+        title: event.summary || event.event_type || 'Login denial',
+        meta: `${formatDateTime(event.created_at)} | ${(event.target_email || event.user_email || 'Unknown user')}`,
+        copy: event.metadata && Object.keys(event.metadata).length ? JSON.stringify(event.metadata) : 'No extra metadata recorded.',
+        tag: 'Denied',
+        tagTone: 'chip-danger',
+        actions: []
+      })),
+      footerActions: [
+        { label: 'Open denied events', action: 'open-review-filter', target: 'events', filter: 'denied', buttonClass: 'button-primary' }
+      ]
+    };
+  }
+
+  if (reviewKey === 'new-users') {
+    return {
+      kicker: 'New users',
+      title: 'Recent sign-ups',
+      copy: 'Review the newest accounts, approve the ones you want to keep, or open the filtered user list for full moderation details.',
+      items: recentlyJoined.map(user => ({
+        title: user.name || user.email,
+        meta: `${user.email} | Joined ${formatDateTime(user.created_at)}`,
+        copy: `${user.is_authorized_email ? 'Already approved' : 'Waiting approval'} | ${user.tracked_product_count || 0} tracked product${Number(user.tracked_product_count || 0) === 1 ? '' : 's'}`,
+        tag: user.is_authorized_email ? 'Approved' : 'Pending',
+        tagTone: user.is_authorized_email ? 'chip-success' : 'chip-warning',
+        actions: user.is_authorized_email
+          ? []
+          : [{ label: 'Approve user', action: 'authorize-user-email', email: user.email, buttonClass: 'button-success' }]
+      })),
+      footerActions: [
+        { label: 'Open recent users', action: 'open-review-filter', target: 'users', filter: 'new', buttonClass: 'button-primary' }
+      ]
+    };
+  }
+
+  return {
+    kicker: 'Review item',
+    title: 'Nothing urgent',
+    copy: 'The queue is clear right now.',
+    items: [],
+    footerActions: []
+  };
+}
+
+function openReviewModal(reviewKey) {
+  const config = getReviewModalConfig(reviewKey);
+  state.activeReviewKey = reviewKey;
+
+  const modal = document.getElementById('review-modal');
+  const kicker = document.getElementById('review-modal-kicker');
+  const title = document.getElementById('review-modal-title');
+  const copy = document.getElementById('review-modal-copy');
+  const actions = document.getElementById('review-modal-actions');
+
+  if (!modal || !kicker || !title || !copy || !actions) return;
+
+  kicker.textContent = config.kicker || 'Review item';
+  title.textContent = config.title || 'Needs attention';
+  copy.textContent = config.copy || '';
+  renderReviewItems(config.items || []);
+  actions.innerHTML = (config.footerActions || []).map(action => `
+    <button
+      class="button ${action.buttonClass || 'button-muted'}"
+      type="button"
+      data-action="${escapeHtml(action.action || '')}"
+      data-review-target="${escapeHtml(action.target || '')}"
+      data-review-filter="${escapeHtml(action.filter || '')}"
+    >${escapeHtml(action.label || 'Open')}</button>
+  `).join('');
+
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function openReviewFilter(target, filter) {
+  closeReviewModal();
+  if (target === 'users') {
+    setUserFilter(filter || 'all');
+    scrollToPanel('users-panel');
+  } else if (target === 'events') {
+    setEventFilter(filter || 'all');
+    scrollToPanel('events-panel');
+  }
+}
+
+function refreshActiveReviewModal() {
+  if (state.activeReviewKey) {
+    openReviewModal(state.activeReviewKey);
+  }
 }
 
 function renderSettings(settings) {
@@ -563,7 +846,7 @@ async function renderGoogleSignInButton(clientId) {
     size: 'large',
     shape: 'rectangular',
     text: 'continue_with',
-    width: 320
+    width: Math.max(240, Math.min(360, Math.floor(container.getBoundingClientRect().width || 320)))
   });
   container.classList.remove('is-pending');
 }
@@ -577,6 +860,9 @@ async function handleGoogleCredentialResponse(response) {
   try {
     await apiRequest('/api/auth/google', 'POST', { credential: response.credential });
     await refreshAdminSession({ loadOverviewIfUnlocked: false });
+    if (!state.session?.authenticated && state.session?.google_authenticated) {
+      document.getElementById('admin-password')?.focus();
+    }
     showBanner('Google sign-in complete. Enter the admin password to continue.', 'success');
   } catch (error) {
     showBanner(error.message, 'error');
@@ -587,6 +873,7 @@ async function handleGoogleCredentialResponse(response) {
 async function loadAdminOverview(showSuccessBanner = false) {
   const overview = await apiRequest('/api/admin/overview');
   renderOverview(overview);
+  refreshActiveReviewModal();
   if (showSuccessBanner) {
     showBanner('Admin data refreshed', 'success');
   }
@@ -659,6 +946,30 @@ function webhookTextareaToDestinations() {
     .map(url => ({ url }));
 }
 
+function formatWebhookTestDetail(result) {
+  const failures = (result?.destinations || []).filter(item => !item?.delivered);
+  if (!failures.length) {
+    return '';
+  }
+
+  const firstFailure = failures[0];
+  const url = String(firstFailure.url || '');
+  let detail = String(firstFailure.error || '').trim();
+  if (!detail && firstFailure.status_code) {
+    detail = `HTTP ${firstFailure.status_code}`;
+  }
+  if (!detail) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname}: ${detail}`;
+  } catch (error) {
+    return detail;
+  }
+}
+
 async function handleSettingsSave(event) {
   event.preventDefault();
   try {
@@ -677,19 +988,31 @@ async function handleSettingsSave(event) {
 
 async function handleTestWebhook() {
   const button = document.getElementById('test-webhook-button');
+  const destinations = webhookTextareaToDestinations();
   if (button) {
     button.disabled = true;
     button.textContent = 'Sending...';
   }
 
   try {
-    const response = await apiRequest('/api/admin/test-webhook', 'POST', {});
+    if (!destinations.length) {
+      throw new Error('Add at least one admin webhook URL before testing.');
+    }
+
+    const response = await apiRequest('/api/admin/test-webhook', 'POST', {
+      admin_webhook_destinations: destinations
+    });
     const result = response?.result || {};
     const delivered = Number(result.delivered || 0);
     const attempted = Number(result.attempted || 0);
-    showBanner(`Webhook test delivered to ${delivered} of ${attempted} destination${attempted === 1 ? '' : 's'}`, 'success');
+    const detail = formatWebhookTestDetail(result);
+    const tone = delivered === attempted ? 'success' : 'info';
+    const summary = `Webhook test delivered to ${delivered} of ${attempted} destination${attempted === 1 ? '' : 's'}`;
+    showBanner(detail ? `${summary}. ${detail}` : summary, tone);
   } catch (error) {
-    showBanner(error.message, 'error');
+    const result = error?.payload?.result || {};
+    const detail = formatWebhookTestDetail(result);
+    showBanner(detail ? `${error.message} ${detail}` : error.message, 'error');
   } finally {
     if (button) {
       button.disabled = false;
@@ -817,7 +1140,13 @@ document.addEventListener('click', event => {
   if (!actionElement) return;
 
   const action = actionElement.dataset.action;
-  if (action === 'remove-authorized-email') {
+  if (action === 'open-review-item') {
+    openReviewModal(actionElement.dataset.reviewKey || '');
+  } else if (action === 'open-review-filter') {
+    openReviewFilter(actionElement.dataset.reviewTarget || '', actionElement.dataset.reviewFilter || '');
+  } else if (action === 'close-review-modal') {
+    closeReviewModal();
+  } else if (action === 'remove-authorized-email') {
     removeAuthorizedEmail(actionElement.dataset.email || '');
   } else if (action === 'authorize-user-email') {
     authorizeUserEmail(actionElement.dataset.email || '');
@@ -830,6 +1159,19 @@ document.addEventListener('click', event => {
   } else if (action === 'unban-user') {
     unbanUser(Number(actionElement.dataset.userId || 0));
   }
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && state.activeReviewKey) {
+    closeReviewModal();
+    return;
+  }
+
+  const actionElement = event.target instanceof Element ? event.target.closest('[data-action="open-review-item"]') : null;
+  if (!actionElement) return;
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  openReviewModal(actionElement.dataset.reviewKey || '');
 });
 
 initializeAdminPage();
