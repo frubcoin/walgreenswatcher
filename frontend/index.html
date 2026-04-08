@@ -6054,12 +6054,33 @@
       message: 'Type at least 3 characters for address suggestions.',
       tone: 'muted'
     };
+    let onboardingMapAddressSuggestions = [];
+    let onboardingMapAddressHighlightedIndex = -1;
+    let onboardingMapAddressAutocompleteBusy = false;
+    let onboardingMapAddressAutocompleteTimer = 0;
+    let onboardingMapAddressStatus = {
+      message: 'Type at least 3 characters for address suggestions.',
+      tone: 'muted'
+    };
     let manualLocationStatus = {
       message: 'Enter an address, city, or ZIP to center the map.',
       tone: 'muted'
     };
+    function getInitialTabName(pathname = window.location.pathname) {
+      const normalizedPath = String(pathname || '').replace(/\/+$/, '') || '/';
+      if (normalizedPath === '/settings' || normalizedPath === '/trending') {
+        return 'settings';
+      }
+      if (normalizedPath === '/history') {
+        return 'history';
+      }
+      return 'results';
+    }
+
     const INITIAL_ROUTE_PATH = window.location.pathname.replace(/\/+$/, '') || '/';
+    const INITIAL_TAB_NAME = getInitialTabName(INITIAL_ROUTE_PATH);
     let pendingInitialMapScroll = INITIAL_ROUTE_PATH === '/map';
+    let pendingInitialTrendingScroll = INITIAL_ROUTE_PATH === '/trending';
     let trackedProductsCache = [];
     let trendingProductsCache = [];
     let trendingRetentionHours = 24;
@@ -6804,9 +6825,13 @@
               <div class="onboarding-form-card">
                 <div class="onboarding-form-card-title">Saved map address</div>
                 <div class="onboarding-form-card-copy">Optional. This is only used in map view to recenter the map and calculate distances from a saved place when you want something other than live browser location.</div>
-                <div class="form-group">
+                <div class="form-group settings-map-address-field onboarding-map-address-field">
                   <label class="form-label" for="onboarding-map-address">Map View Address</label>
                   <input type="text" class="form-input" id="onboarding-map-address" maxlength="180" placeholder="Enter address, city, or ZIP" autocomplete="street-address" spellcheck="false" value="${escapeHtml(draft.mapAddress || '')}">
+                  <div class="settings-map-address-status onboarding-inline-status" id="onboarding-map-address-status" data-tone="${escapeHtml(onboardingMapAddressStatus.tone || 'muted')}">${escapeHtml(onboardingMapAddressStatus.message)}</div>
+                  <div class="settings-map-address-results map-location-search-results" id="onboarding-map-address-results" ${onboardingMapAddressSuggestions.length ? '' : 'hidden'}>
+                    ${onboardingMapAddressSuggestions.length ? renderOnboardingMapAddressSuggestionsHtml() : ''}
+                  </div>
                   <span class="form-hint">Stored locally in this browser only. It is not saved to our servers.</span>
                 </div>
               </div>
@@ -7413,9 +7438,14 @@
       setAuthenticatedUi(true);
       setAuthGateMode('signin');
       updateAuthStatus('');
+      openTab(INITIAL_TAB_NAME, { loadContent: false });
       await loadSettings();
       const statusPayload = await loadStatus();
+      if (INITIAL_TAB_NAME === 'history') {
+        await loadHistory();
+      }
       maybeScrollToInitialMapView();
+      maybeScrollToInitialTrendingView();
       maybeOpenOnboarding(statusPayload);
       startStatusPolling();
       return true;
@@ -8149,6 +8179,29 @@
       });
     }
 
+    function getInitialTrendingScrollTarget() {
+      return document.querySelector('#panel-settings .trending-products-panel')
+        || document.getElementById('trending-products-list');
+    }
+
+    function maybeScrollToInitialTrendingView() {
+      if (!pendingInitialTrendingScroll || document.body.classList.contains('auth-gate-active')) return;
+      if (currentTab !== 'settings') return;
+
+      const target = getInitialTrendingScrollTarget();
+      if (!target) return;
+
+      pendingInitialTrendingScroll = false;
+      window.requestAnimationFrame(() => {
+        target.scrollIntoView({
+          block: 'start',
+          inline: 'nearest',
+          behavior: 'auto'
+        });
+        queueShellScrollbarUpdate();
+      });
+    }
+
     function getResultsMapFramedLatLng(targetLatLng, zoom, options = {}) {
       if (!resultsMap || !targetLatLng) return targetLatLng;
 
@@ -8294,6 +8347,25 @@
         `).join('');
     }
 
+    function setOnboardingMapAddressStatus(message = '', tone = 'muted') {
+      onboardingMapAddressStatus = {
+        message: String(message || ''),
+        tone: String(tone || 'muted')
+      };
+    }
+
+    function renderOnboardingMapAddressSuggestionsHtml() {
+      return onboardingMapAddressSuggestions.map((suggestion, index) => `
+          <button
+            class="map-location-suggestion ${index === onboardingMapAddressHighlightedIndex ? 'is-active' : ''}"
+            type="button"
+            data-action="select-onboarding-map-address-suggestion"
+            data-suggestion-index="${index}">
+            <span class="map-location-suggestion-label">${escapeHtml(suggestion.label)}</span>
+          </button>
+        `).join('');
+    }
+
     function syncSettingsMapAddressUi(options = {}) {
       const { focusInput = false } = options;
       const input = document.getElementById('cfg-map-address');
@@ -8309,6 +8381,30 @@
         const hasSuggestions = settingsMapAddressSuggestions.length > 0;
         results.hidden = !hasSuggestions;
         results.innerHTML = hasSuggestions ? renderSettingsMapAddressSuggestionsHtml() : '';
+      }
+
+      if (input && focusInput) {
+        window.requestAnimationFrame(() => {
+          input.focus({ preventScroll: true });
+        });
+      }
+    }
+
+    function syncOnboardingMapAddressUi(options = {}) {
+      const { focusInput = false } = options;
+      const input = document.getElementById('onboarding-map-address');
+      const status = document.getElementById('onboarding-map-address-status');
+      const results = document.getElementById('onboarding-map-address-results');
+
+      if (status) {
+        status.textContent = onboardingMapAddressStatus.message;
+        status.dataset.tone = onboardingMapAddressStatus.tone || 'muted';
+      }
+
+      if (results) {
+        const hasSuggestions = onboardingMapAddressSuggestions.length > 0;
+        results.hidden = !hasSuggestions;
+        results.innerHTML = hasSuggestions ? renderOnboardingMapAddressSuggestionsHtml() : '';
       }
 
       if (input && focusInput) {
@@ -8587,6 +8683,88 @@
       syncSettingsMapAddressUi();
     }
 
+    async function loadOnboardingMapAddressSuggestions(query) {
+      const normalizedQuery = String(query || '').trim();
+
+      if (normalizedQuery.length < 3) {
+        onboardingMapAddressSuggestions = [];
+        onboardingMapAddressHighlightedIndex = -1;
+        onboardingMapAddressAutocompleteBusy = false;
+        setOnboardingMapAddressStatus('Type at least 3 characters for address suggestions.');
+        syncOnboardingMapAddressUi();
+        return [];
+      }
+
+      onboardingMapAddressAutocompleteBusy = true;
+      setOnboardingMapAddressStatus('Searching addresses...', 'info');
+      syncOnboardingMapAddressUi();
+
+      try {
+        const suggestions = await requestManualLocationSuggestions(normalizedQuery);
+        onboardingMapAddressSuggestions = suggestions;
+        onboardingMapAddressHighlightedIndex = suggestions.length ? 0 : -1;
+        setOnboardingMapAddressStatus(
+          suggestions.length
+            ? 'Choose a suggestion to use this saved map location.'
+            : 'No matches yet. Try a street, city, or ZIP.',
+          suggestions.length ? 'info' : 'error'
+        );
+        return suggestions;
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          return [];
+        }
+
+        console.warn('Onboarding address lookup error:', error);
+        onboardingMapAddressSuggestions = [];
+        onboardingMapAddressHighlightedIndex = -1;
+        setOnboardingMapAddressStatus('Could not load address suggestions right now.', 'error');
+        return [];
+      } finally {
+        onboardingMapAddressAutocompleteBusy = false;
+        syncOnboardingMapAddressUi();
+      }
+    }
+
+    function queueOnboardingMapAddressAutocomplete(query) {
+      const normalizedQuery = String(query || '');
+
+      if (onboardingMapAddressAutocompleteTimer) {
+        window.clearTimeout(onboardingMapAddressAutocompleteTimer);
+        onboardingMapAddressAutocompleteTimer = 0;
+      }
+
+      if (normalizedQuery.trim().length < 3) {
+        onboardingMapAddressSuggestions = [];
+        onboardingMapAddressHighlightedIndex = -1;
+        onboardingMapAddressAutocompleteBusy = false;
+        setOnboardingMapAddressStatus('Type at least 3 characters for address suggestions.');
+        syncOnboardingMapAddressUi();
+        return;
+      }
+
+      onboardingMapAddressSuggestions = [];
+      onboardingMapAddressHighlightedIndex = -1;
+      setOnboardingMapAddressStatus('Searching addresses...', 'info');
+      onboardingMapAddressAutocompleteTimer = window.setTimeout(() => {
+        onboardingMapAddressAutocompleteTimer = 0;
+        void loadOnboardingMapAddressSuggestions(normalizedQuery);
+      }, 280);
+      syncOnboardingMapAddressUi();
+    }
+
+    function clearOnboardingMapAddressSuggestions() {
+      if (onboardingMapAddressAutocompleteTimer) {
+        window.clearTimeout(onboardingMapAddressAutocompleteTimer);
+        onboardingMapAddressAutocompleteTimer = 0;
+      }
+      onboardingMapAddressSuggestions = [];
+      onboardingMapAddressHighlightedIndex = -1;
+      onboardingMapAddressAutocompleteBusy = false;
+      setOnboardingMapAddressStatus('Type at least 3 characters for address suggestions.');
+      syncOnboardingMapAddressUi();
+    }
+
     function centerMapOnManualLocation(suggestion) {
       if (!suggestion) return;
 
@@ -8643,6 +8821,24 @@
       showToast('Saved map address updated', 'success');
     }
 
+    function applyOnboardingMapAddressSuggestion(suggestion) {
+      if (!suggestion) return;
+
+      const normalizedLabel = String(suggestion.label || '').trim();
+      onboardingDraft = {
+        ...ensureOnboardingDraft(),
+        mapAddress: normalizedLabel
+      };
+      const input = document.getElementById('onboarding-map-address');
+      if (input) {
+        input.value = normalizedLabel;
+      }
+      onboardingMapAddressSuggestions = [];
+      onboardingMapAddressHighlightedIndex = -1;
+      setOnboardingMapAddressStatus('Address selected. It will be saved when you continue.', 'success');
+      syncOnboardingMapAddressUi();
+    }
+
     function selectManualLocationSuggestionByIndex(index) {
       const suggestion = manualLocationSuggestions[index];
       if (!suggestion) return;
@@ -8653,6 +8849,12 @@
       const suggestion = settingsMapAddressSuggestions[index];
       if (!suggestion) return;
       applySettingsMapAddressSuggestion(suggestion);
+    }
+
+    function selectOnboardingMapAddressSuggestionByIndex(index) {
+      const suggestion = onboardingMapAddressSuggestions[index];
+      if (!suggestion) return;
+      applyOnboardingMapAddressSuggestion(suggestion);
     }
 
     async function submitManualLocationSearch() {
@@ -8747,6 +8949,9 @@
           return;
         case 'select-settings-map-address-suggestion':
           selectSettingsMapAddressSuggestionByIndex(Number(actionElement.dataset.suggestionIndex || -1));
+          return;
+        case 'select-onboarding-map-address-suggestion':
+          selectOnboardingMapAddressSuggestionByIndex(Number(actionElement.dataset.suggestionIndex || -1));
           return;
         case 'show-my-location':
           await handleShowMyLocation();
@@ -9624,6 +9829,40 @@
         }
       }
 
+      if (event.target instanceof HTMLInputElement && event.target.id === 'onboarding-map-address') {
+        if (event.key === 'ArrowDown' && onboardingMapAddressSuggestions.length) {
+          event.preventDefault();
+          onboardingMapAddressHighlightedIndex = (onboardingMapAddressHighlightedIndex + 1) % onboardingMapAddressSuggestions.length;
+          syncOnboardingMapAddressUi();
+          return;
+        }
+
+        if (event.key === 'ArrowUp' && onboardingMapAddressSuggestions.length) {
+          event.preventDefault();
+          onboardingMapAddressHighlightedIndex = onboardingMapAddressHighlightedIndex <= 0
+            ? onboardingMapAddressSuggestions.length - 1
+            : onboardingMapAddressHighlightedIndex - 1;
+          syncOnboardingMapAddressUi();
+          return;
+        }
+
+        if (event.key === 'Enter' && onboardingMapAddressSuggestions.length) {
+          event.preventDefault();
+          const suggestionIndex = onboardingMapAddressHighlightedIndex >= 0 ? onboardingMapAddressHighlightedIndex : 0;
+          selectOnboardingMapAddressSuggestionByIndex(suggestionIndex);
+          return;
+        }
+
+        if (event.key === 'Escape' && onboardingMapAddressSuggestions.length) {
+          event.preventDefault();
+          onboardingMapAddressSuggestions = [];
+          onboardingMapAddressHighlightedIndex = -1;
+          setOnboardingMapAddressStatus('Type at least 3 characters for address suggestions.');
+          syncOnboardingMapAddressUi();
+          return;
+        }
+      }
+
       if (event.key !== 'Escape') return;
       const techStackModal = document.getElementById('tech-stack-modal');
       if (techStackModal && !techStackModal.hidden) {
@@ -9644,6 +9883,10 @@
       }
       if (event.target.id === 'cfg-map-address') {
         queueSettingsMapAddressAutocomplete(event.target.value);
+        return;
+      }
+      if (event.target.id === 'onboarding-map-address') {
+        queueOnboardingMapAddressAutocomplete(event.target.value);
       }
     });
 
@@ -9682,6 +9925,17 @@
         syncSettingsMapAddressUi();
       }
 
+      if (
+        onboardingMapAddressSuggestions.length &&
+        event.target instanceof Element &&
+        !event.target.closest('.onboarding-map-address-field')
+      ) {
+        onboardingMapAddressSuggestions = [];
+        onboardingMapAddressHighlightedIndex = -1;
+        setOnboardingMapAddressStatus('Type at least 3 characters for address suggestions.');
+        syncOnboardingMapAddressUi();
+      }
+
       const onboardingModal = document.getElementById('onboarding-modal');
       if (!onboardingModal || onboardingModal.hidden) return;
       if (event.target === onboardingModal) {
@@ -9706,7 +9960,8 @@
       scheduleResultsMapInvalidate({ preserveActive: true });
     }, { passive: true });
 
-    function openTab(name) {
+    function openTab(name, options = {}) {
+      const { loadContent = true } = options;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById(`tab-${name}`).classList.add('active');
@@ -9717,14 +9972,17 @@
         settingsButton.style.display = name === 'settings' ? 'none' : '';
       }
 
-      if (name === 'results') {
+      if (loadContent && name === 'results') {
         loadStatus();
         window.requestAnimationFrame(() => {
           scheduleResultsMapInvalidate({ preserveActive: true });
         });
       }
-      if (name === 'history') {
+      if (loadContent && name === 'history') {
         loadHistory();
+      }
+      if (loadContent && name === 'settings') {
+        maybeScrollToInitialTrendingView();
       }
       queueShellScrollbarUpdate();
     }
