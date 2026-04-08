@@ -6341,6 +6341,7 @@
     let resultsMapMarkersByKey = new Map();
     let userLocationMarker = null;
     let resultsMapInvalidateTimer = 0;
+    let resultsMapFocusTimer = 0;
     let resultsMapResizeObserver = null;
     let activeResultsMapKey = null;
     let currentResultsMapTheme = loadStoredResultsMapTheme();
@@ -8616,6 +8617,10 @@
         window.clearTimeout(resultsMapInvalidateTimer);
         resultsMapInvalidateTimer = 0;
       }
+      if (resultsMapFocusTimer) {
+        window.clearTimeout(resultsMapFocusTimer);
+        resultsMapFocusTimer = 0;
+      }
       if (resultsMapResizeObserver) {
         resultsMapResizeObserver.disconnect();
         resultsMapResizeObserver = null;
@@ -8852,29 +8857,60 @@
       if (scrollIntoView) {
         scrollMobileResultsToMap();
       }
-      resultsMap.invalidateSize();
-      const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
-      const targetZoom = Math.max(currentZoom, 14);
-      const targetLatLng = marker.getLatLng();
-      const focusTarget = getResultsMapFramedLatLng(targetLatLng, targetZoom, {
-        mobileRatio: 0.24,
-        desktopRatio: 0.18,
-        minOffset: 48,
-        maxOffset: 120
-      });
-      resultsMap.once('moveend', () => {
-        marker.openPopup();
-      });
-      if (typeof resultsMap.flyTo === 'function') {
-        resultsMap.flyTo(focusTarget, targetZoom, {
-          animate,
-          duration,
-          easeLinearity: 0.25
-        });
-      } else {
-        resultsMap.setView(focusTarget, targetZoom, { animate });
-      }
       setActiveResultsMapItem(locationKey);
+
+      const applyFocus = () => {
+        if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
+
+        resultsMap.invalidateSize();
+        window.requestAnimationFrame(() => {
+          if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
+
+          resultsMap.invalidateSize();
+          const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
+          const targetZoom = Math.max(currentZoom, 14);
+          const targetLatLng = marker.getLatLng();
+          const focusTarget = getResultsMapFramedLatLng(targetLatLng, targetZoom, {
+            mobileRatio: 0.24,
+            desktopRatio: 0.18,
+            minOffset: 48,
+            maxOffset: 120
+          });
+
+          resultsMap.once('moveend', () => {
+            window.requestAnimationFrame(() => {
+              if (!resultsMap) return;
+              resultsMap.invalidateSize();
+              marker.openPopup();
+            });
+          });
+
+          if (typeof resultsMap.flyTo === 'function') {
+            resultsMap.flyTo(focusTarget, targetZoom, {
+              animate,
+              duration,
+              easeLinearity: 0.25
+            });
+          } else {
+            resultsMap.setView(focusTarget, targetZoom, { animate });
+          }
+        });
+      };
+
+      if (resultsMapFocusTimer) {
+        window.clearTimeout(resultsMapFocusTimer);
+        resultsMapFocusTimer = 0;
+      }
+
+      const focusDelay = scrollIntoView && isMobileSignedInDashboard() ? 260 : 0;
+      if (focusDelay > 0) {
+        resultsMapFocusTimer = window.setTimeout(() => {
+          resultsMapFocusTimer = 0;
+          applyFocus();
+        }, focusDelay);
+      } else {
+        applyFocus();
+      }
     }
 
     function focusResultsMapMarkerByElement(element) {
