@@ -197,7 +197,7 @@ class StockDatabase:
     @staticmethod
     def _default_admin_settings() -> Dict[str, Any]:
         return {
-            "google_allowlist_enabled": False,
+            "google_allowlist_enabled": True,
             "admin_webhook_destinations": [],
             "alert_new_users": DEFAULT_ADMIN_ALERT_NEW_USERS,
             "alert_user_actions": DEFAULT_ADMIN_ALERT_USER_ACTIONS,
@@ -581,9 +581,7 @@ class StockDatabase:
 
         stored = {row["key"]: row["value"] for row in rows}
         return {
-            "google_allowlist_enabled": bool(
-                self._decode_json(stored.get("google_allowlist_enabled"), defaults["google_allowlist_enabled"])
-            ),
+            "google_allowlist_enabled": True,
             "admin_webhook_destinations": self._decode_json(
                 stored.get("admin_webhook_destinations"),
                 defaults["admin_webhook_destinations"],
@@ -604,7 +602,7 @@ class StockDatabase:
         merged = {**current, **updates}
         timestamp = datetime.utcnow().isoformat()
         serializable = {
-            "google_allowlist_enabled": bool(merged.get("google_allowlist_enabled")),
+            "google_allowlist_enabled": True,
             "admin_webhook_destinations": list(merged.get("admin_webhook_destinations") or []),
             "alert_new_users": bool(merged.get("alert_new_users", DEFAULT_ADMIN_ALERT_NEW_USERS)),
             "alert_user_actions": bool(merged.get("alert_user_actions", DEFAULT_ADMIN_ALERT_USER_ACTIONS)),
@@ -678,10 +676,6 @@ class StockDatabase:
         normalized_email = _normalize_email(email)
         if not normalized_email:
             return False
-
-        settings = self.get_admin_settings()
-        if not settings.get("google_allowlist_enabled"):
-            return True
 
         with self._connect() as conn:
             row = conn.execute(

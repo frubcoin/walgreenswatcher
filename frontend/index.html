@@ -4582,38 +4582,49 @@
         </section>
         <aside class="auth-panel">
           <div class="auth-panel-card">
-            <div class="auth-panel-title">Sign in with Google</div>
-            <div class="auth-panel-copy">First-time users will get a short setup guide after login. (app installation
-              optional)</div>
-            <div class="auth-actions">
-              <div id="google-signin-button" aria-live="polite"></div>
-              <div class="auth-install-slot">
-                <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
-                  <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
-                    <path
-                      d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
-                  </svg>
-                  Install App
-                </button>
-                <div class="auth-install-copy install-app-copy" hidden>Optional: install it for faster access from your
-                  desktop or home screen.</div>
+            <div id="auth-signin-content">
+              <div class="auth-panel-title">Sign in with Google to join the waitlist</div>
+              <div class="auth-panel-copy">First-time users will get a short setup guide after approval. (app installation
+                optional)</div>
+              <div class="auth-actions">
+                <div id="google-signin-button" aria-live="polite"></div>
+                <div class="auth-install-slot">
+                  <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
+                    <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
+                      <path
+                        d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
+                    </svg>
+                    Install App
+                  </button>
+                  <div class="auth-install-copy install-app-copy" hidden>Optional: install it for faster access from your
+                    desktop or home screen.</div>
+                </div>
+              </div>
+              <ul class="auth-note-list">
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Product info
+                    auto resolved from links.</span></li>
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Discord
+                    webhooks with configurable role notifications.</span></li>
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Beat
+                    everyone else to the product.</span></li>
+              </ul>
+              <div class="auth-legal-note">By continuing, you agree to the <a class="inline-legal-link" href="/terms"
+                  target="_blank" rel="noopener noreferrer">Terms</a> and acknowledge the <a class="inline-legal-link"
+                  href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and <a
+                  class="inline-legal-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>.
               </div>
             </div>
-            <ul class="auth-note-list">
-              <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Product info
-                  auto resolved from
-                  links.</span></li>
-              <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Discord
-                  webhooks with configurable
-                  role notifications.</span></li>
-              <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Beat
-                  everyone else to the
-                  product.</span></li>
-            </ul>
-            <div class="auth-legal-note">By continuing, you agree to the <a class="inline-legal-link" href="/terms"
-                target="_blank" rel="noopener noreferrer">Terms</a> and acknowledge the <a class="inline-legal-link"
-                href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and <a
-                class="inline-legal-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>.
+            <div id="auth-waitlist-card" hidden>
+              <div class="auth-panel-title">Added to the waitlist</div>
+              <div class="auth-panel-copy" id="auth-waitlist-copy">Your sign-in has been received and is waiting on admin review.</div>
+              <ul class="auth-note-list">
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">An admin has to approve your Google account before the dashboard unlocks.</span></li>
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">After approval, your next visit will open the first-time setup guide automatically.</span></li>
+                <li class="auth-note-item"><span class="auth-note-bullet"></span><span class="auth-note-copy">Need to switch accounts? Sign out here and use a different Google login.</span></li>
+              </ul>
+              <div class="auth-actions">
+                <button class="btn btn-secondary" type="button" data-action="logout">Use a different Google account</button>
+              </div>
             </div>
             <div id="auth-status-text" class="auth-status"></div>
           </div>
@@ -5481,6 +5492,27 @@
       }
     }
 
+    function setAuthGateMode(mode = 'signin', payload = null) {
+      const signInContent = document.getElementById('auth-signin-content');
+      const waitlistCard = document.getElementById('auth-waitlist-card');
+      const waitlistCopy = document.getElementById('auth-waitlist-copy');
+      const waitlistedUser = payload?.waitlisted_user || null;
+      const waitlistMessage = payload?.access_denied_reason
+        || (waitlistedUser?.email
+          ? `${waitlistedUser.email} is waiting for admin approval.`
+          : 'Your sign-in has been received and is waiting on admin review.');
+
+      if (signInContent) {
+        signInContent.hidden = mode === 'waitlist';
+      }
+      if (waitlistCard) {
+        waitlistCard.hidden = mode !== 'waitlist';
+      }
+      if (waitlistCopy) {
+        waitlistCopy.textContent = waitlistMessage;
+      }
+    }
+
     function setInstallButtonsVisible(visible) {
       document.querySelectorAll('.install-app-btn').forEach(button => {
         button.hidden = !visible;
@@ -6218,7 +6250,8 @@
           body: JSON.stringify({ credential: response.credential })
         });
         result = await authResponse.json();
-        if (!authResponse.ok || !result?.authenticated) {
+        const isWaitlisted = result?.access_state === 'waitlisted';
+        if ((!authResponse.ok && !isWaitlisted) || (!result?.authenticated && !isWaitlisted)) {
           const message = result?.error || 'Google sign-in failed. Check your backend Google client ID and allowed origins.';
           updateAuthStatus(message);
           return;
@@ -6235,6 +6268,7 @@
       const payload = sessionPayload || await apiCall('/api/auth/session', 'GET', null, { allowUnauthorized: true });
       authState = payload;
       currentUser = payload?.user || null;
+      const isWaitlisted = payload?.access_state === 'waitlisted';
       resetOnboardingSessionState();
       updateCurrentUserDisplay(currentUser);
 
@@ -6242,8 +6276,9 @@
         setBootLoaderPreference(false);
         stopStatusPolling();
         setAuthenticatedUi(false);
+        setAuthGateMode(isWaitlisted ? 'waitlist' : 'signin', payload);
         refreshPublicStatsForLogin();
-        if (payload?.google_client_id) {
+        if (!isWaitlisted && payload?.google_client_id) {
           const googleReady = await waitForGoogleIdentity();
           if (googleReady) {
             renderGoogleSignInButton(payload.google_client_id);
@@ -6251,9 +6286,10 @@
             updateAuthStatus('Google sign-in did not finish loading. Refresh and try again.');
           }
         } else {
+          renderGoogleSignInButton('');
           updateAuthStatus('');
         }
-        if (payload?.access_denied_reason) {
+        if (!isWaitlisted && payload?.access_denied_reason) {
           updateAuthStatus(payload.access_denied_reason);
         }
         return false;
@@ -6261,6 +6297,7 @@
 
       setBootLoaderPreference(true);
       setAuthenticatedUi(true);
+      setAuthGateMode('signin');
       updateAuthStatus('');
       await loadSettings();
       const statusPayload = await loadStatus();
@@ -6286,8 +6323,7 @@
       updateCurrentUserDisplay(null);
       setAuthenticatedUi(false);
       const sessionPayload = await apiCall('/api/auth/session', 'GET', null, { allowUnauthorized: true, suppressAuthRedirect: true });
-      authState = sessionPayload;
-      renderGoogleSignInButton(sessionPayload?.google_client_id || '');
+      await hydrateAuthenticatedSession(sessionPayload);
       updateAuthStatus('Signed out.');
     }
 
@@ -7259,7 +7295,21 @@
       resultsMap.setView([lat, lng], 14, { animate: true });
     }
 
+    async function focusSavedMapLocation() {
+      const savedReference = await ensureSavedMapAddressReference();
+      if (!savedReference || !resultsMap) return false;
+      ensureUserLocationMarker(savedReference.latitude, savedReference.longitude);
+      resultsMap.setView([savedReference.latitude, savedReference.longitude], 14, { animate: true });
+      hideManualLocationFallback({ preserveQuery: true });
+      showToast(`Centered map on ${savedReference.label || 'your saved address'}`, 'success');
+      return true;
+    }
+
     async function handleShowMyLocation() {
+      if (await focusSavedMapLocation()) {
+        return;
+      }
+
       if (!navigator.geolocation) {
         showToast('Location services are not supported by your browser', 'error');
         showManualLocationFallback('Browser location is unavailable here. Enter an address, city, or ZIP instead.', 'info');

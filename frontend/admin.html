@@ -4,12 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Walgreens Watcher Admin</title>
+  <title>Frub's Walgreens Watcher Admin</title>
   <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#35393d">
+  <link rel="icon" type="image/png" href="/frubgreens.webp">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="/admin.css">
   <script src="/runtime-config.js"></script>
@@ -18,13 +20,21 @@
 </head>
 
 <body>
+  <div class="pokemon-bg-overlay" aria-hidden="true"></div>
   <div class="admin-root">
-    <header class="topbar">
+    <header class="topbar app-window">
       <div class="brand-lockup">
-        <p class="eyebrow">Platform Management</p>
-        <h1>Watcher Control Room</h1>
-        <p class="topbar-copy">A tighter operational surface for access control, user moderation, alert routing, and
-          platform health.</p>
+        <div class="brand-row">
+          <div class="logo-icon" aria-hidden="true">
+            <img src="/frubgreens.webp" alt="">
+          </div>
+          <div class="brand-copy">
+            <span class="brand-kicker">Walgreens Watcher</span>
+            <h1>Admin</h1>
+          </div>
+        </div>
+        <p class="topbar-copy">Access, moderation, approvals, and audit history in the same visual system as the
+          main app.</p>
       </div>
       <div class="topbar-actions">
         <div class="status-pill" id="admin-session-chip">Checking session</div>
@@ -34,11 +44,11 @@
     </header>
 
     <main class="admin-shell">
-      <section class="auth-gate panel" id="admin-auth-panel">
+      <section class="auth-gate app-window panel" id="admin-auth-panel">
         <div class="auth-copy">
-          <p class="eyebrow">Admin Unlock</p>
-          <h2>Verified Operator Access</h2>
-          <p id="admin-auth-copy">Sign in with an authorized Google account first, then enter the server-side admin
+          <p class="eyebrow">Admin Access</p>
+          <h2>Sign in, then unlock admin</h2>
+          <p id="admin-auth-copy">Sign in with an approved Google account first, then enter the server-side admin
             password to unlock moderation controls.</p>
         </div>
 
@@ -48,7 +58,7 @@
               <span class="step-index">01</span>
               <div>
                 <h3>Google Identity</h3>
-                <p id="admin-google-copy">Use one of the authorized Google emails for this app.</p>
+                <p id="admin-google-copy">Use one of the approved Google emails for this app.</p>
               </div>
             </div>
             <div class="signed-in-card" id="admin-google-user-card" hidden>
@@ -75,7 +85,7 @@
                 <input id="admin-password" name="password" type="password" autocomplete="current-password"
                   placeholder="Admin password" required>
               </label>
-              <button class="button button-primary" id="admin-password-submit" type="submit">Unlock Control Room</button>
+              <button class="button button-primary" id="admin-password-submit" type="submit">Unlock Admin</button>
             </form>
           </section>
         </div>
@@ -86,7 +96,7 @@
           <article class="panel hero-card hero-card-primary">
             <div class="hero-card-head">
               <div>
-                <p class="eyebrow">Platform Snapshot</p>
+                <p class="eyebrow">Overview</p>
                 <h2 id="hero-uptime-label">Service status</h2>
               </div>
               <div class="hero-badge" id="hero-users-total">0 users</div>
@@ -98,18 +108,18 @@
           <article class="panel hero-card hero-card-secondary">
             <div class="hero-card-head">
               <div>
-                <p class="eyebrow">Attention Queue</p>
-                <h2>Needs Operator Review</h2>
+                <p class="eyebrow">Review Queue</p>
+                <h2>Needs attention</h2>
               </div>
             </div>
             <div class="attention-list" id="attention-list"></div>
           </article>
         </section>
 
-        <section class="panel workspace-panel">
+        <section class="panel app-window workspace-panel">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Operator Workbench</p>
+              <p class="eyebrow">Users</p>
               <h2>Users</h2>
             </div>
             <div class="toolbar">
@@ -123,7 +133,7 @@
                   <option value="all">All users</option>
                   <option value="attention">Needs review</option>
                   <option value="banned">Banned</option>
-                  <option value="unauthorized">Not allowlisted</option>
+                  <option value="unauthorized">Pending approval</option>
                   <option value="scheduler">Scheduler enabled</option>
                   <option value="new">Recently joined</option>
                 </select>
@@ -134,19 +144,19 @@
         </section>
 
         <section class="operations-grid">
-          <section class="panel settings-panel">
+          <section class="panel app-window settings-panel">
             <div class="section-head">
               <div>
-                <p class="eyebrow">Platform Controls</p>
-                <h2>Guardrails & Alerts</h2>
+                <p class="eyebrow">Settings</p>
+                <h2>Guardrails and alerts</h2>
               </div>
             </div>
             <form id="admin-settings-form" class="stack">
               <label class="toggle-row">
-                <input id="allowlist-enabled" type="checkbox">
+                <input id="allowlist-enabled" type="checkbox" checked disabled>
                 <span>
-                  <strong>Require authorized Google emails</strong>
-                  <small>When enabled, only emails on the allowlist can sign in.</small>
+                  <strong>Approval queue required</strong>
+                  <small>All Google sign-ins land on the waitlist until an admin approves the email.</small>
                 </span>
               </label>
               <label class="toggle-row">
@@ -171,11 +181,11 @@
             </form>
           </section>
 
-          <section class="panel allowlist-panel">
+          <section class="panel app-window allowlist-panel">
             <div class="section-head">
               <div>
-                <p class="eyebrow">Identity Directory</p>
-                <h2>Authorized Google Emails</h2>
+                <p class="eyebrow">Approvals</p>
+                <h2>Approved Google Emails</h2>
               </div>
             </div>
             <form id="authorized-email-form" class="stack">
@@ -187,16 +197,16 @@
                 <span>Note</span>
                 <input id="authorized-email-note" type="text" placeholder="Owner, team, or reason">
               </label>
-              <button class="button button-primary" type="submit">Add Authorized Email</button>
+              <button class="button button-primary" type="submit">Add Approved Email</button>
             </form>
             <div class="allowlist-list" id="authorized-email-list"></div>
           </section>
         </section>
 
-        <section class="panel events-panel">
+        <section class="panel app-window events-panel">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Event Stream</p>
+              <p class="eyebrow">Audit Log</p>
               <h2>Audit Feed</h2>
             </div>
             <div class="toolbar">

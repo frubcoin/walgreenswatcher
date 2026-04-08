@@ -127,17 +127,17 @@ function setSessionUi(session) {
     setGoogleStatus('Google verified and admin password accepted.', 'success');
   } else if (googleAuthenticated) {
     sessionChip.textContent = `Google verified | ${session.user.email}`;
-    authCopy.textContent = 'Google sign-in is complete. Enter the admin password to unlock the control room.';
+    authCopy.textContent = 'Google sign-in is complete. Enter the admin password to unlock admin access.';
     setGoogleStatus('Google sign-in complete. Continue with the admin password.', 'success');
   } else {
     sessionChip.textContent = 'Locked';
-    authCopy.textContent = 'Sign in with an authorized Google account first, then enter the server-side admin password to unlock moderation controls.';
+    authCopy.textContent = 'Sign in with an approved Google account first, then enter the server-side admin password to unlock moderation controls.';
     if (session.access_denied_reason) {
       setGoogleStatus(session.access_denied_reason, 'error');
     } else if (!session.google_client_id) {
       setGoogleStatus('GOOGLE_CLIENT_ID is not configured on the backend.', 'error');
     } else {
-      setGoogleStatus('Use one of the authorized Google emails for this app.', 'info');
+      setGoogleStatus('Use one of the approved Google emails for this app.', 'info');
     }
   }
 
@@ -145,12 +145,12 @@ function setSessionUi(session) {
     googleCard.hidden = false;
     googleName.textContent = session.user.name || session.user.email;
     googleEmail.textContent = session.user.email || '';
-    googleCopy.textContent = 'Your current Google session is checked against the app allowlist before admin unlock.';
+    googleCopy.textContent = 'Your current Google session is checked against the approval list before admin unlock.';
   } else {
     googleCard.hidden = true;
     googleName.textContent = '';
     googleEmail.textContent = '';
-    googleCopy.textContent = 'Use one of the authorized Google emails for this app.';
+    googleCopy.textContent = 'Use one of the approved Google emails for this app.';
   }
 
   googleSignoutButton.hidden = !googleAuthenticated;
@@ -187,7 +187,7 @@ function renderPlatformSnapshot(platform) {
     {
       label: 'Schedulers',
       value: String(totals.scheduler_enabled_users || 0),
-      note: `${totals.banned_users || 0} banned | ${totals.authorized_users || 0} allowlisted`
+      note: `${totals.banned_users || 0} banned | ${totals.authorized_users || 0} approved`
     }
   ];
 
@@ -211,8 +211,8 @@ function buildAttentionItems(overview) {
 
   if (runningUnauthorized.length) {
     items.push({
-      title: `${runningUnauthorized.length} scheduler account${runningUnauthorized.length === 1 ? '' : 's'} need allowlist review`,
-      body: 'These users still have schedulers enabled while their email is not allowlisted.',
+      title: `${runningUnauthorized.length} scheduler account${runningUnauthorized.length === 1 ? '' : 's'} need approval review`,
+      body: 'These users still have schedulers enabled while their email is waiting for approval.',
       tone: 'warning'
     });
   }
@@ -220,7 +220,7 @@ function buildAttentionItems(overview) {
   if (totals.login_denials) {
     items.push({
       title: `${totals.login_denials} recent login denial${totals.login_denials === 1 ? '' : 's'}`,
-      body: 'Review the event stream to confirm whether they were expected allowlist or ban decisions.',
+      body: 'Review the event stream to confirm whether they were expected approval or ban decisions.',
       tone: 'danger'
     });
   }
@@ -259,7 +259,8 @@ function renderAttentionQueue(overview) {
 }
 
 function renderSettings(settings) {
-  document.getElementById('allowlist-enabled').checked = Boolean(settings.google_allowlist_enabled);
+  document.getElementById('allowlist-enabled').checked = true;
+  document.getElementById('allowlist-enabled').disabled = true;
   document.getElementById('alert-new-users').checked = Boolean(settings.alert_new_users);
   document.getElementById('alert-user-actions').checked = Boolean(settings.alert_user_actions);
   document.getElementById('admin-webhooks').value = (settings.admin_webhook_destinations || [])
@@ -271,7 +272,7 @@ function renderSettings(settings) {
 function renderAuthorizedEmails(entries) {
   const container = document.getElementById('authorized-email-list');
   if (!entries.length) {
-    container.innerHTML = '<div class="empty-state">No authorized Google emails have been added yet.</div>';
+    container.innerHTML = '<div class="empty-state">No approved Google emails have been added yet.</div>';
     return;
   }
 
@@ -331,7 +332,7 @@ function renderUsers(users) {
         </div>
         <div class="tag-row">
           <span class="chip ${user.is_banned ? 'chip-danger' : 'chip-success'}">${user.is_banned ? 'Banned' : 'Active'}</span>
-          <span class="chip ${user.is_authorized_email ? 'chip-success' : 'chip-warning'}">${user.is_authorized_email ? 'Allowlisted' : 'Not allowlisted'}</span>
+          <span class="chip ${user.is_authorized_email ? 'chip-success' : 'chip-warning'}">${user.is_authorized_email ? 'Approved' : 'Waiting approval'}</span>
           <span class="chip ${user.scheduler_enabled ? 'chip-warning' : ''}">${user.scheduler_enabled ? 'Scheduler on' : 'Scheduler off'}</span>
           ${isUserNew(user) ? '<span class="chip chip-success">New user</span>' : ''}
         </div>
@@ -354,8 +355,8 @@ function renderUsers(users) {
 
       <div class="action-row">
         ${user.is_authorized_email
-          ? `<button class="button button-muted button-compact" type="button" data-action="revoke-user-email" data-email="${escapeHtml(user.email)}">Revoke allowlist</button>`
-          : `<button class="button button-success button-compact" type="button" data-action="authorize-user-email" data-email="${escapeHtml(user.email)}">Allowlist email</button>`}
+          ? `<button class="button button-muted button-compact" type="button" data-action="revoke-user-email" data-email="${escapeHtml(user.email)}">Remove approval</button>`
+          : `<button class="button button-success button-compact" type="button" data-action="authorize-user-email" data-email="${escapeHtml(user.email)}">Approve user</button>`}
         ${user.scheduler_enabled
           ? `<button class="button button-warning button-compact" type="button" data-action="stop-user-scheduler" data-user-id="${user.id}">Stop scheduler</button>`
           : ''}
@@ -584,7 +585,6 @@ async function handleSettingsSave(event) {
   event.preventDefault();
   try {
     const response = await apiRequest('/api/admin/settings', 'POST', {
-      google_allowlist_enabled: document.getElementById('allowlist-enabled').checked,
       alert_new_users: document.getElementById('alert-new-users').checked,
       alert_user_actions: document.getElementById('alert-user-actions').checked,
       admin_webhook_destinations: webhookTextareaToDestinations()
@@ -610,7 +610,7 @@ async function handleAuthorizedEmailAdd(event) {
     emailInput.value = '';
     noteInput.value = '';
     await loadAdminOverview();
-    showBanner('Authorized email saved', 'success');
+    showBanner('Approved email saved', 'success');
   } catch (error) {
     showBanner(error.message, 'error');
   }
@@ -620,7 +620,7 @@ async function removeAuthorizedEmail(email) {
   try {
     await apiRequest('/api/admin/authorized-emails/remove', 'POST', { email });
     await loadAdminOverview();
-    showBanner('Authorized email removed', 'success');
+    showBanner('Approved email removed', 'success');
   } catch (error) {
     showBanner(error.message, 'error');
   }
@@ -630,10 +630,10 @@ async function authorizeUserEmail(email) {
   try {
     await apiRequest('/api/admin/authorized-emails', 'POST', {
       email,
-      note: 'Approved from control room'
+      note: 'Approved from admin panel'
     });
     await loadAdminOverview();
-    showBanner('User email allowlisted', 'success');
+    showBanner('User approved', 'success');
   } catch (error) {
     showBanner(error.message, 'error');
   }
@@ -643,7 +643,7 @@ async function revokeUserEmail(email) {
   try {
     await apiRequest('/api/admin/authorized-emails/remove', 'POST', { email });
     await loadAdminOverview();
-    showBanner('User email removed from allowlist', 'success');
+    showBanner('User approval removed', 'success');
   } catch (error) {
     showBanner(error.message, 'error');
   }

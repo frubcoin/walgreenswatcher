@@ -75,6 +75,7 @@ scheduler_manager.start_enabled_schedulers()
 SERVICE_UPTIME_HEARTBEAT_SECONDS = 30
 _uptime_tracker_started = False
 ADMIN_SESSION_KEY = "admin_authenticated"
+WAITLIST_SESSION_KEY = "waitlisted_user_id"
 
 
 def _is_allowed_walgreens_host(hostname: str) -> bool:
@@ -211,8 +212,19 @@ def _session_user() -> Optional[Dict[str, Any]]:
     return db.get_user_by_id(int(user_id))
 
 
+def _session_waitlisted_user() -> Optional[Dict[str, Any]]:
+    user_id = session.get(WAITLIST_SESSION_KEY)
+    if not user_id:
+        return None
+    return db.get_user_by_id(int(user_id))
+
+
 def _clear_user_session() -> None:
     session.pop("user_id", None)
+
+
+def _clear_waitlist_session() -> None:
+    session.pop(WAITLIST_SESSION_KEY, None)
 
 
 def _session_admin_authenticated() -> bool:
@@ -227,6 +239,35 @@ def _admin_panel_configured() -> bool:
     return bool(ADMIN_PANEL_PASSWORD)
 
 
+def _start_user_session(user: Dict[str, Any], *, preserve_admin_authenticated: bool = False) -> None:
+    session.clear()
+    session.permanent = True
+    if preserve_admin_authenticated:
+        session[ADMIN_SESSION_KEY] = True
+    session["user_id"] = int(user["id"])
+
+
+def _start_waitlist_session(user: Dict[str, Any]) -> None:
+    session.clear()
+    session.permanent = True
+    session[WAITLIST_SESSION_KEY] = int(user["id"])
+
+
+def _waitlist_message_for_user(user: Dict[str, Any]) -> str:
+    email = str(user.get("email") or "").strip()
+    if email:
+        return f"{email} was added to the waitlist. An admin needs to approve this account before it can use the app."
+    return "Your account is on the waitlist. An admin needs to approve it before you can use the app."
+
+
+def _transition_denied_user_session(user: Dict[str, Any]) -> None:
+    _clear_admin_session()
+    if bool(user.get("is_banned")):
+        session.clear()
+        return
+    _start_waitlist_session(user)
+
+
 def _access_denied_reason_for_user(user: Dict[str, Any]) -> Optional[str]:
     if bool(user.get("is_banned")):
         ban_reason = str(user.get("ban_reason") or "").strip()
@@ -234,7 +275,7 @@ def _access_denied_reason_for_user(user: Dict[str, Any]) -> Optional[str]:
             return f"Your account has been banned. Reason: {ban_reason}"
         return "Your account has been banned."
     if not db.is_google_email_authorized(str(user.get("email") or "")):
-        return "Your Google account is not authorized for this app"
+        return _waitlist_message_for_user(user)
     return None
 
 
@@ -284,8 +325,7 @@ def require_auth(func):
             return jsonify({"error": "Authentication required"}), 401
         access_denied_reason = _access_denied_reason_for_user(user)
         if access_denied_reason:
-            _clear_user_session()
-            _clear_admin_session()
+            _transition_denied_user_session(user)
             return jsonify({"error": access_denied_reason}), 403
         return func(user, *args, **kwargs)
 
@@ -303,8 +343,7 @@ def require_admin(func):
             return jsonify({"error": "Google sign-in required for admin access"}), 401
         access_denied_reason = _access_denied_reason_for_user(user)
         if access_denied_reason:
-            _clear_user_session()
-            _clear_admin_session()
+            _transition_denied_user_session(user)
             return jsonify({"error": access_denied_reason}), 403
         if not _session_admin_authenticated():
             return jsonify({"error": "Admin authentication required"}), 401
@@ -333,20 +372,55 @@ def _google_client_configured() -> bool:
 
 
 def _public_auth_payload(user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    access_denied_reason = _access_denied_reason_for_user(user) if user else None
-    if user and access_denied_reason:
-        _clear_user_session()
-        _clear_admin_session()
-        user = None
+    waitlisted_user = _session_waitlisted_user()
+    access_denied_reason = ""
+    access_state = "signed_out"
 
-    admin_settings = db.get_admin_settings()
+    if user:
+        access_denied_reason = _access_denied_reason_for_user(user) or ""
+        if access_denied_reason:
+            _clear_admin_session()
+            if bool(user.get("is_banned")):
+                session.clear()
+                user = None
+                waitlisted_user = None
+            else:
+                _start_waitlist_session(user)
+                user = None
+                waitlisted_user = _session_waitlisted_user()
+                access_state = "waitlisted"
+        else:
+            _clear_waitlist_session()
+            access_state = "approved"
+    elif waitlisted_user:
+        waitlist_denial = _access_denied_reason_for_user(waitlisted_user)
+        if waitlist_denial:
+            access_denied_reason = waitlist_denial
+            if bool(waitlisted_user.get("is_banned")):
+                session.clear()
+                waitlisted_user = None
+            else:
+                access_state = "waitlisted"
+        else:
+            _start_user_session(waitlisted_user)
+            user = waitlisted_user
+            waitlisted_user = None
+            access_state = "approved"
+
+    if user:
+        access_state = "approved"
+    elif waitlisted_user:
+        access_state = "waitlisted"
+
     return {
         "authenticated": bool(user),
         "google_client_id": GOOGLE_CLIENT_ID or "",
-        "google_allowlist_enabled": bool(admin_settings.get("google_allowlist_enabled")),
+        "google_allowlist_enabled": True,
         "admin_panel_configured": _admin_panel_configured(),
-        "access_denied_reason": access_denied_reason or "",
+        "access_denied_reason": access_denied_reason,
+        "access_state": access_state,
         "user": _serialized_user(user),
+        "waitlisted_user": _serialized_user(waitlisted_user),
     }
 
 
@@ -356,8 +430,7 @@ def _public_admin_payload() -> Dict[str, Any]:
         _clear_admin_session()
     access_denied_reason = _access_denied_reason_for_user(user) if user else None
     if user and access_denied_reason:
-        _clear_user_session()
-        _clear_admin_session()
+        _transition_denied_user_session(user)
         user = None
 
     return {
@@ -503,16 +576,6 @@ def google_sign_in():
         return jsonify({"error": "Google account email is not verified"}), 401
 
     normalized_email = str(token_info.get("email") or "").strip().lower()
-    if not db.is_google_email_authorized(normalized_email):
-        _record_audit_event(
-            "auth.login_denied",
-            f"Rejected sign-in for unauthorized email {normalized_email}",
-            user_email=normalized_email,
-            metadata={"reason": "allowlist", "email": normalized_email},
-            alert_category="user_action",
-        )
-        return jsonify({"error": "This Google account is not authorized for this app"}), 403
-
     user = db.upsert_user_from_google(
         google_sub=str(token_info.get("sub") or ""),
         email=normalized_email,
@@ -532,24 +595,40 @@ def google_sign_in():
 
     access_denied_reason = _access_denied_reason_for_user(user)
     if access_denied_reason:
+        if bool(user.get("is_banned")):
+            _record_audit_event(
+                "auth.login_denied",
+                f"Rejected sign-in for {user['email']}: {access_denied_reason}",
+                target_user=user,
+                user_email=user["email"],
+                metadata={"reason": access_denied_reason},
+                alert_category="user_action",
+            )
+            session.clear()
+            payload = _public_auth_payload(None)
+            payload["error"] = access_denied_reason
+            payload["access_denied_reason"] = access_denied_reason
+            return jsonify(payload), 403
+
         _record_audit_event(
-            "auth.login_denied",
-            f"Rejected sign-in for {user['email']}: {access_denied_reason}",
+            "auth.waitlist_added",
+            f"Approval required for {user['email']}",
             target_user=user,
             user_email=user["email"],
-            metadata={"reason": access_denied_reason},
+            metadata={
+                "reason": "approval_required",
+                "email": user["email"],
+                "is_new_user": bool(user.get("is_new_user")),
+            },
             alert_category="user_action",
         )
-        _clear_user_session()
-        _clear_admin_session()
-        return jsonify({"error": access_denied_reason}), 403
+        _start_waitlist_session(user)
+        payload = _public_auth_payload(None)
+        payload["error"] = payload.get("access_denied_reason") or access_denied_reason
+        return jsonify(payload), 403
 
     was_admin_authenticated = _session_admin_authenticated()
-    session.clear()
-    session.permanent = True
-    if was_admin_authenticated:
-        session[ADMIN_SESSION_KEY] = True
-    session["user_id"] = int(user["id"])
+    _start_user_session(user, preserve_admin_authenticated=was_admin_authenticated)
 
     scheduler = _current_scheduler(user)
     scheduler.refresh_from_db()
@@ -597,8 +676,7 @@ def admin_login():
 
     access_denied_reason = _access_denied_reason_for_user(user)
     if access_denied_reason:
-        _clear_user_session()
-        _clear_admin_session()
+        _transition_denied_user_session(user)
         return jsonify({"error": access_denied_reason}), 403
 
     data = request.json or {}
@@ -960,8 +1038,6 @@ def update_admin_settings():
     data = request.json or {}
     updates: Dict[str, Any] = {}
 
-    if "google_allowlist_enabled" in data:
-        updates["google_allowlist_enabled"] = bool(data.get("google_allowlist_enabled"))
     if "alert_new_users" in data:
         updates["alert_new_users"] = bool(data.get("alert_new_users"))
     if "alert_user_actions" in data:
@@ -975,17 +1051,16 @@ def update_admin_settings():
     settings["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
         settings.get("admin_webhook_destinations")
     )
-    if settings.get("google_allowlist_enabled"):
-        for user in db.list_users_for_admin():
-            if not user.get("is_authorized_email"):
-                db.update_user_settings(int(user["id"]), {"scheduler_enabled": False})
-                _stop_user_scheduler_if_running(int(user["id"]))
+    for user in db.list_users_for_admin():
+        if not user.get("is_authorized_email"):
+            db.update_user_settings(int(user["id"]), {"scheduler_enabled": False})
+            _stop_user_scheduler_if_running(int(user["id"]))
     _record_audit_event(
         "admin.settings_updated",
         "Admin settings updated",
         actor_user=admin_user,
         metadata={
-            "google_allowlist_enabled": settings.get("google_allowlist_enabled"),
+            "google_allowlist_enabled": True,
             "webhook_count": len(settings.get("admin_webhook_destinations") or []),
             "alert_new_users": settings.get("alert_new_users"),
             "alert_user_actions": settings.get("alert_user_actions"),
