@@ -778,9 +778,8 @@
 
     #google-signin-button {
       position: relative;
-      width: 100%;
+      width: 320px;
       min-height: var(--google-signin-slot-height);
-      max-width: 320px;
       display: flex;
       align-items: center;
       line-height: 0;
@@ -843,14 +842,13 @@
     }
 
     .auth-install-slot {
-      width: 100%;
+      width: 320px;
       display: grid;
       align-content: start;
       gap: var(--install-slot-gap);
       justify-items: start;
-      padding-left: 10px;
+      padding-left: 1px;
       min-height: calc(var(--install-button-height) + var(--install-slot-gap) + var(--install-copy-height));
-      max-width: 320px;
     }
 
     .auth-install-slot .install-app-btn,
@@ -859,8 +857,8 @@
     }
 
     .auth-install-slot .install-app-btn {
-      width: 100%;
-      min-width: 0;
+      width: 320px !important;
+      min-width: 320px !important;
       height: var(--install-button-height);
       justify-content: flex-start;
       padding: 8px 16px;
