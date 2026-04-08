@@ -22,6 +22,7 @@ from google.oauth2 import id_token
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import (  # noqa: E402
+    ADMIN_PANEL_PASSWORD,
     CORS_ALLOWED_ORIGINS,
     FLASK_SECRET_KEY,
     GOOGLE_CLIENT_ID,
@@ -30,6 +31,7 @@ from config import (  # noqa: E402
     SESSION_COOKIE_SAMESITE,
     SESSION_COOKIE_SECURE,
 )
+from admin_notifications import AdminAlertService  # noqa: E402
 from database import StockDatabase  # noqa: E402
 from product_resolver import resolve_product_link  # noqa: E402
 from scheduler import SchedulerManager  # noqa: E402
@@ -44,6 +46,7 @@ app = Flask(__name__, static_folder="../frontend", static_url_path="")
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 INLINE_SCRIPT_NONCE_TOKEN = "__CSP_NONCE__"
 FRONTEND_HTML_PAGES = {
+    "admin.html",
     "index.html",
     "privacy.html",
     "terms.html",
@@ -66,10 +69,12 @@ CORS(
 )
 
 db = StockDatabase()
+admin_alerts = AdminAlertService(db)
 scheduler_manager = SchedulerManager(db)
 scheduler_manager.start_enabled_schedulers()
 SERVICE_UPTIME_HEARTBEAT_SECONDS = 30
 _uptime_tracker_started = False
+ADMIN_SESSION_KEY = "admin_authenticated"
 
 
 def _is_allowed_walgreens_host(hostname: str) -> bool:
@@ -170,6 +175,7 @@ def _build_content_security_policy(nonce: str) -> str:
             "https://accounts.google.com",
             "https://*.google.com",
             "https://*.googleapis.com",
+            "https://nominatim.openstreetmap.org",
         ],
         "frame-src": [
             "https://accounts.google.com",
@@ -205,13 +211,80 @@ def _session_user() -> Optional[Dict[str, Any]]:
     return db.get_user_by_id(int(user_id))
 
 
+def _clear_user_session() -> None:
+    session.pop("user_id", None)
+
+
+def _session_admin_authenticated() -> bool:
+    return bool(session.get(ADMIN_SESSION_KEY))
+
+
+def _clear_admin_session() -> None:
+    session.pop(ADMIN_SESSION_KEY, None)
+
+
+def _admin_panel_configured() -> bool:
+    return bool(ADMIN_PANEL_PASSWORD)
+
+
+def _access_denied_reason_for_user(user: Dict[str, Any]) -> Optional[str]:
+    if bool(user.get("is_banned")):
+        return "Your account has been banned"
+    if not db.is_google_email_authorized(str(user.get("email") or "")):
+        return "Your Google account is not authorized for this app"
+    return None
+
+
+def _record_audit_event(
+    event_type: str,
+    summary: str,
+    *,
+    actor_user: Optional[Dict[str, Any]] = None,
+    target_user: Optional[Dict[str, Any]] = None,
+    user_email: str = "",
+    metadata: Optional[Dict[str, Any]] = None,
+    alert_category: Optional[str] = None,
+) -> Dict[str, Any]:
+    event = db.record_audit_event(
+        event_type,
+        summary,
+        actor_user_id=int(actor_user["id"]) if actor_user else None,
+        target_user_id=int(target_user["id"]) if target_user else None,
+        user_email=user_email or str((actor_user or {}).get("email") or ""),
+        metadata=metadata,
+    )
+    event["actor_name"] = str((actor_user or {}).get("name") or "")
+    event["actor_email"] = str((actor_user or {}).get("email") or "")
+    event["target_name"] = str((target_user or {}).get("name") or "")
+    event["target_email"] = str((target_user or {}).get("email") or "")
+    if alert_category:
+        admin_alerts.notify(category=alert_category, event=event)
+    return event
+
+
 def require_auth(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         user = _session_user()
         if user is None:
             return jsonify({"error": "Authentication required"}), 401
+        access_denied_reason = _access_denied_reason_for_user(user)
+        if access_denied_reason:
+            _clear_user_session()
+            return jsonify({"error": access_denied_reason}), 403
         return func(user, *args, **kwargs)
+
+    return wrapper
+
+
+def require_admin(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not _admin_panel_configured():
+            return jsonify({"error": "Admin panel password is not configured"}), 503
+        if not _session_admin_authenticated():
+            return jsonify({"error": "Admin authentication required"}), 401
+        return func(*args, **kwargs)
 
     return wrapper
 
@@ -236,9 +309,18 @@ def _google_client_configured() -> bool:
 
 
 def _public_auth_payload(user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    access_denied_reason = _access_denied_reason_for_user(user) if user else None
+    if user and access_denied_reason:
+        _clear_user_session()
+        user = None
+
+    admin_settings = db.get_admin_settings()
     return {
         "authenticated": bool(user),
         "google_client_id": GOOGLE_CLIENT_ID or "",
+        "google_allowlist_enabled": bool(admin_settings.get("google_allowlist_enabled")),
+        "admin_panel_configured": _admin_panel_configured(),
+        "access_denied_reason": access_denied_reason or "",
         "user": (
             {
                 "id": user["id"],
@@ -249,6 +331,32 @@ def _public_auth_payload(user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             if user
             else None
         ),
+    }
+
+
+def _public_admin_payload() -> Dict[str, Any]:
+    return {
+        "authenticated": _session_admin_authenticated(),
+        "configured": _admin_panel_configured(),
+    }
+
+
+def _stop_user_scheduler_if_running(user_id: int) -> None:
+    scheduler = scheduler_manager.get_or_create(int(user_id))
+    if scheduler.is_running:
+        scheduler.stop()
+
+
+def _admin_overview_payload() -> Dict[str, Any]:
+    settings = db.get_admin_settings()
+    settings["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
+        settings.get("admin_webhook_destinations")
+    )
+    return {
+        "settings": settings,
+        "authorized_google_emails": db.list_authorized_google_emails(),
+        "users": db.list_users_for_admin(),
+        "events": db.list_audit_events(limit=100),
     }
 
 
@@ -315,26 +423,121 @@ def google_sign_in():
     if not token_info.get("email_verified"):
         return jsonify({"error": "Google account email is not verified"}), 401
 
+    normalized_email = str(token_info.get("email") or "").strip().lower()
+    if not db.is_google_email_authorized(normalized_email):
+        _record_audit_event(
+            "auth.login_denied",
+            f"Rejected sign-in for unauthorized email {normalized_email}",
+            user_email=normalized_email,
+            metadata={"reason": "allowlist", "email": normalized_email},
+            alert_category="user_action",
+        )
+        return jsonify({"error": "This Google account is not authorized for this app"}), 403
+
     user = db.upsert_user_from_google(
         google_sub=str(token_info.get("sub") or ""),
-        email=str(token_info.get("email") or ""),
+        email=normalized_email,
         name=str(token_info.get("name") or token_info.get("email") or "Google User"),
         picture=str(token_info.get("picture") or ""),
     )
 
+    if bool(user.get("is_new_user")):
+        _record_audit_event(
+            "auth.user_created",
+            f"New user joined: {user['email']}",
+            target_user=user,
+            user_email=user["email"],
+            metadata={"name": user.get("name", ""), "created_at": user.get("created_at", "")},
+            alert_category="new_user",
+        )
+
+    access_denied_reason = _access_denied_reason_for_user(user)
+    if access_denied_reason:
+        _record_audit_event(
+            "auth.login_denied",
+            f"Rejected sign-in for {user['email']}: {access_denied_reason}",
+            target_user=user,
+            user_email=user["email"],
+            metadata={"reason": access_denied_reason},
+            alert_category="user_action",
+        )
+        _clear_user_session()
+        return jsonify({"error": access_denied_reason}), 403
+
+    was_admin_authenticated = _session_admin_authenticated()
     session.clear()
     session.permanent = True
+    if was_admin_authenticated:
+        session[ADMIN_SESSION_KEY] = True
     session["user_id"] = int(user["id"])
 
     scheduler = _current_scheduler(user)
     scheduler.refresh_from_db()
+
+    _record_audit_event(
+        "auth.login",
+        f"User signed in: {user['email']}",
+        actor_user=user,
+        user_email=user["email"],
+        alert_category="user_action",
+    )
 
     return jsonify(_public_auth_payload(user))
 
 
 @app.route("/api/auth/logout", methods=["POST"])
 def logout():
+    user = _session_user()
+    if user is not None:
+        _record_audit_event(
+            "auth.logout",
+            f"User signed out: {user['email']}",
+            actor_user=user,
+            user_email=user["email"],
+            alert_category="user_action",
+        )
+    _clear_user_session()
+    return jsonify({"success": True})
+
+
+@app.route("/api/admin/session", methods=["GET"])
+def get_admin_session():
+    return jsonify(_public_admin_payload())
+
+
+@app.route("/api/admin/login", methods=["POST"])
+def admin_login():
+    if not _admin_panel_configured():
+        return jsonify({"error": "Admin panel password is not configured"}), 503
+
+    data = request.json or {}
+    password = str(data.get("password") or "")
+    if not secrets.compare_digest(password, ADMIN_PANEL_PASSWORD):
+        return jsonify({"error": "Invalid admin password"}), 401
+
+    user_id = session.get("user_id")
     session.clear()
+    session.permanent = True
+    if user_id:
+        session["user_id"] = int(user_id)
+    session[ADMIN_SESSION_KEY] = True
+    _record_audit_event(
+        "admin.login",
+        "Admin panel login succeeded",
+        user_email="admin",
+    )
+    return jsonify(_public_admin_payload())
+
+
+@app.route("/api/admin/logout", methods=["POST"])
+def admin_logout():
+    if _session_admin_authenticated():
+        _record_audit_event(
+            "admin.logout",
+            "Admin panel logout",
+            user_email="admin",
+        )
+    _clear_admin_session()
     return jsonify({"success": True})
 
 
@@ -362,6 +565,13 @@ def get_status(user: Dict[str, Any]):
 def manual_check(user: Dict[str, Any]):
     scheduler = _current_scheduler(user)
     result = scheduler.manual_check()
+    if result.get("success"):
+        _record_audit_event(
+            "user.manual_check",
+            f"Manual stock check started by {user['email']}",
+            actor_user=user,
+            alert_category="user_action",
+        )
     return jsonify(result)
 
 
@@ -391,6 +601,13 @@ def start_scheduler(user: Dict[str, Any]):
 
     success = scheduler.start()
     if success:
+        _record_audit_event(
+            "user.scheduler_started",
+            f"Scheduler started by {user['email']}",
+            actor_user=user,
+            metadata={"check_interval_minutes": scheduler.check_interval_minutes},
+            alert_category="user_action",
+        )
         return jsonify({"message": "Scheduler started", "success": True})
     return jsonify({"message": "Scheduler already running", "success": False}), 400
 
@@ -401,6 +618,12 @@ def stop_scheduler(user: Dict[str, Any]):
     scheduler = _current_scheduler(user)
     success = scheduler.stop()
     if success:
+        _record_audit_event(
+            "user.scheduler_stopped",
+            f"Scheduler stopped by {user['email']}",
+            actor_user=user,
+            alert_category="user_action",
+        )
         return jsonify({"message": "Scheduler stopped", "success": True})
     return jsonify({"error": "Scheduler not running"}), 400
 
@@ -450,6 +673,18 @@ def configure(user: Dict[str, Any]):
             scheduler.set_pokemon_background_tile_size(pokemon_background_tile_size)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+
+    _record_audit_event(
+        "user.settings_updated",
+        f"Settings updated by {user['email']}",
+        actor_user=user,
+        metadata={
+            "zipcode": scheduler.current_zipcode,
+            "check_interval_minutes": scheduler.check_interval_minutes,
+            "discord_webhook_count": len(scheduler.discord_destinations),
+        },
+        alert_category="user_action",
+    )
 
     return jsonify(
         {
@@ -529,6 +764,18 @@ def add_product(user: Dict[str, Any]):
     if not success:
         return jsonify({"error": "Product already tracked"}), 400
 
+    _record_audit_event(
+        "user.product_added",
+        f"Tracked product added by {user['email']}: {product_name}",
+        actor_user=user,
+        metadata={
+            "product_id": article_id,
+            "retailer": retailer,
+            "name": product_name,
+        },
+        alert_category="user_action",
+    )
+
     return jsonify(
         {
             "message": "Product added",
@@ -565,11 +812,19 @@ def remove_product(user: Dict[str, Any]):
     scheduler = _current_scheduler(user)
     data = request.json or {}
     product_id = str(data.get("id", "")).strip()
+    product_name = str(data.get("name", "")).strip()
     if not product_id:
         return jsonify({"error": "Product ID required"}), 400
 
     success = scheduler.remove_product(product_id)
     if success:
+        _record_audit_event(
+            "user.product_removed",
+            f"Tracked product removed by {user['email']}: {product_name or product_id}",
+            actor_user=user,
+            metadata={"product_id": product_id, "name": product_name},
+            alert_category="user_action",
+        )
         return jsonify({"message": "Product removed", "id": product_id})
     return jsonify({"error": "Product not found"}), 404
 
@@ -593,8 +848,155 @@ def update_product(user: Dict[str, Any]):
         return jsonify({"error": str(exc)}), 400
 
     if success:
+        _record_audit_event(
+            "user.product_renamed",
+            f"Tracked product renamed by {user['email']}: {product_name}",
+            actor_user=user,
+            metadata={"product_id": product_id, "name": product_name},
+            alert_category="user_action",
+        )
         return jsonify({"message": "Product updated", "id": product_id, "name": product_name})
     return jsonify({"error": "Product not found"}), 404
+
+
+@app.route("/api/admin/overview", methods=["GET"])
+@require_admin
+def get_admin_overview():
+    return jsonify(_admin_overview_payload())
+
+
+@app.route("/api/admin/settings", methods=["POST"])
+@require_admin
+def update_admin_settings():
+    data = request.json or {}
+    updates: Dict[str, Any] = {}
+
+    if "google_allowlist_enabled" in data:
+        updates["google_allowlist_enabled"] = bool(data.get("google_allowlist_enabled"))
+    if "alert_new_users" in data:
+        updates["alert_new_users"] = bool(data.get("alert_new_users"))
+    if "alert_user_actions" in data:
+        updates["alert_user_actions"] = bool(data.get("alert_user_actions"))
+    if "admin_webhook_destinations" in data:
+        updates["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
+            data.get("admin_webhook_destinations")
+        )
+
+    settings = db.update_admin_settings(updates)
+    settings["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
+        settings.get("admin_webhook_destinations")
+    )
+    if settings.get("google_allowlist_enabled"):
+        for user in db.list_users_for_admin():
+            if not user.get("is_authorized_email"):
+                db.update_user_settings(int(user["id"]), {"scheduler_enabled": False})
+                _stop_user_scheduler_if_running(int(user["id"]))
+    _record_audit_event(
+        "admin.settings_updated",
+        "Admin settings updated",
+        user_email="admin",
+        metadata={
+            "google_allowlist_enabled": settings.get("google_allowlist_enabled"),
+            "webhook_count": len(settings.get("admin_webhook_destinations") or []),
+            "alert_new_users": settings.get("alert_new_users"),
+            "alert_user_actions": settings.get("alert_user_actions"),
+        },
+    )
+    return jsonify({"settings": settings})
+
+
+@app.route("/api/admin/authorized-emails", methods=["POST"])
+@require_admin
+def add_authorized_email():
+    data = request.json or {}
+    email = str(data.get("email") or "").strip()
+    note = str(data.get("note") or "").strip()
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    try:
+        entry = db.add_authorized_google_email(email, note=note)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    _record_audit_event(
+        "admin.authorized_email_added",
+        f"Authorized Google email added: {entry['email']}",
+        user_email="admin",
+        metadata={"email": entry["email"], "note": entry.get("note", "")},
+    )
+    return jsonify(
+        {
+            "entry": entry,
+            "authorized_google_emails": db.list_authorized_google_emails(),
+        }
+    )
+
+
+@app.route("/api/admin/authorized-emails/remove", methods=["POST"])
+@require_admin
+def remove_authorized_email():
+    data = request.json or {}
+    email = str(data.get("email") or "").strip()
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    removed = db.remove_authorized_google_email(email)
+    if not removed:
+        return jsonify({"error": "Authorized email not found"}), 404
+
+    _record_audit_event(
+        "admin.authorized_email_removed",
+        f"Authorized Google email removed: {email.strip().lower()}",
+        user_email="admin",
+        metadata={"email": email.strip().lower()},
+    )
+    return jsonify({"authorized_google_emails": db.list_authorized_google_emails()})
+
+
+@app.route("/api/admin/users/<int:user_id>/ban", methods=["POST"])
+@require_admin
+def ban_user(user_id: int):
+    target_user = db.get_user_by_id(user_id)
+    if target_user is None:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.json or {}
+    reason = str(data.get("reason") or "").strip()
+    updated_user = db.set_user_banned_state(user_id, True, reason=reason)
+    if updated_user is None:
+        return jsonify({"error": "User not found"}), 404
+
+    db.update_user_settings(user_id, {"scheduler_enabled": False})
+    _stop_user_scheduler_if_running(user_id)
+    _record_audit_event(
+        "admin.user_banned",
+        f"User banned: {updated_user['email']}",
+        target_user=updated_user,
+        user_email="admin",
+        metadata={"reason": reason},
+    )
+    return jsonify({"user": updated_user, "users": db.list_users_for_admin()})
+
+
+@app.route("/api/admin/users/<int:user_id>/unban", methods=["POST"])
+@require_admin
+def unban_user(user_id: int):
+    target_user = db.get_user_by_id(user_id)
+    if target_user is None:
+        return jsonify({"error": "User not found"}), 404
+
+    updated_user = db.set_user_banned_state(user_id, False, reason="")
+    if updated_user is None:
+        return jsonify({"error": "User not found"}), 404
+
+    _record_audit_event(
+        "admin.user_unbanned",
+        f"User unbanned: {updated_user['email']}",
+        target_user=updated_user,
+        user_email="admin",
+    )
+    return jsonify({"user": updated_user, "users": db.list_users_for_admin()})
 
 
 @app.route("/api/health", methods=["GET"])
@@ -606,6 +1008,12 @@ def health():
 @app.route("/index.html")
 def index():
     return _serve_frontend_html_file("index.html")
+
+
+@app.route("/admin")
+@app.route("/admin.html")
+def admin_panel():
+    return _serve_frontend_html_file("admin.html")
 
 
 @app.route("/privacy.html")

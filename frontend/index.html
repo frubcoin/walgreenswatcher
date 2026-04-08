@@ -38,7 +38,6 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <script src="/runtime-config.js"></script>
-  <script src="https://unpkg.com/typewriter-effect@latest/dist/core.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     *,
@@ -965,45 +964,12 @@
       align-items: flex-start;
       color: var(--text-secondary);
       font-size: 14px;
-      opacity: 0.68;
-      transform: translateY(6px);
-      transition: opacity 0.32s ease, transform 0.32s ease, color 0.32s ease;
-    }
-
-    .auth-note-item.is-revealing,
-    .auth-note-item.is-complete {
       opacity: 1;
-      transform: translateY(0);
-    }
-
-    .auth-note-item.is-revealing {
-      color: rgba(244, 247, 249, 0.96);
-    }
-
-    .auth-note-item.is-complete {
-      color: var(--text-secondary);
+      transform: none;
     }
 
     .auth-note-copy {
-      position: relative;
-      display: inline-block;
-    }
-
-    .auth-note-copy .auth-note-wrapper {
       display: inline;
-    }
-
-    .auth-note-copy .auth-note-caret {
-      display: inline-block;
-      width: 1px;
-      height: 1em;
-      margin-left: 3px;
-      vertical-align: -0.14em;
-      color: transparent;
-      background: rgba(243, 117, 32, 0.92);
-      box-shadow: 0 0 10px rgba(243, 117, 32, 0.26);
-      opacity: 0.92;
-      animation: auth-note-caret 0.8s steps(1, end) infinite;
     }
 
     .auth-note-bullet {
@@ -1014,52 +980,12 @@
       margin-top: 6px;
       flex-shrink: 0;
       box-shadow: 0 0 0 4px rgba(243, 117, 32, 0.12);
-      transition: transform 0.32s ease, box-shadow 0.32s ease, filter 0.32s ease;
-    }
-
-    .auth-note-item.is-revealing .auth-note-bullet {
-      transform: scale(1.08);
-      filter: saturate(1.08);
-      box-shadow: 0 0 0 5px rgba(243, 117, 32, 0.16), 0 0 18px rgba(230, 38, 0, 0.22);
-      animation: auth-note-bullet-pulse 1.2s ease-out infinite;
-    }
-
-    .auth-note-item.is-complete .auth-note-bullet {
-      transform: scale(1);
-      filter: none;
     }
 
     .auth-status {
       font-size: 13px;
       color: var(--text-muted);
       min-height: 20px;
-    }
-
-    @keyframes auth-note-caret {
-
-      0%,
-      49% {
-        opacity: 0;
-      }
-
-      50%,
-      100% {
-        opacity: 0.85;
-      }
-    }
-
-    @keyframes auth-note-bullet-pulse {
-      0% {
-        box-shadow: 0 0 0 4px rgba(243, 117, 32, 0.16), 0 0 10px rgba(230, 38, 0, 0.16);
-      }
-
-      70% {
-        box-shadow: 0 0 0 7px rgba(243, 117, 32, 0.05), 0 0 22px rgba(230, 38, 0, 0.26);
-      }
-
-      100% {
-        box-shadow: 0 0 0 4px rgba(243, 117, 32, 0.16), 0 0 10px rgba(230, 38, 0, 0.16);
-      }
     }
 
     .auth-legal-note {
@@ -1081,23 +1007,6 @@
     .inline-legal-link:hover,
     .inline-legal-link:focus-visible {
       color: #ffffff;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .auth-note-copy .auth-note-caret {
-        animation: none;
-      }
-
-      .auth-note-item,
-      .auth-note-item.is-revealing,
-      .auth-note-item.is-complete {
-        opacity: 1;
-        transform: none;
-      }
-
-      .auth-note-item.is-revealing .auth-note-bullet {
-        animation: none;
-      }
     }
 
     .onboarding-modal {
@@ -2339,6 +2248,41 @@
       padding: 0;
     }
 
+    .map-search-toggle-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      min-height: 40px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(30, 34, 40, 0.88);
+      color: var(--text-primary);
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(8px);
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .map-search-toggle-btn:hover,
+    .map-search-toggle-btn:focus-visible {
+      background: rgba(40, 45, 50, 0.96);
+      border-color: var(--accent-soft-border);
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    .map-search-toggle-btn.is-active {
+      background: var(--accent);
+      border-color: rgba(255, 255, 255, 0.16);
+      color: var(--accent-contrast);
+    }
+
     .map-locate-btn:hover {
       background: var(--accent);
       border-color: var(--accent-soft-border);
@@ -2355,6 +2299,163 @@
       height: 22px;
       filter: invert(1) brightness(2);
       /* Make the black icon white */
+    }
+
+    .map-location-search {
+      position: absolute;
+      top: 70px;
+      left: 20px;
+      z-index: 1000;
+      width: min(360px, calc(100% - 40px));
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background:
+        linear-gradient(180deg, rgba(24, 28, 33, 0.96), rgba(18, 21, 26, 0.96));
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.38);
+      backdrop-filter: blur(14px);
+    }
+
+    .map-location-search[hidden] {
+      display: none;
+    }
+
+    .map-location-search-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .map-location-search-title {
+      font-size: 13px;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-primary);
+    }
+
+    .map-location-search-close {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      transition: color 0.18s ease;
+    }
+
+    .map-location-search-close:hover,
+    .map-location-search-close:focus-visible {
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .map-location-search-copy {
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+    }
+
+    .map-location-search-row {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .map-location-search-input {
+      width: 100%;
+      min-width: 0;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(8, 10, 13, 0.52);
+      color: var(--text-primary);
+      padding: 12px 14px;
+      font: inherit;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+
+    .map-location-search-input::placeholder {
+      color: rgba(214, 220, 225, 0.56);
+    }
+
+    .map-location-search-input:focus {
+      outline: none;
+      border-color: var(--accent-soft-border);
+      box-shadow: 0 0 0 3px rgba(72, 156, 212, 0.14);
+      background: rgba(10, 12, 15, 0.72);
+    }
+
+    .map-location-search-submit {
+      min-width: 88px;
+      justify-content: center;
+    }
+
+    .map-location-search-status {
+      margin-top: 10px;
+      min-height: 18px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .map-location-search-status[data-tone="info"] {
+      color: var(--text-secondary);
+    }
+
+    .map-location-search-status[data-tone="error"] {
+      color: #ffb1a6;
+    }
+
+    .map-location-search-status[data-tone="success"] {
+      color: #98d7ff;
+    }
+
+    .map-location-search-results {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 220px;
+      overflow: auto;
+    }
+
+    .map-location-search-results[hidden] {
+      display: none;
+    }
+
+    .map-location-suggestion {
+      width: 100%;
+      text-align: left;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-primary);
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .map-location-suggestion:hover,
+    .map-location-suggestion:focus-visible,
+    .map-location-suggestion.is-active {
+      background: rgba(72, 156, 212, 0.16);
+      border-color: rgba(72, 156, 212, 0.38);
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    .map-location-suggestion-label {
+      display: block;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text-primary);
     }
 
     .user-location-pulse {
@@ -2551,24 +2652,45 @@
     }
 
     .results-map-theme-btn {
+      --theme-icon-color: var(--text-secondary);
+      --theme-icon-hover-color: var(--text-primary);
       appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       border: 0;
       border-radius: 999px;
-      padding: 7px 12px;
+      width: 38px;
+      height: 38px;
+      padding: 0;
       background: transparent;
-      color: var(--text-secondary);
-      font-family: 'Space Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
+      color: var(--theme-icon-color);
       cursor: pointer;
       transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    }
+
+    .results-map-theme-btn[data-map-theme="dark"] {
+      --theme-icon-color: #9fb1c4;
+      --theme-icon-hover-color: #dce7f3;
+    }
+
+    .results-map-theme-btn[data-map-theme="light"] {
+      --theme-icon-color: #f0bf56;
+      --theme-icon-hover-color: #ffd98d;
+    }
+
+    .results-map-theme-icon {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+      pointer-events: none;
+      flex-shrink: 0;
     }
 
     .results-map-theme-btn:hover,
     .results-map-theme-btn:focus-visible {
       background: rgba(255, 255, 255, 0.1);
-      color: var(--text-primary);
+      color: var(--theme-icon-hover-color);
       outline: none;
     }
 
@@ -2622,13 +2744,86 @@
     }
 
     .results-map-card[data-map-theme="light"] .results-map-theme-btn {
-      color: #42515f;
+      color: var(--theme-icon-color);
+    }
+
+    .results-map-card[data-map-theme="light"] .results-map-theme-btn[data-map-theme="dark"] {
+      --theme-icon-color: #516273;
+      --theme-icon-hover-color: #15212c;
+    }
+
+    .results-map-card[data-map-theme="light"] .results-map-theme-btn[data-map-theme="light"] {
+      --theme-icon-color: #b36d07;
+      --theme-icon-hover-color: #8c5300;
     }
 
     .results-map-card[data-map-theme="light"] .results-map-theme-btn:hover,
     .results-map-card[data-map-theme="light"] .results-map-theme-btn:focus-visible {
       background: rgba(62, 81, 98, 0.08);
+      color: var(--theme-icon-hover-color);
+    }
+
+    .results-map-card[data-map-theme="light"] .map-search-toggle-btn {
+      background: rgba(248, 251, 253, 0.94);
+      border-color: rgba(62, 81, 98, 0.18);
       color: #15212c;
+      box-shadow: 0 10px 24px rgba(14, 29, 41, 0.16);
+    }
+
+    .results-map-card[data-map-theme="light"] .map-search-toggle-btn:hover,
+    .results-map-card[data-map-theme="light"] .map-search-toggle-btn:focus-visible {
+      background: #ffffff;
+      border-color: rgba(72, 156, 212, 0.4);
+    }
+
+    .results-map-card[data-map-theme="light"] .map-search-toggle-btn.is-active {
+      background: var(--accent);
+      color: var(--accent-contrast);
+    }
+
+    .results-map-card[data-map-theme="light"] .map-location-search {
+      background:
+        linear-gradient(180deg, rgba(248, 251, 253, 0.98), rgba(236, 242, 247, 0.98));
+      border-color: rgba(62, 81, 98, 0.16);
+      box-shadow: 0 18px 36px rgba(14, 29, 41, 0.16);
+    }
+
+    .results-map-card[data-map-theme="light"] .map-location-search-title,
+    .results-map-card[data-map-theme="light"] .map-location-suggestion-label {
+      color: #15212c;
+    }
+
+    .results-map-card[data-map-theme="light"] .map-location-search-copy,
+    .results-map-card[data-map-theme="light"] .map-location-search-status[data-tone="info"] {
+      color: #42515f;
+    }
+
+    .results-map-card[data-map-theme="light"] .map-location-search-close,
+    .results-map-card[data-map-theme="light"] .map-location-search-status {
+      color: #61707f;
+    }
+
+    .results-map-card[data-map-theme="light"] .map-location-search-input {
+      background: rgba(255, 255, 255, 0.92);
+      border-color: rgba(62, 81, 98, 0.18);
+      color: #15212c;
+    }
+
+    .results-map-card[data-map-theme="light"] .map-location-search-input::placeholder {
+      color: rgba(66, 81, 95, 0.62);
+    }
+
+    .results-map-card[data-map-theme="light"] .map-location-suggestion {
+      background: rgba(255, 255, 255, 0.86);
+      border-color: rgba(62, 81, 98, 0.12);
+      color: #15212c;
+    }
+
+    .results-map-card[data-map-theme="light"] .map-location-suggestion:hover,
+    .results-map-card[data-map-theme="light"] .map-location-suggestion:focus-visible,
+    .results-map-card[data-map-theme="light"] .map-location-suggestion.is-active {
+      background: rgba(72, 156, 212, 0.14);
+      border-color: rgba(72, 156, 212, 0.3);
     }
 
     .result-card {
@@ -3208,7 +3403,7 @@
       outline: none;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1060px) {
       .wrapper {
         padding-left: 14px;
         padding-right: 14px;
@@ -3226,6 +3421,42 @@
       .auth-showcase,
       .auth-panel {
         padding: 28px 24px;
+        justify-items: center;
+        text-align: center;
+      }
+
+      .auth-card {
+        width: min(100%, 920px);
+        max-width: none;
+        justify-items: center;
+      }
+
+      .auth-title,
+      .auth-copy {
+        max-width: none;
+      }
+
+      .auth-copy,
+      .auth-panel-copy,
+      .auth-status,
+      .auth-legal-note {
+        margin-inline: auto;
+      }
+
+      .auth-metrics,
+      .auth-feature-grid,
+      .auth-note-list {
+        width: 100%;
+      }
+
+      .auth-panel-card {
+        width: min(100%, 820px);
+        justify-items: center;
+        text-align: center;
+      }
+
+      #google-signin-button {
+        margin-left: 0;
       }
 
       body.auth-gate-active .auth-gate {
@@ -3289,6 +3520,22 @@
       .results-map-canvas {
         height: 360px;
         min-height: 0;
+      }
+
+      .map-location-search {
+        width: min(360px, calc(100% - 32px));
+        top: 68px;
+        left: 16px;
+      }
+
+      .map-search-toggle-btn {
+        top: 16px;
+        left: 16px;
+      }
+
+      .map-locate-btn {
+        right: 16px;
+        bottom: 16px;
       }
 
       .site-footer {
@@ -3405,6 +3652,31 @@
       .onboarding-progress-text {
         font-size: 13px;
         white-space: nowrap;
+      }
+
+      .map-location-search {
+        width: calc(100% - 24px);
+        top: 60px;
+        left: 12px;
+        padding: 12px;
+      }
+
+      .map-location-search-row {
+        grid-template-columns: 1fr;
+      }
+
+      .map-location-search-submit {
+        width: 100%;
+      }
+
+      .map-search-toggle-btn {
+        top: 12px;
+        left: 12px;
+      }
+
+      .map-locate-btn {
+        right: 12px;
+        bottom: 12px;
       }
 
       .onboarding-content {
@@ -3526,21 +3798,27 @@
 
       body.auth-gate-active .wrapper {
         min-height: auto;
-        padding: 0 0 calc(24px + env(safe-area-inset-bottom, 0px));
+        padding: 0;
         display: block;
         transform: none;
       }
 
       body.auth-gate-active .auth-gate {
         margin-top: 0;
-        min-height: 100dvh;
+        min-height: auto;
         max-height: none;
         overflow: visible;
         border: none;
         border-radius: 0;
         box-shadow: none;
         backdrop-filter: none;
-        background: transparent;
+        background-color: #1f2327;
+        background-image:
+          linear-gradient(180deg, rgba(16, 18, 22, 0.32), rgba(10, 12, 15, 0.5)),
+          var(--auth-window-background-image);
+        background-position: center, center;
+        background-repeat: no-repeat, no-repeat;
+        background-size: cover, cover;
       }
 
       body.auth-gate-active .auth-showcase,
@@ -3553,7 +3831,7 @@
       }
 
       body.auth-gate-active .auth-panel {
-        padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: 12px;
       }
 
       body.auth-gate-active .auth-showcase {
@@ -3579,7 +3857,21 @@
       }
 
       body.auth-gate-active .auth-feature-grid {
-        display: none;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      body.auth-gate-active .auth-feature {
+        padding: 14px 12px;
+      }
+
+      body.auth-gate-active .auth-feature-title {
+        font-size: 15px;
+      }
+
+      body.auth-gate-active .auth-feature-copy {
+        font-size: 13px;
       }
 
       body.auth-gate-active .auth-panel-card {
@@ -3948,6 +4240,11 @@
       footerTextShadow: '0 1px 12px rgba(0, 0, 0, 0.65)'
     };
     const RESULTS_MAP_THEME_STORAGE_KEY = 'walgreens_results_map_theme';
+    const MAP_ADDRESS_STORAGE_KEY = 'walgreens_saved_map_address';
+    const RESULTS_MAP_THEME_ICONS = {
+      dark: '<svg class="results-map-theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Zm0-80q88 0 158-48.5T740-375q-20 5-40 8t-40 3q-123 0-209.5-86.5T364-660q0-20 3-40t8-40q-78 32-126.5 102T200-480q0 116 82 198t198 82Zm-10-270Z"/></svg>',
+      light: '<svg class="results-map-theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" aria-hidden="true"><path d="M565-395q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35Zm-226.5 56.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Zm326-268Z"/></svg>'
+    };
     const RESULTS_MAP_THEMES = {
       dark: {
         label: 'Dark',
@@ -4552,6 +4849,17 @@
           </div>
         </div>
 
+        <h2
+          style="font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-top: 32px; margin-bottom: 20px;">
+          Map Settings</h2>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label class="form-label" for="cfg-map-address">Saved Map Address</label>
+            <input type="text" class="form-input" id="cfg-map-address" maxlength="180" placeholder="Enter address, city, or ZIP">
+            <span class="form-hint">Used only for the map view when live location fails or when you want a quick saved place. Stored in this browser only.</span>
+          </div>
+        </div>
+
         <!-- Cosmetic Settings -->
         <h2
           style="font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-top: 32px; margin-bottom: 20px;">
@@ -4686,6 +4994,18 @@
     let userLocationMarker = null;
     let activeResultsMapKey = null;
     let currentResultsMapTheme = loadStoredResultsMapTheme();
+    let manualLocationFallbackVisible = false;
+    let manualLocationQuery = loadStoredMapAddress();
+    let manualLocationSuggestions = [];
+    let manualLocationHighlightedIndex = -1;
+    let manualLocationAutocompleteBusy = false;
+    let manualLocationAutocompleteTimer = 0;
+    let manualLocationAutocompleteController = null;
+    let manualLocationAutocompleteRequestId = 0;
+    let manualLocationStatus = {
+      message: 'Enter an address, city, or ZIP to center the map.',
+      tone: 'muted'
+    };
     let trackedProductsCache = [];
     let editingProductId = null;
     let currentUser = null;
@@ -4707,8 +5027,6 @@
     let hasWindowLoaded = document.readyState === 'complete';
     let hasInitialSessionResolved = false;
     let hasInitialFontsResolved = !document.fonts || document.fonts.status === 'loaded';
-    let authNoteTypewriterInstances = [];
-    let authNoteTypewriterFrame = 0;
     let googleButtonRevealTimer = 0;
 
     const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
@@ -4797,110 +5115,6 @@
       root.classList.remove('is-visible', 'is-dragging');
     }
 
-    function normalizeAuthNoteText(value) {
-      return String(value || '').replace(/\s+/g, ' ').trim();
-    }
-
-    function resetAuthNoteTypewriter() {
-      authNoteTypewriterInstances.forEach(instance => {
-        if (instance && typeof instance.stop === 'function') {
-          instance.stop();
-        }
-      });
-      authNoteTypewriterInstances = [];
-      if (authNoteTypewriterFrame) {
-        window.cancelAnimationFrame(authNoteTypewriterFrame);
-        authNoteTypewriterFrame = 0;
-      }
-
-      document.querySelectorAll('.auth-note-copy').forEach(node => {
-        const item = node.closest('.auth-note-item');
-        const fullText = normalizeAuthNoteText(node.dataset.fullText || node.textContent);
-        node.dataset.fullText = fullText;
-        node.textContent = fullText;
-        node.style.minHeight = '';
-        node.classList.remove('is-typing');
-        if (item) {
-          item.classList.remove('is-revealing', 'is-complete');
-        }
-      });
-    }
-
-    function queueAuthNoteTypewriter() {
-      if (authNoteTypewriterFrame) {
-        window.cancelAnimationFrame(authNoteTypewriterFrame);
-      }
-
-      authNoteTypewriterFrame = window.requestAnimationFrame(() => {
-        authNoteTypewriterFrame = window.requestAnimationFrame(() => {
-          authNoteTypewriterFrame = 0;
-          const authGate = document.getElementById('auth-gate');
-          if (!document.body.classList.contains('auth-gate-active') || !authGate || authGate.hidden) return;
-          startAuthNoteTypewriter();
-        });
-      });
-    }
-
-    function startAuthNoteTypewriter() {
-      const nodes = Array.from(document.querySelectorAll('.auth-note-copy'));
-      if (!nodes.length) return;
-
-      resetAuthNoteTypewriter();
-
-      const prefersReducedMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-      const TypewriterCore = window.Typewriter;
-      if (prefersReducedMotion || !TypewriterCore) {
-        nodes.forEach(node => {
-          const item = node.closest('.auth-note-item');
-          const fullText = normalizeAuthNoteText(node.dataset.fullText || node.textContent);
-          node.dataset.fullText = fullText;
-          node.textContent = fullText;
-          if (item) item.classList.add('is-complete');
-        });
-        return;
-      }
-
-      const runNote = index => {
-        if (index >= nodes.length) return;
-
-        const node = nodes[index];
-        const item = node.closest('.auth-note-item');
-        const fullText = normalizeAuthNoteText(node.dataset.fullText || node.textContent);
-        node.dataset.fullText = fullText;
-        node.textContent = fullText;
-        node.style.minHeight = `${node.offsetHeight}px`;
-        node.innerHTML = '';
-        node.classList.add('is-typing');
-        if (item) item.classList.add('is-revealing');
-
-        const typewriter = new TypewriterCore(node, {
-          autoStart: false,
-          cursor: '|',
-          delay: fullText.length > 40 ? 13 : 18,
-          skipAddStyles: true,
-          wrapperClassName: 'auth-note-wrapper',
-          cursorClassName: 'auth-note-caret'
-        });
-
-        authNoteTypewriterInstances.push(typewriter);
-        typewriter
-          .pauseFor(index === 0 ? 220 : 180)
-          .typeString(fullText)
-          .callFunction(() => {
-            node.classList.remove('is-typing');
-            node.style.minHeight = '';
-            if (item) {
-              item.classList.remove('is-revealing');
-              item.classList.add('is-complete');
-            }
-            runNote(index + 1);
-          })
-          .start();
-      };
-
-      runNote(0);
-    }
-
     function waitForInitialFonts(maxMs = 1200) {
       if (!document.fonts?.ready) {
         hasInitialFontsResolved = true;
@@ -4922,9 +5136,6 @@
 
       if (!loader) {
         document.body.classList.remove('app-booting');
-        if (document.body.classList.contains('auth-gate-active')) {
-          queueAuthNoteTypewriter();
-        }
         return;
       }
 
@@ -4932,9 +5143,6 @@
       loader.dataset.dismissed = 'true';
       loader.remove();
       document.body.classList.remove('app-booting');
-      if (document.body.classList.contains('auth-gate-active')) {
-        queueAuthNoteTypewriter();
-      }
     }
 
     function queueShellScrollbarUpdate() {
@@ -5088,6 +5296,27 @@
       }
     }
 
+    function loadStoredMapAddress() {
+      try {
+        return String(localStorage.getItem(MAP_ADDRESS_STORAGE_KEY) || '').trim();
+      } catch (error) {
+        return '';
+      }
+    }
+
+    function storeMapAddress(address) {
+      const normalizedAddress = String(address || '').trim();
+      try {
+        if (normalizedAddress) {
+          localStorage.setItem(MAP_ADDRESS_STORAGE_KEY, normalizedAddress);
+        } else {
+          localStorage.removeItem(MAP_ADDRESS_STORAGE_KEY);
+        }
+      } catch (error) {
+      }
+      return normalizedAddress;
+    }
+
     function persistResultsMapTheme(theme) {
       try {
         localStorage.setItem(RESULTS_MAP_THEME_STORAGE_KEY, normalizeResultsMapTheme(theme));
@@ -5151,7 +5380,7 @@
         container.setAttribute('role', 'group');
         container.setAttribute('aria-label', 'Map theme');
         container.innerHTML = Object.entries(RESULTS_MAP_THEMES).map(([theme, config]) => `
-            <button class="results-map-theme-btn ${currentResultsMapTheme === theme ? 'is-active' : ''}" type="button" data-map-theme="${theme}" aria-pressed="${currentResultsMapTheme === theme ? 'true' : 'false'}">${config.label}</button>
+            <button class="results-map-theme-btn ${currentResultsMapTheme === theme ? 'is-active' : ''}" type="button" data-map-theme="${theme}" aria-label="${config.label} map theme" title="${config.label}" aria-pressed="${currentResultsMapTheme === theme ? 'true' : 'false'}">${RESULTS_MAP_THEME_ICONS[theme] || config.label}</button>
           `).join('');
 
         L.DomEvent.disableClickPropagation(container);
@@ -5891,11 +6120,6 @@
       if (appShell) appShell.hidden = !isAuthenticated;
       document.body.classList.toggle('auth-gate-active', !isAuthenticated);
       document.body.classList.toggle('app-active', isAuthenticated);
-      if (isAuthenticated) {
-        resetAuthNoteTypewriter();
-      } else if (!document.body.classList.contains('app-booting')) {
-        queueAuthNoteTypewriter();
-      }
       queueShellScrollbarUpdate();
     }
 
@@ -6395,6 +6619,313 @@
       focusResultsMapMarker(locationKey);
     }
 
+    function getManualLocationSearchElements() {
+      return {
+        panel: document.getElementById('map-location-search'),
+        toggle: document.getElementById('map-location-search-toggle'),
+        input: document.getElementById('manual-location-input'),
+        status: document.getElementById('map-location-search-status'),
+        results: document.getElementById('map-location-search-results'),
+        submit: document.querySelector('[data-action="submit-manual-location"]')
+      };
+    }
+
+    function setManualLocationStatus(message, tone = 'muted') {
+      manualLocationStatus = {
+        message: String(message || '').trim() || 'Enter an address, city, or ZIP to center the map.',
+        tone
+      };
+    }
+
+    function cancelManualLocationAutocomplete() {
+      if (manualLocationAutocompleteTimer) {
+        window.clearTimeout(manualLocationAutocompleteTimer);
+        manualLocationAutocompleteTimer = 0;
+      }
+
+      if (manualLocationAutocompleteController) {
+        manualLocationAutocompleteController.abort();
+        manualLocationAutocompleteController = null;
+      }
+
+      manualLocationAutocompleteBusy = false;
+    }
+
+    function renderManualLocationSuggestionsHtml() {
+      return manualLocationSuggestions.map((suggestion, index) => `
+          <button
+            class="map-location-suggestion ${index === manualLocationHighlightedIndex ? 'is-active' : ''}"
+            type="button"
+            data-action="select-manual-location-suggestion"
+            data-suggestion-index="${index}">
+            <span class="map-location-suggestion-label">${escapeHtml(suggestion.label)}</span>
+          </button>
+        `).join('');
+    }
+
+    function syncManualLocationSearchUi(options = {}) {
+      const { focusInput = false } = options;
+      const { panel, toggle, input, status, results, submit } = getManualLocationSearchElements();
+
+      if (panel) {
+        panel.hidden = !manualLocationFallbackVisible;
+      }
+
+      if (toggle) {
+        toggle.classList.toggle('is-active', manualLocationFallbackVisible);
+        toggle.setAttribute('aria-expanded', manualLocationFallbackVisible ? 'true' : 'false');
+        toggle.dataset.action = manualLocationFallbackVisible ? 'hide-manual-location-fallback' : 'show-manual-location-fallback';
+      }
+
+      if (input && document.activeElement !== input) {
+        input.value = manualLocationQuery;
+      }
+
+      if (status) {
+        status.textContent = manualLocationStatus.message;
+        status.dataset.tone = manualLocationStatus.tone || 'muted';
+      }
+
+      if (results) {
+        const hasSuggestions = manualLocationSuggestions.length > 0;
+        results.hidden = !hasSuggestions;
+        results.innerHTML = hasSuggestions ? renderManualLocationSuggestionsHtml() : '';
+      }
+
+      if (submit) {
+        submit.disabled = manualLocationAutocompleteBusy || !manualLocationQuery.trim();
+      }
+
+      if (input && focusInput) {
+        window.requestAnimationFrame(() => {
+          input.focus({ preventScroll: true });
+          input.select();
+        });
+      }
+    }
+
+    function showManualLocationFallback(message = '', tone = 'info') {
+      manualLocationFallbackVisible = true;
+      if (!manualLocationQuery) {
+        manualLocationQuery = loadStoredMapAddress();
+      }
+      if (message) {
+        setManualLocationStatus(message, tone);
+      }
+      syncManualLocationSearchUi({ focusInput: true });
+    }
+
+    function hideManualLocationFallback(options = {}) {
+      const { preserveQuery = true } = options;
+      manualLocationFallbackVisible = false;
+      manualLocationSuggestions = [];
+      manualLocationHighlightedIndex = -1;
+      cancelManualLocationAutocomplete();
+      if (!preserveQuery) {
+        manualLocationQuery = '';
+      }
+      setManualLocationStatus('Enter an address, city, or ZIP to center the map.');
+      syncManualLocationSearchUi();
+    }
+
+    async function requestManualLocationSuggestions(query) {
+      const normalizedQuery = String(query || '').trim();
+      const requestId = ++manualLocationAutocompleteRequestId;
+      const controller = new AbortController();
+
+      if (manualLocationAutocompleteController) {
+        manualLocationAutocompleteController.abort();
+      }
+      manualLocationAutocompleteController = controller;
+
+      try {
+        const params = new URLSearchParams({
+          format: 'jsonv2',
+          addressdetails: '1',
+          limit: '5',
+          countrycodes: 'us',
+          q: normalizedQuery
+        });
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Address lookup failed (${response.status})`);
+        }
+
+        const payload = await response.json();
+        if (requestId !== manualLocationAutocompleteRequestId) {
+          return [];
+        }
+
+        return Array.isArray(payload)
+          ? payload.map(item => {
+            const label = String(item?.display_name || '').trim();
+            const latitude = Number(item?.lat);
+            const longitude = Number(item?.lon);
+            if (!label || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+              return null;
+            }
+            return { label, latitude, longitude };
+          }).filter(Boolean)
+          : [];
+      } finally {
+        if (manualLocationAutocompleteController === controller) {
+          manualLocationAutocompleteController = null;
+        }
+      }
+    }
+
+    async function loadManualLocationSuggestions(query) {
+      const normalizedQuery = String(query || '').trim();
+
+      if (normalizedQuery.length < 3) {
+        cancelManualLocationAutocomplete();
+        manualLocationSuggestions = [];
+        manualLocationHighlightedIndex = -1;
+        setManualLocationStatus('Type at least 3 characters for address suggestions.');
+        syncManualLocationSearchUi();
+        return [];
+      }
+
+      manualLocationAutocompleteBusy = true;
+      setManualLocationStatus('Searching addresses...', 'info');
+      syncManualLocationSearchUi();
+
+      try {
+        const suggestions = await requestManualLocationSuggestions(normalizedQuery);
+        manualLocationSuggestions = suggestions;
+        manualLocationHighlightedIndex = suggestions.length ? 0 : -1;
+        setManualLocationStatus(
+          suggestions.length
+            ? 'Choose a suggestion or press Enter to use the first match.'
+            : 'No matches yet. Try a street, city, or ZIP.',
+          suggestions.length ? 'info' : 'error'
+        );
+        return suggestions;
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          return [];
+        }
+
+        console.warn('Manual location lookup error:', error);
+        manualLocationSuggestions = [];
+        manualLocationHighlightedIndex = -1;
+        setManualLocationStatus('Could not load address suggestions right now.', 'error');
+        return [];
+      } finally {
+        manualLocationAutocompleteBusy = false;
+        syncManualLocationSearchUi();
+      }
+    }
+
+    function queueManualLocationAutocomplete(query) {
+      manualLocationQuery = String(query || '');
+
+      if (manualLocationAutocompleteTimer) {
+        window.clearTimeout(manualLocationAutocompleteTimer);
+        manualLocationAutocompleteTimer = 0;
+      }
+
+      if (String(query || '').trim().length < 3) {
+        cancelManualLocationAutocomplete();
+        manualLocationSuggestions = [];
+        manualLocationHighlightedIndex = -1;
+        setManualLocationStatus('Type at least 3 characters for address suggestions.');
+        syncManualLocationSearchUi();
+        return;
+      }
+
+      manualLocationSuggestions = [];
+      manualLocationHighlightedIndex = -1;
+      setManualLocationStatus('Searching addresses...', 'info');
+      manualLocationAutocompleteTimer = window.setTimeout(() => {
+        manualLocationAutocompleteTimer = 0;
+        void loadManualLocationSuggestions(manualLocationQuery);
+      }, 280);
+      syncManualLocationSearchUi();
+    }
+
+    function centerMapOnManualLocation(suggestion) {
+      if (!resultsMap || !suggestion) return;
+
+      manualLocationQuery = storeMapAddress(suggestion.label);
+      const mapAddressInput = document.getElementById('cfg-map-address');
+      if (mapAddressInput) {
+        mapAddressInput.value = manualLocationQuery;
+      }
+      updateUserLocationOnMap({
+        coords: {
+          latitude: suggestion.latitude,
+          longitude: suggestion.longitude
+        }
+      });
+      hideManualLocationFallback({ preserveQuery: true });
+      showToast('Centered map on the entered address', 'success');
+    }
+
+    function selectManualLocationSuggestionByIndex(index) {
+      const suggestion = manualLocationSuggestions[index];
+      if (!suggestion) return;
+      centerMapOnManualLocation(suggestion);
+    }
+
+    async function submitManualLocationSearch() {
+      const { input } = getManualLocationSearchElements();
+      const query = String(input?.value || manualLocationQuery || '').trim();
+
+      if (!query) {
+        setManualLocationStatus('Enter an address, city, or ZIP first.', 'error');
+        syncManualLocationSearchUi({ focusInput: true });
+        return;
+      }
+
+      manualLocationQuery = query;
+
+      if (manualLocationSuggestions.length) {
+        const suggestionIndex = manualLocationHighlightedIndex >= 0 ? manualLocationHighlightedIndex : 0;
+        selectManualLocationSuggestionByIndex(suggestionIndex);
+        return;
+      }
+
+      cancelManualLocationAutocomplete();
+      manualLocationAutocompleteBusy = true;
+      setManualLocationStatus('Looking up that address...', 'info');
+      syncManualLocationSearchUi();
+
+      try {
+        const suggestions = await requestManualLocationSuggestions(query);
+        manualLocationSuggestions = suggestions;
+        manualLocationHighlightedIndex = suggestions.length ? 0 : -1;
+        if (!suggestions.length) {
+          setManualLocationStatus('No matching address found. Try a fuller street, city, or ZIP.', 'error');
+          return;
+        }
+        centerMapOnManualLocation(suggestions[0]);
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          return;
+        }
+
+        console.warn('Manual location search error:', error);
+        setManualLocationStatus('Address lookup is unavailable right now.', 'error');
+      } finally {
+        manualLocationAutocompleteBusy = false;
+        syncManualLocationSearchUi();
+      }
+    }
+
+    function handleManualLocationInput(value) {
+      if (!manualLocationFallbackVisible) {
+        manualLocationFallbackVisible = true;
+      }
+      queueManualLocationAutocomplete(value);
+    }
+
     async function handleActionClick(actionElement) {
       const action = actionElement?.dataset?.action || '';
       if (!action) return;
@@ -6420,6 +6951,18 @@
           return;
         case 'onboarding-next':
           await handleOnboardingNext();
+          return;
+        case 'show-manual-location-fallback':
+          showManualLocationFallback('Enter an address, city, or ZIP to center the map.');
+          return;
+        case 'hide-manual-location-fallback':
+          hideManualLocationFallback();
+          return;
+        case 'submit-manual-location':
+          await submitManualLocationSearch();
+          return;
+        case 'select-manual-location-suggestion':
+          selectManualLocationSuggestionByIndex(Number(actionElement.dataset.suggestionIndex || -1));
           return;
         case 'show-my-location':
           await handleShowMyLocation();
@@ -6557,6 +7100,7 @@
     async function handleShowMyLocation() {
       if (!navigator.geolocation) {
         showToast('Location services are not supported by your browser', 'error');
+        showManualLocationFallback('Browser location is unavailable here. Enter an address, city, or ZIP instead.', 'info');
         return;
       }
 
@@ -6574,6 +7118,7 @@
 
         if (!canRetry) {
           console.warn('Geolocation error:', error);
+          showManualLocationFallback('Live location failed. Enter an address, city, or ZIP instead.', 'info');
           showToast(getGeolocationErrorMessage(error, true), 'error');
           return;
         }
@@ -6587,6 +7132,7 @@
         showToast('Located using an approximate location', 'success');
       } catch (fallbackError) {
         console.warn('Geolocation fallback error:', fallbackError);
+        showManualLocationFallback('Desktop location still failed. Enter an address, city, or ZIP instead.', 'info');
         showToast(getGeolocationErrorMessage(fallbackError, true), 'error');
       }
     }
@@ -6701,6 +7247,37 @@
               <div class="results-map-shell">
                 <div class="results-map-card">
                   <div class="results-map-canvas" id="results-map"></div>
+                  <button
+                    class="map-search-toggle-btn ${manualLocationFallbackVisible ? 'is-active' : ''}"
+                    id="map-location-search-toggle"
+                    type="button"
+                    data-action="${manualLocationFallbackVisible ? 'hide-manual-location-fallback' : 'show-manual-location-fallback'}"
+                    aria-controls="map-location-search"
+                    aria-expanded="${manualLocationFallbackVisible ? 'true' : 'false'}">
+                    Search address
+                  </button>
+                  <div class="map-location-search" id="map-location-search" ${manualLocationFallbackVisible ? '' : 'hidden'}>
+                    <div class="map-location-search-head">
+                      <div class="map-location-search-title">Manual Location</div>
+                      <button class="map-location-search-close" type="button" data-action="hide-manual-location-fallback">Close</button>
+                    </div>
+                    <div class="map-location-search-copy">If browser location stalls on desktop, enter an address, city, or ZIP and we will center the map there.</div>
+                    <div class="map-location-search-row">
+                      <input
+                        class="map-location-search-input"
+                        id="manual-location-input"
+                        type="text"
+                        autocomplete="street-address"
+                        spellcheck="false"
+                        placeholder="Enter address, city, or ZIP"
+                        value="${escapeHtml(manualLocationQuery)}">
+                      <button class="btn btn-secondary map-location-search-submit" type="button" data-action="submit-manual-location" ${manualLocationAutocompleteBusy || !manualLocationQuery.trim() ? 'disabled' : ''}>Use</button>
+                    </div>
+                    <div class="map-location-search-status" id="map-location-search-status" data-tone="${escapeHtml(manualLocationStatus.tone || 'muted')}" aria-live="polite">${escapeHtml(manualLocationStatus.message)}</div>
+                    <div class="map-location-search-results" id="map-location-search-results" ${manualLocationSuggestions.length ? '' : 'hidden'}>
+                      ${renderManualLocationSuggestionsHtml()}
+                    </div>
+                  </div>
                   <button class="map-locate-btn" type="button" data-action="show-my-location" title="Show my location">
                     <img src="/location.svg" alt="Locate me">
                   </button>
@@ -6723,6 +7300,8 @@
       } else {
         destroyResultsMap();
       }
+
+      syncManualLocationSearchUi();
     }
 
     function setResultsView(view) {
@@ -6932,6 +7511,44 @@
         }
       }
 
+      if (event.target instanceof HTMLInputElement && event.target.id === 'manual-location-input') {
+        if (event.key === 'ArrowDown' && manualLocationSuggestions.length) {
+          event.preventDefault();
+          manualLocationHighlightedIndex = (manualLocationHighlightedIndex + 1) % manualLocationSuggestions.length;
+          syncManualLocationSearchUi();
+          return;
+        }
+
+        if (event.key === 'ArrowUp' && manualLocationSuggestions.length) {
+          event.preventDefault();
+          manualLocationHighlightedIndex = manualLocationHighlightedIndex <= 0
+            ? manualLocationSuggestions.length - 1
+            : manualLocationHighlightedIndex - 1;
+          syncManualLocationSearchUi();
+          return;
+        }
+
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          void submitManualLocationSearch();
+          return;
+        }
+
+        if (event.key === 'Escape' && manualLocationSuggestions.length) {
+          event.preventDefault();
+          manualLocationSuggestions = [];
+          manualLocationHighlightedIndex = -1;
+          syncManualLocationSearchUi();
+          return;
+        }
+
+        if (event.key === 'Escape' && manualLocationFallbackVisible) {
+          event.preventDefault();
+          hideManualLocationFallback();
+          return;
+        }
+      }
+
       if (event.key !== 'Escape') return;
       const techStackModal = document.getElementById('tech-stack-modal');
       if (techStackModal && !techStackModal.hidden) {
@@ -6942,6 +7559,12 @@
       const onboardingModal = document.getElementById('onboarding-modal');
       if (!onboardingModal || onboardingModal.hidden) return;
       closeOnboarding(false);
+    });
+
+    document.addEventListener('input', event => {
+      if (!(event.target instanceof HTMLInputElement)) return;
+      if (event.target.id !== 'manual-location-input') return;
+      handleManualLocationInput(event.target.value);
     });
 
     document.addEventListener('click', async event => {
@@ -6957,10 +7580,22 @@
         return;
       }
 
+      if (
+        manualLocationSuggestions.length &&
+        event.target instanceof Element &&
+        !event.target.closest('#map-location-search') &&
+        !event.target.closest('#map-location-search-toggle')
+      ) {
+        manualLocationSuggestions = [];
+        manualLocationHighlightedIndex = -1;
+        syncManualLocationSearchUi();
+      }
+
       const onboardingModal = document.getElementById('onboarding-modal');
       if (!onboardingModal || onboardingModal.hidden) return;
       if (event.target === onboardingModal) {
         closeOnboarding(false);
+        return;
       }
     });
 
@@ -7242,6 +7877,14 @@
     }
 
     async function loadSettings() {
+      const storedMapAddress = loadStoredMapAddress();
+      const mapAddressInput = document.getElementById('cfg-map-address');
+      if (mapAddressInput) {
+        mapAddressInput.value = storedMapAddress;
+      }
+      manualLocationQuery = storedMapAddress;
+      syncManualLocationSearchUi();
+
       const data = await apiCall('/api/status');
       if (!data) return;
       const status = data.status || {};
@@ -7253,6 +7896,7 @@
         tileSize: status.pokemon_background_tile_size ?? DEFAULT_POKEMON_BACKGROUND_TILE_SIZE
       });
       renderDiscordDestinationRows(status.discord_destinations || []);
+      syncManualLocationSearchUi();
 
       const products = status.tracked_products || [];
       renderTrackedProducts(products);
@@ -7261,10 +7905,13 @@
     async function saveSettings() {
       const zip = document.getElementById('cfg-zip').value.trim();
       const interval = document.getElementById('cfg-interval').value.trim();
+      const mapAddress = storeMapAddress(document.getElementById('cfg-map-address').value.trim());
       const webhookDestinations = collectDiscordDestinations();
       const pokemonBackgroundEnabled = document.getElementById('cfg-pokemon-bg-enabled').checked;
       const pokemonBackgroundTheme = document.getElementById('cfg-pokemon-bg-theme').value || DEFAULT_POKEMON_BACKGROUND_THEME;
       const pokemonBackgroundTileSize = normalizePokemonBackgroundTileSize(document.getElementById('cfg-pokemon-bg-size').value);
+      manualLocationQuery = mapAddress;
+      syncManualLocationSearchUi();
 
       const data = {};
       if (zip) data.zipcode = zip;
@@ -7281,10 +7928,12 @@
           theme: result.pokemon_background_theme || pokemonBackgroundTheme,
           tileSize: result.pokemon_background_tile_size ?? pokemonBackgroundTileSize
         });
+        document.getElementById('cfg-map-address').value = mapAddress;
         showToast('Settings saved', 'success');
         await loadStatus();
       } else {
-        showToast('Failed to save', 'error');
+        document.getElementById('cfg-map-address').value = mapAddress;
+        showToast('Server settings failed to save, but the map address was stored locally', 'error');
       }
     }
 

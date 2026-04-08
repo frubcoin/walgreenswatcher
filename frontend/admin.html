@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Walgreens Watcher Admin</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/admin.css">
+  <script src="/runtime-config.js"></script>
+  <script src="/admin.js" defer></script>
+</head>
+
+<body>
+  <div class="page-shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">Operations Console</p>
+        <h1>Walgreens Watcher Admin</h1>
+        <p class="lede">Approve Google accounts, moderate users, and forward security-relevant activity to your own
+          webhook endpoints.</p>
+      </div>
+      <div class="masthead-actions">
+        <div class="chip" id="admin-session-chip">Checking session</div>
+        <button class="ghost-button" id="refresh-button" type="button">Refresh</button>
+        <button class="ghost-button" id="logout-button" type="button" hidden>Log Out</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel auth-panel" id="admin-auth-panel">
+        <div class="panel-header">
+          <div>
+            <p class="panel-kicker">Admin Login</p>
+            <h2>Password Required</h2>
+          </div>
+        </div>
+        <p class="panel-copy" id="admin-auth-copy">Enter the server-side admin password to unlock moderation and access
+          controls.</p>
+        <form id="admin-login-form" class="stack">
+          <label class="field">
+            <span>Password</span>
+            <input id="admin-password" name="password" type="password" autocomplete="current-password"
+              placeholder="Admin password" required>
+          </label>
+          <button class="primary-button" type="submit">Unlock Admin</button>
+        </form>
+      </section>
+
+      <section class="dashboard" id="admin-dashboard" hidden>
+        <section class="stat-grid" id="stats-grid">
+          <article class="panel stat-card">
+            <span class="stat-label">Users</span>
+            <strong class="stat-value" id="stat-users">0</strong>
+            <span class="stat-meta" id="stat-users-meta">No data yet</span>
+          </article>
+          <article class="panel stat-card">
+            <span class="stat-label">Allowlist</span>
+            <strong class="stat-value" id="stat-allowlist">0</strong>
+            <span class="stat-meta" id="stat-allowlist-meta">Email approvals</span>
+          </article>
+          <article class="panel stat-card">
+            <span class="stat-label">Banned</span>
+            <strong class="stat-value" id="stat-banned">0</strong>
+            <span class="stat-meta" id="stat-banned-meta">Restricted accounts</span>
+          </article>
+          <article class="panel stat-card">
+            <span class="stat-label">Alerts</span>
+            <strong class="stat-value" id="stat-webhooks">0</strong>
+            <span class="stat-meta" id="stat-webhooks-meta">Webhook destinations</span>
+          </article>
+        </section>
+
+        <section class="content-grid">
+          <section class="panel" id="settings-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Access Control</p>
+                <h2>Admin Settings</h2>
+              </div>
+            </div>
+            <form id="admin-settings-form" class="stack">
+              <label class="toggle-row">
+                <input id="allowlist-enabled" type="checkbox">
+                <span>
+                  <strong>Require authorized Google emails</strong>
+                  <small>When enabled, only emails on the allowlist can sign in.</small>
+                </span>
+              </label>
+              <label class="toggle-row">
+                <input id="alert-new-users" type="checkbox">
+                <span>
+                  <strong>Alert on new users</strong>
+                  <small>Send a webhook event when someone joins for the first time.</small>
+                </span>
+              </label>
+              <label class="toggle-row">
+                <input id="alert-user-actions" type="checkbox">
+                <span>
+                  <strong>Alert on user actions</strong>
+                  <small>Send alerts for sign-ins, settings changes, scheduler changes, and product actions.</small>
+                </span>
+              </label>
+              <label class="field">
+                <span>Admin alert webhooks</span>
+                <textarea id="admin-webhooks" rows="5"
+                  placeholder="One webhook URL per line"></textarea>
+              </label>
+              <button class="primary-button" type="submit">Save Settings</button>
+            </form>
+          </section>
+
+          <section class="panel" id="allowlist-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Authorized Emails</p>
+                <h2>Google Allowlist</h2>
+              </div>
+            </div>
+            <form id="authorized-email-form" class="stack compact-form">
+              <label class="field">
+                <span>Email</span>
+                <input id="authorized-email-input" type="email" placeholder="name@example.com" required>
+              </label>
+              <label class="field">
+                <span>Note</span>
+                <input id="authorized-email-note" type="text" placeholder="Optional note">
+              </label>
+              <button class="primary-button" type="submit">Add Email</button>
+            </form>
+            <div class="list-shell" id="authorized-email-list"></div>
+          </section>
+        </section>
+
+        <section class="panel" id="users-panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Moderation</p>
+              <h2>Users</h2>
+            </div>
+          </div>
+          <div class="user-list" id="user-list"></div>
+        </section>
+
+        <section class="panel" id="events-panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Recent Activity</p>
+              <h2>Audit Feed</h2>
+            </div>
+          </div>
+          <div class="event-list" id="event-list"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="status-banner" id="status-banner" aria-live="polite"></div>
+</body>
+
+</html>

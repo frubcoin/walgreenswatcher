@@ -25,6 +25,7 @@ def _env_csv(name: str, default: str = "") -> List[str]:
 # App / Auth Configuration
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "change-me-in-production")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+ADMIN_PANEL_PASSWORD = os.getenv("ADMIN_PANEL_PASSWORD", "").strip()
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "walgreens_watcher_session")
 SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", False)
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")

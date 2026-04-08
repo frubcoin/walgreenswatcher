@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_POKEMON_BACKGROUND_ENABLED = False
 DEFAULT_POKEMON_BACKGROUND_THEME = "gyra"
 DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645
+DEFAULT_ADMIN_ALERT_NEW_USERS = True
+DEFAULT_ADMIN_ALERT_USER_ACTIONS = True
+
+
+def _normalize_email(email: Any) -> str:
+    return str(email or "").strip().lower()
 
 
 class StockDatabase:
@@ -53,6 +59,9 @@ class StockDatabase:
                     email TEXT NOT NULL,
                     name TEXT NOT NULL,
                     picture TEXT DEFAULT '',
+                    is_banned INTEGER NOT NULL DEFAULT 0,
+                    ban_reason TEXT NOT NULL DEFAULT '',
+                    banned_at TEXT DEFAULT '',
                     created_at TEXT NOT NULL,
                     last_login_at TEXT NOT NULL
                 );
@@ -100,7 +109,53 @@ class StockDatabase:
                     sample_minute TEXT PRIMARY KEY,
                     created_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS admin_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS authorized_google_emails (
+                    email TEXT PRIMARY KEY,
+                    note TEXT NOT NULL DEFAULT '',
+                    added_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS audit_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    actor_user_id INTEGER,
+                    target_user_id INTEGER,
+                    user_email TEXT NOT NULL DEFAULT '',
+                    summary TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY(actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                    FOREIGN KEY(target_user_id) REFERENCES users(id) ON DELETE SET NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_audit_events_created_at
+                    ON audit_events(created_at DESC);
                 """
+            )
+            self._ensure_column(
+                conn,
+                "users",
+                "is_banned",
+                "INTEGER NOT NULL DEFAULT 0",
+            )
+            self._ensure_column(
+                conn,
+                "users",
+                "ban_reason",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+            self._ensure_column(
+                conn,
+                "users",
+                "banned_at",
+                "TEXT DEFAULT ''",
             )
             self._ensure_column(
                 conn,
@@ -139,6 +194,15 @@ class StockDatabase:
         except (TypeError, ValueError):
             return fallback
 
+    @staticmethod
+    def _default_admin_settings() -> Dict[str, Any]:
+        return {
+            "google_allowlist_enabled": False,
+            "admin_webhook_destinations": [],
+            "alert_new_users": DEFAULT_ADMIN_ALERT_NEW_USERS,
+            "alert_user_actions": DEFAULT_ADMIN_ALERT_USER_ACTIONS,
+        }
+
     def _ensure_user_settings(self, conn: sqlite3.Connection, user_id: int) -> None:
         conn.execute(
             """
@@ -174,6 +238,7 @@ class StockDatabase:
         picture: str = "",
     ) -> Dict[str, Any]:
         timestamp = datetime.utcnow().isoformat()
+        normalized_email = _normalize_email(email)
 
         with self._connect() as conn:
             existing = conn.execute(
@@ -188,23 +253,37 @@ class StockDatabase:
                     SET email = ?, name = ?, picture = ?, last_login_at = ?
                     WHERE id = ?
                     """,
-                    (email, name, picture, timestamp, existing["id"]),
+                    (normalized_email, name, picture, timestamp, existing["id"]),
                 )
                 user_id = int(existing["id"])
+                is_new_user = False
             else:
                 cursor = conn.execute(
                     """
-                    INSERT INTO users (google_sub, email, name, picture, created_at, last_login_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (
+                        google_sub,
+                        email,
+                        name,
+                        picture,
+                        is_banned,
+                        ban_reason,
+                        banned_at,
+                        created_at,
+                        last_login_at
+                    )
+                    VALUES (?, ?, ?, ?, 0, '', '', ?, ?)
                     """,
-                    (google_sub, email, name, picture, timestamp, timestamp),
+                    (google_sub, normalized_email, name, picture, timestamp, timestamp),
                 )
                 user_id = int(cursor.lastrowid)
+                is_new_user = True
 
             self._ensure_user_settings(conn, user_id)
             row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
 
-        return self._row_to_dict(row) or {}
+        payload = self._row_to_dict(row) or {}
+        payload["is_new_user"] = is_new_user
+        return payload
 
     def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
         with self._connect() as conn:
@@ -495,6 +574,291 @@ class StockDatabase:
             "successful_checks": int((row["successful_checks"] or 0) if row else 0),
         }
 
+    def get_admin_settings(self) -> Dict[str, Any]:
+        defaults = self._default_admin_settings()
+        with self._connect() as conn:
+            rows = conn.execute("SELECT key, value FROM admin_settings").fetchall()
+
+        stored = {row["key"]: row["value"] for row in rows}
+        return {
+            "google_allowlist_enabled": bool(
+                self._decode_json(stored.get("google_allowlist_enabled"), defaults["google_allowlist_enabled"])
+            ),
+            "admin_webhook_destinations": self._decode_json(
+                stored.get("admin_webhook_destinations"),
+                defaults["admin_webhook_destinations"],
+            ),
+            "alert_new_users": bool(
+                self._decode_json(stored.get("alert_new_users"), defaults["alert_new_users"])
+            ),
+            "alert_user_actions": bool(
+                self._decode_json(stored.get("alert_user_actions"), defaults["alert_user_actions"])
+            ),
+        }
+
+    def update_admin_settings(self, updates: Dict[str, Any]) -> Dict[str, Any]:
+        if not updates:
+            return self.get_admin_settings()
+
+        current = self.get_admin_settings()
+        merged = {**current, **updates}
+        timestamp = datetime.utcnow().isoformat()
+        serializable = {
+            "google_allowlist_enabled": bool(merged.get("google_allowlist_enabled")),
+            "admin_webhook_destinations": list(merged.get("admin_webhook_destinations") or []),
+            "alert_new_users": bool(merged.get("alert_new_users", DEFAULT_ADMIN_ALERT_NEW_USERS)),
+            "alert_user_actions": bool(merged.get("alert_user_actions", DEFAULT_ADMIN_ALERT_USER_ACTIONS)),
+        }
+
+        with self._connect() as conn:
+            for key, value in serializable.items():
+                conn.execute(
+                    """
+                    INSERT INTO admin_settings (key, value, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(key) DO UPDATE
+                    SET value = excluded.value, updated_at = excluded.updated_at
+                    """,
+                    (key, json.dumps(value), timestamp),
+                )
+
+        return self.get_admin_settings()
+
+    def list_authorized_google_emails(self) -> List[Dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT email, note, added_at
+                FROM authorized_google_emails
+                ORDER BY email ASC
+                """
+            ).fetchall()
+
+        return [dict(row) for row in rows]
+
+    def add_authorized_google_email(self, email: str, note: str = "") -> Dict[str, Any]:
+        normalized_email = _normalize_email(email)
+        if not normalized_email:
+            raise ValueError("Authorized email is required")
+
+        timestamp = datetime.utcnow().isoformat()
+        normalized_note = str(note or "").strip()
+
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO authorized_google_emails (email, note, added_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(email) DO UPDATE
+                SET note = excluded.note
+                """,
+                (normalized_email, normalized_note, timestamp),
+            )
+            row = conn.execute(
+                "SELECT email, note, added_at FROM authorized_google_emails WHERE email = ?",
+                (normalized_email,),
+            ).fetchone()
+
+        return self._row_to_dict(row) or {}
+
+    def remove_authorized_google_email(self, email: str) -> bool:
+        normalized_email = _normalize_email(email)
+        if not normalized_email:
+            return False
+
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM authorized_google_emails WHERE email = ?",
+                (normalized_email,),
+            )
+
+        return cursor.rowcount > 0
+
+    def is_google_email_authorized(self, email: str) -> bool:
+        normalized_email = _normalize_email(email)
+        if not normalized_email:
+            return False
+
+        settings = self.get_admin_settings()
+        if not settings.get("google_allowlist_enabled"):
+            return True
+
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM authorized_google_emails WHERE email = ?",
+                (normalized_email,),
+            ).fetchone()
+        return row is not None
+
+    def set_user_banned_state(self, user_id: int, banned: bool, reason: str = "") -> Optional[Dict[str, Any]]:
+        timestamp = datetime.utcnow().isoformat() if banned else ""
+        normalized_reason = str(reason or "").strip() if banned else ""
+
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE users
+                SET is_banned = ?, ban_reason = ?, banned_at = ?
+                WHERE id = ?
+                """,
+                (int(bool(banned)), normalized_reason, timestamp, int(user_id)),
+            )
+            row = conn.execute("SELECT * FROM users WHERE id = ?", (int(user_id),)).fetchone()
+
+        return self._row_to_dict(row)
+
+    def list_users_for_admin(self) -> List[Dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    u.id,
+                    u.google_sub,
+                    u.email,
+                    u.name,
+                    u.picture,
+                    u.is_banned,
+                    u.ban_reason,
+                    u.banned_at,
+                    u.created_at,
+                    u.last_login_at,
+                    COALESCE(s.scheduler_enabled, 0) AS scheduler_enabled,
+                    COALESCE(s.current_zipcode, '') AS current_zipcode,
+                    COALESCE(s.check_interval_minutes, ?) AS check_interval_minutes,
+                    COUNT(DISTINCT p.article_id) AS tracked_product_count,
+                    COUNT(ch.id) AS total_checks,
+                    MAX(ch.timestamp) AS last_check,
+                    EXISTS(
+                        SELECT 1
+                        FROM authorized_google_emails a
+                        WHERE a.email = lower(trim(u.email))
+                    ) AS is_authorized_email
+                FROM users u
+                LEFT JOIN user_settings s ON s.user_id = u.id
+                LEFT JOIN tracked_products p ON p.user_id = u.id
+                LEFT JOIN check_history ch ON ch.user_id = u.id
+                GROUP BY
+                    u.id,
+                    u.google_sub,
+                    u.email,
+                    u.name,
+                    u.picture,
+                    u.is_banned,
+                    u.ban_reason,
+                    u.banned_at,
+                    u.created_at,
+                    u.last_login_at,
+                    s.scheduler_enabled,
+                    s.current_zipcode,
+                    s.check_interval_minutes
+                ORDER BY u.created_at DESC, u.id DESC
+                """,
+                (DEFAULT_CHECK_INTERVAL_MINUTES,),
+            ).fetchall()
+
+        users: List[Dict[str, Any]] = []
+        for row in rows:
+            entry = dict(row)
+            entry["is_banned"] = bool(entry.get("is_banned"))
+            entry["scheduler_enabled"] = bool(entry.get("scheduler_enabled"))
+            entry["tracked_product_count"] = int(entry.get("tracked_product_count") or 0)
+            entry["total_checks"] = int(entry.get("total_checks") or 0)
+            entry["check_interval_minutes"] = int(
+                entry.get("check_interval_minutes") or DEFAULT_CHECK_INTERVAL_MINUTES
+            )
+            entry["is_authorized_email"] = bool(entry.get("is_authorized_email"))
+            users.append(entry)
+        return users
+
+    def record_audit_event(
+        self,
+        event_type: str,
+        summary: str,
+        *,
+        actor_user_id: Optional[int] = None,
+        target_user_id: Optional[int] = None,
+        user_email: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        timestamp = datetime.utcnow().isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO audit_events (
+                    event_type,
+                    actor_user_id,
+                    target_user_id,
+                    user_email,
+                    summary,
+                    metadata_json,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(event_type or "").strip(),
+                    actor_user_id,
+                    target_user_id,
+                    _normalize_email(user_email),
+                    str(summary or "").strip(),
+                    json.dumps(metadata or {}),
+                    timestamp,
+                ),
+            )
+            row = conn.execute(
+                """
+                SELECT
+                    id,
+                    event_type,
+                    actor_user_id,
+                    target_user_id,
+                    user_email,
+                    summary,
+                    metadata_json,
+                    created_at
+                FROM audit_events
+                WHERE id = ?
+                """,
+                (int(cursor.lastrowid),),
+            ).fetchone()
+
+        event = self._row_to_dict(row) or {}
+        event["metadata"] = self._decode_json(event.pop("metadata_json", "{}"), {})
+        return event
+
+    def list_audit_events(self, limit: int = 100) -> List[Dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    e.id,
+                    e.event_type,
+                    e.actor_user_id,
+                    e.target_user_id,
+                    e.user_email,
+                    e.summary,
+                    e.metadata_json,
+                    e.created_at,
+                    actor.name AS actor_name,
+                    actor.email AS actor_email,
+                    target.name AS target_name,
+                    target.email AS target_email
+                FROM audit_events e
+                LEFT JOIN users actor ON actor.id = e.actor_user_id
+                LEFT JOIN users target ON target.id = e.target_user_id
+                ORDER BY e.created_at DESC, e.id DESC
+                LIMIT ?
+                """,
+                (max(1, int(limit)),),
+            ).fetchall()
+
+        events: List[Dict[str, Any]] = []
+        for row in rows:
+            event = dict(row)
+            event["metadata"] = self._decode_json(event.pop("metadata_json", "{}"), {})
+            events.append(event)
+        return events
+
     def record_service_heartbeat(self, timestamp: Optional[datetime] = None) -> None:
         heartbeat_time = timestamp or datetime.utcnow()
         sample_minute = heartbeat_time.replace(second=0, microsecond=0)
@@ -575,8 +939,9 @@ class StockDatabase:
                 FROM users u
                 JOIN user_settings s ON s.user_id = u.id
                 WHERE s.scheduler_enabled = 1
+                  AND COALESCE(u.is_banned, 0) = 0
                 ORDER BY u.id ASC
                 """
             ).fetchall()
 
-        return [dict(row) for row in rows]
+        return [dict(row) for row in rows if self.is_google_email_authorized(str(row["email"] or ""))]
