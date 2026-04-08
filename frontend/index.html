@@ -9828,15 +9828,12 @@
       });
 
       if (shouldOpenFocusedLocation && focusLocationKey) {
-        const shouldAnimateFocus = Boolean(previousActiveLocationKey);
         resultsMap?.whenReady?.(() => {
           window.requestAnimationFrame(() => {
             window.requestAnimationFrame(() => {
-              focusResultsMapMarker(focusLocationKey, {
-                animate: shouldAnimateFocus,
-                scrollIntoView: false,
-                duration: shouldAnimateFocus ? 0.8 : 0
-              });
+              const matchingItem = Array.from(document.querySelectorAll('#results-view-map .results-map-item'))
+                .find(item => item?.dataset?.locationKey === focusLocationKey);
+              matchingItem?.click();
             });
           });
         });
