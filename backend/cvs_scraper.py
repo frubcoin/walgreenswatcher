@@ -205,6 +205,10 @@ class CvsStockChecker:
             locations = response.get("atgResponse")
         return isinstance(locations, list)
 
+    @staticmethod
+    def _is_access_denied_response(status_code: int, snippet: str) -> bool:
+        return int(status_code or 0) == 403 and "access denied" in str(snippet or "").lower()
+
     def _fetch_inventory_payload(self, product: Dict[str, Any], zip_code: str) -> Dict[str, Any]:
         product_id = str(
             product.get("product_id")
@@ -250,6 +254,18 @@ class CvsStockChecker:
                                 data = response.json()
                             except ValueError:
                                 snippet = response.text[:200].replace("\n", " ")
+                                if self._is_access_denied_response(response.status_code, snippet):
+                                    logger.warning(
+                                        "CVS inventory blocked at edge for %s: HTTP %s %s",
+                                        inventory_url,
+                                        response.status_code,
+                                        snippet,
+                                    )
+                                    raise ValueError(
+                                        "CVS blocked this server or IP from the inventory API "
+                                        "(HTTP 403 Access Denied). The request shape matches the browser, "
+                                        "but CVS is rejecting this host before the API can respond."
+                                    )
                                 failures.append(f"{inventory_url} HTTP {response.status_code}: {snippet}")
                                 logger.warning(
                                     "CVS inventory non-JSON response from %s: HTTP %s %s",
