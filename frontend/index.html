@@ -10533,22 +10533,6 @@
       }
     });
 
-    document.addEventListener('change', event => {
-      if (!(event.target instanceof HTMLSelectElement)) return;
-      if (event.target.id !== 'results-map-product-filter') return;
-
-      currentResultsMapProductFilter = String(event.target.value || '').trim();
-      if (latestRenderedResults && currentTab === 'results') {
-        const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
-        const filteredLocations = getFilteredResultsMapLocations(mapData.locations);
-        syncResultsMapSidebar(mapData);
-
-        if (currentResultsView === 'map') {
-          rerenderResultsMapForFilteredLocations(filteredLocations);
-        }
-      }
-    });
-
     document.addEventListener('click', async event => {
       const actionElement = event.target instanceof Element ? event.target.closest('[data-action]') : null;
       if (actionElement) {
@@ -10593,6 +10577,19 @@
         onboardingMapAddressHighlightedIndex = -1;
         setOnboardingMapAddressStatus('Type at least 3 characters for address suggestions.');
         syncOnboardingMapAddressUi();
+      }
+
+      if (
+        resultsMapProductMenuOpen &&
+        event.target instanceof Element &&
+        !event.target.closest('.results-map-filter-row') &&
+        !event.target.closest('.results-map-filter-btn')
+      ) {
+        resultsMapProductMenuOpen = false;
+        if (latestRenderedResults && currentTab === 'results' && currentResultsView === 'map') {
+          const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
+          syncResultsMapSidebar(mapData);
+        }
       }
 
       const onboardingModal = document.getElementById('onboarding-modal');
