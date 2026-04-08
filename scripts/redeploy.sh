@@ -86,7 +86,17 @@ run_as_app_user() {
 }
 
 cleanup_python_artifacts() {
+  local target_user="${1:-}"
+
   log "Cleaning Python cache artifacts"
+  if [[ -n "$target_user" && "$(id -un)" != "$target_user" ]]; then
+    run_as_app_user "$target_user" find "$APP_DIR" \
+      \( -path "$APP_DIR/.git" -o -path "$APP_DIR/.venv" -o -path "$APP_DIR/node_modules" -o -path "$APP_DIR/backend/crawlee/node_modules" \) -prune \
+      -o \( -type d -name "__pycache__" -print -exec rm -rf {} + \) \
+      -o \( -type f \( -name "*.pyc" -o -name "*.pyo" \) -print -delete \)
+    return
+  fi
+
   find "$APP_DIR" \
     \( -path "$APP_DIR/.git" -o -path "$APP_DIR/.venv" -o -path "$APP_DIR/node_modules" -o -path "$APP_DIR/backend/crawlee/node_modules" \) -prune \
     -o \( -type d -name "__pycache__" -print -exec rm -rf {} + \) \
@@ -180,13 +190,15 @@ main() {
   git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
   run_as_app_user "$target_user" git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
 
+  cleanup_python_artifacts "$target_user"
+
   log "Fetching latest refs"
   run_as_app_user "$target_user" git -C "$APP_DIR" fetch --prune
 
   log "Pulling latest code"
   run_as_app_user "$target_user" git -C "$APP_DIR" pull --ff-only
 
-  cleanup_python_artifacts
+  cleanup_python_artifacts "$target_user"
 
   local python_bin
   python_bin="$(find_python)"
