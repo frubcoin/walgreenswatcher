@@ -346,13 +346,15 @@
     .app-window {
       margin-top: 18px;
       padding: 0 22px 28px;
-      background: rgba(18, 20, 22, 0.88);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(rgba(18, 20, 22, 0.88), rgba(18, 20, 22, 0.88)) padding-box, 
+                  linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.01)) border-box;
+      background-clip: padding-box, border-box;
+      border: 1px solid transparent;
       border-radius: 18px;
-      box-shadow:
-        0 24px 64px rgba(0, 0, 0, 0.5),
-        inset 0 1px 0 rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(28px);
+      box-shadow: 
+        8px 32px 64px rgba(0, 0, 0, 0.5),
+        inset 1px 1px 0 rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
       overflow: hidden;
     }
 
@@ -436,19 +438,20 @@
       isolation: isolate;
       margin-top: 18px;
       padding: 0;
-      background-color: #1f2327;
       background-image:
-        linear-gradient(180deg, rgba(16, 18, 22, 0.32), rgba(10, 12, 15, 0.5)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02)) border-box,
+        linear-gradient(180deg, rgba(16, 18, 22, 0.2), rgba(10, 12, 15, 0.4)) padding-box,
         var(--auth-window-background-image);
-      background-position: center, center;
-      background-repeat: no-repeat, no-repeat;
-      background-size: cover, cover;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background-clip: border-box, padding-box, padding-box;
+      background-position: center, center, center;
+      background-repeat: no-repeat, no-repeat, no-repeat;
+      background-size: cover, cover, cover;
+      border: 1px solid transparent;
       border-radius: 22px;
-      box-shadow:
-        0 24px 64px rgba(0, 0, 0, 0.5),
-        inset 0 1px 0 rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(24px) saturate(1.2);
+      box-shadow: 
+        12px 36px 72px rgba(0, 0, 0, 0.5),
+        inset 1px 1px 0 rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(16px) saturate(1.2);
       overflow: hidden;
     }
 
@@ -746,11 +749,12 @@
       gap: 18px;
       padding: 24px;
       border-radius: 18px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.02),
-        0 10px 40px rgba(0, 0, 0, 0.2);
+      background: linear-gradient(rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01)) padding-box,
+                  linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.01)) border-box;
+      border: 1px solid transparent;
+      box-shadow: 
+        inset 1px 1px 0 rgba(255, 255, 255, 0.02),
+        0 12px 48px rgba(0, 0, 0, 0.2);
     }
 
     .auth-panel-title {
