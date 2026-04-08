@@ -37,6 +37,15 @@ function formatPercent(value) {
   return `${numeric.toFixed(1)}%`;
 }
 
+function formatInterval(value) {
+  const minutes = Math.max(1, Number(value || 0));
+  if (minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return hours === 1 ? 'Every 1 hour' : `Every ${hours} hours`;
+  }
+  return `Every ${minutes} min`;
+}
+
 function showBanner(message, tone = 'info') {
   window.clearTimeout(bannerTimer);
   statusBanner.textContent = message;
@@ -308,7 +317,8 @@ function filterUsers(users) {
       user.name,
       user.email,
       user.current_zipcode,
-      user.ban_reason
+      user.ban_reason,
+      ...(user.tracked_product_names || [])
     ].join(' ').toLowerCase().includes(search));
   }
 
@@ -329,6 +339,7 @@ function renderUsers(users) {
         <div class="user-title">
           <strong>${escapeHtml(user.name || user.email)}</strong>
           <div class="user-meta">${escapeHtml(user.email)} | Joined ${escapeHtml(formatDateTime(user.created_at))} | Last login ${escapeHtml(formatDateTime(user.last_login_at))}</div>
+          <div class="user-meta">Monitor cadence: ${escapeHtml(formatInterval(user.check_interval_minutes || 60))}</div>
         </div>
         <div class="tag-row">
           <span class="chip ${user.is_banned ? 'chip-danger' : 'chip-success'}">${user.is_banned ? 'Banned' : 'Active'}</span>
@@ -342,8 +353,18 @@ function renderUsers(users) {
         <div class="user-stat"><strong>${escapeHtml(String(user.tracked_product_count || 0))}</strong><span>Tracked products</span></div>
         <div class="user-stat"><strong>${escapeHtml(String(user.total_checks || 0))}</strong><span>Total checks</span></div>
         <div class="user-stat"><strong>${escapeHtml(user.current_zipcode || 'None')}</strong><span>ZIP code</span></div>
-        <div class="user-stat"><strong>${escapeHtml(String(user.check_interval_minutes || 0))}m</strong><span>Check interval</span></div>
+        <div class="user-stat"><strong>${escapeHtml(formatInterval(user.check_interval_minutes || 60))}</strong><span>Check interval</span></div>
         <div class="user-stat"><strong>${escapeHtml(formatDateTime(user.last_check))}</strong><span>Last check</span></div>
+      </div>
+
+      <div class="user-products-block">
+        <div class="user-products-head">
+          <strong>Tracked products</strong>
+          <span>${escapeHtml(String(user.tracked_product_count || 0))}</span>
+        </div>
+        ${user.tracked_product_names?.length
+          ? `<div class="user-products-list">${user.tracked_product_names.map(name => `<span class="meta-tag">${escapeHtml(name)}</span>`).join('')}</div>`
+          : '<div class="user-products-empty">No tracked products yet.</div>'}
       </div>
 
       ${user.ban_reason ? `<div class="user-meta">Ban reason: ${escapeHtml(user.ban_reason)}</div>` : ''}

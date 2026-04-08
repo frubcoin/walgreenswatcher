@@ -719,9 +719,33 @@ class StockDatabase:
                     COALESCE(s.scheduler_enabled, 0) AS scheduler_enabled,
                     COALESCE(s.current_zipcode, '') AS current_zipcode,
                     COALESCE(s.check_interval_minutes, ?) AS check_interval_minutes,
-                    COUNT(DISTINCT p.article_id) AS tracked_product_count,
-                    COUNT(ch.id) AS total_checks,
-                    MAX(ch.timestamp) AS last_check,
+                    (
+                        SELECT COUNT(DISTINCT tp.article_id)
+                        FROM tracked_products tp
+                        WHERE tp.user_id = u.id
+                    ) AS tracked_product_count,
+                    COALESCE(
+                        (
+                            SELECT GROUP_CONCAT(product_name, '||')
+                            FROM (
+                                SELECT DISTINCT COALESCE(NULLIF(TRIM(tp.name), ''), tp.article_id) AS product_name
+                                FROM tracked_products tp
+                                WHERE tp.user_id = u.id
+                                ORDER BY tp.created_at DESC, tp.article_id DESC
+                            )
+                        ),
+                        ''
+                    ) AS tracked_product_names,
+                    (
+                        SELECT COUNT(*)
+                        FROM check_history ch
+                        WHERE ch.user_id = u.id
+                    ) AS total_checks,
+                    (
+                        SELECT MAX(ch.timestamp)
+                        FROM check_history ch
+                        WHERE ch.user_id = u.id
+                    ) AS last_check,
                     EXISTS(
                         SELECT 1
                         FROM authorized_google_emails a
@@ -729,8 +753,6 @@ class StockDatabase:
                     ) AS is_authorized_email
                 FROM users u
                 LEFT JOIN user_settings s ON s.user_id = u.id
-                LEFT JOIN tracked_products p ON p.user_id = u.id
-                LEFT JOIN check_history ch ON ch.user_id = u.id
                 GROUP BY
                     u.id,
                     u.google_sub,
@@ -756,6 +778,11 @@ class StockDatabase:
             entry["is_banned"] = bool(entry.get("is_banned"))
             entry["scheduler_enabled"] = bool(entry.get("scheduler_enabled"))
             entry["tracked_product_count"] = int(entry.get("tracked_product_count") or 0)
+            entry["tracked_product_names"] = [
+                value.strip()
+                for value in str(entry.get("tracked_product_names") or "").split("||")
+                if value.strip()
+            ]
             entry["total_checks"] = int(entry.get("total_checks") or 0)
             entry["check_interval_minutes"] = int(
                 entry.get("check_interval_minutes") or DEFAULT_CHECK_INTERVAL_MINUTES
