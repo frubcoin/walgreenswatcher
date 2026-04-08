@@ -4922,6 +4922,18 @@
             <input type="number" class="form-input" id="cfg-interval" min="1" max="1440" step="1" placeholder="60">
             <span class="form-hint">Minutes between automatic checks</span>
           </div>
+          <div class="form-group">
+            <label class="form-label">Install App</label>
+            <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
+              <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
+                <path
+                  d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
+              </svg>
+              Install App
+            </button>
+            <span class="form-hint install-app-copy" hidden>Install the dashboard for faster access from your desktop or
+              home screen.</span>
+          </div>
         </div>
 
         <h2
@@ -4958,18 +4970,6 @@
             <input type="range" class="form-input" id="cfg-pokemon-bg-size" min="200" max="1200" step="5" value="645">
             <span class="form-hint">Adjust how large each repeating tile appears. <span
                 id="cfg-pokemon-bg-size-value">645px</span></span>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Install App</label>
-            <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
-              <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
-                <path
-                  d="M320-120v-80H160q-33 0-56.5-23.5T80-280v-480q0-33 23.5-56.5T160-840h320v80H160v480h640v-120h80v120q0 33-23.5 56.5T800-200H640v80H320Zm360-280L480-600l56-56 104 103v-287h80v287l104-103 56 56-200 200Z" />
-              </svg>
-              Install App
-            </button>
-            <span class="form-hint install-app-copy" hidden>Install the dashboard for faster access from your desktop or
-              home screen.</span>
           </div>
         </div>
 
@@ -5087,6 +5087,8 @@
     let currentUser = null;
     let authState = null;
     let statusRefreshTimer = null;
+    let authStateRefreshTimer = null;
+    let authSessionRefreshInFlight = false;
     let googleButtonRendered = false;
     let latestStatusSnapshot = null;
     let onboardingStepIndex = 0;
@@ -5518,6 +5520,47 @@
         clearInterval(statusRefreshTimer);
         statusRefreshTimer = null;
       }
+    }
+
+    function stopAuthStatePolling() {
+      if (authStateRefreshTimer) {
+        clearInterval(authStateRefreshTimer);
+        authStateRefreshTimer = null;
+      }
+    }
+
+    async function refreshWaitlistAuthState() {
+      if (authSessionRefreshInFlight) return;
+      if (currentUser || authState?.access_state !== 'waitlisted') {
+        stopAuthStatePolling();
+        return;
+      }
+
+      authSessionRefreshInFlight = true;
+      try {
+        const sessionPayload = await apiCall('/api/auth/session', 'GET', null, {
+          allowUnauthorized: true,
+          suppressAuthRedirect: true,
+          silent: true
+        });
+        if (!sessionPayload) return;
+
+        const wasWaitlisted = authState?.access_state === 'waitlisted';
+        const isApprovedNow = Boolean(sessionPayload?.authenticated && sessionPayload?.user);
+        await hydrateAuthenticatedSession(sessionPayload);
+        if (wasWaitlisted && isApprovedNow) {
+          showToast('Approval received. Welcome in.', 'success');
+        }
+      } finally {
+        authSessionRefreshInFlight = false;
+      }
+    }
+
+    function startAuthStatePolling() {
+      stopAuthStatePolling();
+      authStateRefreshTimer = setInterval(() => {
+        refreshWaitlistAuthState();
+      }, 5000);
     }
 
     function startStatusPolling() {
@@ -6319,6 +6362,11 @@
       if (!currentUser) {
         setBootLoaderPreference(false);
         stopStatusPolling();
+        if (isWaitlisted) {
+          startAuthStatePolling();
+        } else {
+          stopAuthStatePolling();
+        }
         setAuthenticatedUi(false);
         setAuthGateMode(isWaitlisted ? 'waitlist' : 'signin', payload);
         refreshPublicStatsForLogin();
@@ -6340,6 +6388,7 @@
       }
 
       setBootLoaderPreference(true);
+      stopAuthStatePolling();
       setAuthenticatedUi(true);
       setAuthGateMode('signin');
       updateAuthStatus('');
@@ -6360,6 +6409,7 @@
       latestStatusSnapshot = null;
       setBootLoaderPreference(false);
       stopStatusPolling();
+      stopAuthStatePolling();
       closeOnboarding(false);
       resetOnboardingSessionState();
       localStorage.removeItem('cached_api_status');
@@ -7977,6 +8027,7 @@
             currentUser = null;
             authState = null;
             stopStatusPolling();
+            stopAuthStatePolling();
             updateCurrentUserDisplay(null);
             setAuthenticatedUi(false);
             const sessionPayload = await apiCall('/api/auth/session', 'GET', null, {
