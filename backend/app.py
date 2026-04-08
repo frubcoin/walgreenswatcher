@@ -371,6 +371,29 @@ def _public_admin_payload() -> Dict[str, Any]:
     }
 
 
+def _logout_response() -> Response:
+    response = jsonify({"success": True})
+    # Expire both the current session cookie and any legacy host-only variant.
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        path="/",
+        secure=SESSION_COOKIE_SECURE,
+        samesite=SESSION_COOKIE_SAMESITE,
+        httponly=True,
+    )
+    if SESSION_COOKIE_DOMAIN:
+        response.delete_cookie(
+            SESSION_COOKIE_NAME,
+            path="/",
+            domain=SESSION_COOKIE_DOMAIN,
+            secure=SESSION_COOKIE_SECURE,
+            samesite=SESSION_COOKIE_SAMESITE,
+            httponly=True,
+        )
+    response.headers["Clear-Site-Data"] = '"cookies", "storage"'
+    return response
+
+
 def _stop_user_scheduler_if_running(user_id: int) -> None:
     scheduler = scheduler_manager.get_or_create(int(user_id))
     if scheduler.is_running:
@@ -554,7 +577,7 @@ def logout():
             alert_category="user_action",
         )
     session.clear()
-    return jsonify({"success": True})
+    return _logout_response()
 
 
 @app.route("/api/admin/session", methods=["GET"])
