@@ -7975,7 +7975,11 @@
         bounds.push([mapDistanceReference.latitude, mapDistanceReference.longitude]);
       }
 
-      if (bounds.length === 1) {
+      if (mapDistanceReference) {
+        resultsMap.setView([mapDistanceReference.latitude, mapDistanceReference.longitude], 14);
+      } else if (locations.length) {
+        resultsMap.setView([locations[0].latitude, locations[0].longitude], 14);
+      } else if (bounds.length === 1) {
         resultsMap.setView(bounds[0], 13);
       } else if (bounds.length > 1) {
         resultsMap.fitBounds(bounds, { padding: [32, 32] });
