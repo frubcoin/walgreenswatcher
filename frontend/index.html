@@ -4956,21 +4956,26 @@
       }
 
       body:not(.auth-gate-active) .site-footer {
-        position: static;
+        position: static !important;
         left: auto;
         right: auto;
-        top: auto;
-        bottom: auto;
+        top: auto !important;
+        bottom: auto !important;
         width: auto;
         margin: 20px 14px 0;
         padding: 14px 0 0;
-        transform: none;
+        transform: none !important;
         justify-content: center;
         gap: 10px;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
         text-align: center;
         font-size: 10px;
         letter-spacing: 0.05em;
+      }
+
+      body:not(.auth-gate-active) .wrapper {
+        min-height: auto !important;
+        padding-bottom: 0 !important;
       }
 
       body:not(.auth-gate-active) .site-footer>span[aria-hidden="true"] {
