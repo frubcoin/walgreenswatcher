@@ -7832,6 +7832,7 @@
 
       Object.values(products || {}).forEach(product => {
         const productName = String(product.product_name || 'Tracked product').trim();
+        const productSourceUrl = sanitizeProductSourceUrl(product.source_url || '');
         const stores = Array.isArray(product.stores) ? product.stores : [];
 
         stores.forEach(store => {
@@ -7863,6 +7864,7 @@
           location.total_inventory += Number.isFinite(inventoryCount) ? inventoryCount : 0;
           location.products.push({
             name: productName,
+            source_url: productSourceUrl,
             inventory_count: Number.isFinite(inventoryCount) ? inventoryCount : 0
           });
         });
@@ -8001,7 +8003,10 @@
 
     function renderMapPopup(location) {
       const productsHtml = location.products.map(product => `
-          <div>${escapeHtml(product.name)} <strong>${Number(product.inventory_count || 0)}</strong></div>
+          <div>${product.source_url
+          ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
+          : escapeHtml(product.name)
+        } <strong>${Number(product.inventory_count || 0)}</strong></div>
         `).join('');
 
       return `
