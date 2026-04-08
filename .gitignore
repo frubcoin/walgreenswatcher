@@ -16,3 +16,5 @@ backend/decodo_cvs_test.py
 backend/decodo_cvs_inventory_test.py
 backend/decodo_cvs_inventory_sweep.py
 backend/cvs_inventory_spider.py
+/backend/crawlee
+package.json
