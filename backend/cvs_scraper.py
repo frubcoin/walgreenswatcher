@@ -42,6 +42,10 @@ CVS_BROWSER_SEC_CH_UA_MOBILE = "?0"
 CVS_BROWSER_SEC_CH_UA_PLATFORM = '"Windows"'
 
 
+class CvsBlockedError(ValueError):
+    """Raised when CVS edge blocks every configured route."""
+
+
 class CvsStockChecker:
     """Check CVS local inventory using the PDP inventory service."""
 
@@ -52,6 +56,7 @@ class CvsStockChecker:
     def __init__(self) -> None:
         self.progress_callback = None
         self.current_zip_code = TARGET_ZIP_CODE
+        self._blocked_until_by_product: Dict[str, float] = {}
 
     def _emit_progress(self, progress_info: Dict[str, Any]) -> None:
         if self.progress_callback:
@@ -185,6 +190,32 @@ class CvsStockChecker:
         return None
 
     @staticmethod
+    def _env_bool(name: str, default: bool = False) -> bool:
+        value = os.getenv(name)
+        if value is None:
+            return default
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _zendriver_user_data_dir() -> str | None:
+        configured = os.getenv("CVS_ZENDRIVER_USER_DATA_DIR", "").strip()
+        if not configured:
+            return None
+        os.makedirs(configured, exist_ok=True)
+        return configured
+
+    @staticmethod
+    def _blocked_cooldown_seconds() -> int:
+        raw = os.getenv("CVS_BLOCK_COOLDOWN_MINUTES", "").strip()
+        if not raw:
+            return 30 * 60
+        try:
+            minutes = int(raw)
+        except ValueError:
+            return 30 * 60
+        return max(0, minutes) * 60
+
+    @staticmethod
     def _run_async(coro: Any) -> Any:
         try:
             asyncio.get_running_loop()
@@ -233,6 +264,10 @@ class CvsStockChecker:
         browser_executable_path = cls._zendriver_browser_executable_path()
         if browser_executable_path:
             browser_kwargs["browser_executable_path"] = browser_executable_path
+        user_data_dir = cls._zendriver_user_data_dir()
+        if user_data_dir:
+            browser_kwargs["user_data_dir"] = user_data_dir
+            logger.info("CVS zendriver using persistent user data dir: %s", user_data_dir)
 
         browser = await zd.start(**browser_kwargs)
         try:
@@ -434,10 +469,19 @@ class CvsStockChecker:
         ).strip()
         if not product_id:
             raise ValueError("CVS products require a numeric product id")
+        blocked_until = float(self._blocked_until_by_product.get(product_id, 0))
+        now = time.time()
+        if blocked_until > now:
+            remaining_seconds = int(blocked_until - now)
+            raise CvsBlockedError(
+                "CVS inventory temporarily paused after edge blocking "
+                f"(retry in ~{max(1, remaining_seconds // 60)} minute(s))"
+            )
 
         failures: List[str] = []
         referer = str(product.get("source_url", "")).strip() or "https://www.cvs.com/"
         api_key_candidates = list(dict.fromkeys(key for key in (CVS_INVENTORY_PUBLIC_API_KEY,) if key))
+        browser_only_mode = self._env_bool("CVS_BROWSER_ONLY_MODE", False)
 
         if api_key_candidates:
             try:
@@ -451,6 +495,14 @@ class CvsStockChecker:
             except Exception as exc:
                 failures.append(f"zendriver browser context {type(exc).__name__}: {exc}")
                 logger.warning("CVS zendriver inventory attempt failed: %s", exc)
+                if browser_only_mode:
+                    if "HTTP 403" in str(exc):
+                        cooldown_seconds = self._blocked_cooldown_seconds()
+                        if cooldown_seconds > 0:
+                            self._blocked_until_by_product[product_id] = time.time() + cooldown_seconds
+                    raise CvsBlockedError(
+                        "CVS browser-context inventory fetch failed while CVS_BROWSER_ONLY_MODE is enabled"
+                    ) from exc
 
         proxy_candidates = self._proxy_candidates()
         if proxy_candidates:
@@ -558,7 +610,10 @@ class CvsStockChecker:
             for proxy_url in proxy_candidates
         ]
         if unique_blocked_routes and len(unique_blocked_routes) == len(set(attempted_route_labels)):
-            raise ValueError(
+            cooldown_seconds = self._blocked_cooldown_seconds()
+            if cooldown_seconds > 0:
+                self._blocked_until_by_product[product_id] = time.time() + cooldown_seconds
+            raise CvsBlockedError(
                 "CVS blocked every configured route from the inventory API "
                 f"(HTTP 403 Access Denied): {', '.join(unique_blocked_routes)}"
             )
