@@ -1717,6 +1717,81 @@
       color: var(--text-primary);
     }
 
+    .onboarding-trending-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .onboarding-trending-item {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .onboarding-trending-item.is-selected {
+      border-color: rgba(72, 156, 212, 0.42);
+      background: rgba(72, 156, 212, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(72, 156, 212, 0.16);
+    }
+
+    .onboarding-trending-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: grid;
+      place-items: center;
+    }
+
+    .onboarding-trending-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .onboarding-trending-body {
+      min-width: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .onboarding-trending-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .onboarding-trending-name {
+      color: var(--text-primary);
+      font-size: 18px;
+      line-height: 1.15;
+      font-weight: 700;
+    }
+
+    .onboarding-trending-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .onboarding-trending-empty {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
     .onboarding-actions {
       display: flex;
       flex-wrap: wrap;
@@ -6880,10 +6955,10 @@
         {
           tag: 'Products',
           title: 'Add the first product you want watched.',
-          copy: 'Paste one supported product link and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
+          copy: 'Pick a community suggestion or paste one supported product link and the app will resolve the product metadata for you. This gets your account out of demo mode immediately.',
           calloutTitle: 'Add at least one tracked item',
           bullets: [
-            'Paste a supported product page URL.',
+            'Choose a community suggestion or paste a supported product page URL.',
             'Use a custom name if you want cleaner Discord labels.',
             `You currently have ${trackedCount} tracked product${trackedCount === 1 ? '' : 's'} saved.`
           ],
@@ -6896,6 +6971,7 @@
           renderForm: () => `
               <div class="onboarding-form-card">
                 <div class="onboarding-form-card-title">First tracked product</div>
+                <div class="onboarding-form-card-copy">If one of the recent community picks matches what you want, use it to prefill the fields below and keep moving.</div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-url">Product URL</label>
                   <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a product link" value="${escapeHtml(draft.productUrl)}">
@@ -6904,6 +6980,10 @@
                   <label class="form-label" for="onboarding-product-name">Custom Name</label>
                   <input type="text" class="form-input" id="onboarding-product-name" maxlength="160" placeholder="Optional custom name" value="${escapeHtml(draft.productName)}">
                   <span class="form-hint">Optional, but useful if the retailer title is messy.</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Trending Suggestions</label>
+                  ${renderOnboardingTrendingSuggestions(draft)}
                 </div>
               </div>
             `,
@@ -7257,6 +7337,29 @@
       latestStatusSnapshot = await loadStatus();
       setOnboardingFeedback(`Added ${customName || resolved.name}.`, 'success');
       return true;
+    }
+
+    function useOnboardingTrendingProduct(sourceElement) {
+      syncOnboardingDraftFromCurrentStep();
+      const product = getTrendingProductFromElement(sourceElement);
+      if (!product) {
+        setOnboardingFeedback('That community suggestion is no longer available. Try another one.', 'error');
+        renderOnboarding();
+        return;
+      }
+
+      const sourceUrl = sanitizeProductSourceUrl(product.source_url || '');
+      if (!sourceUrl) {
+        setOnboardingFeedback('That suggestion no longer has a usable product link.', 'error');
+        renderOnboarding();
+        return;
+      }
+
+      const draft = ensureOnboardingDraft();
+      draft.productUrl = sourceUrl;
+      draft.productName = String(product.name || '').trim();
+      setOnboardingFeedback(`Selected ${product.name || 'that product'}. You can rename it before continuing.`, 'success');
+      renderOnboarding();
     }
 
     async function finishOnboardingLaunch() {
@@ -7727,6 +7830,65 @@
       if (copy) {
         copy.textContent = `Recently tracked community links from the last ${normalizedHours} hours. Add any of them straight to your monitor without pasting the URL again.`;
       }
+    }
+
+    function getOnboardingTrendingSuggestions(limit = 4) {
+      return trendingProductsCache
+        .filter(product => Boolean(sanitizeProductSourceUrl(product?.source_url || '')))
+        .slice(0, Math.max(1, Number(limit) || 4));
+    }
+
+    function renderOnboardingTrendingSuggestions(draft = ensureOnboardingDraft(), limit = 4) {
+      const suggestions = getOnboardingTrendingSuggestions(limit);
+      if (!suggestions.length) {
+        return `<div class="onboarding-trending-empty">No community suggestions are ready yet. Paste any supported product URL to keep moving.</div>`;
+      }
+
+      return `
+        <div class="onboarding-trending-list">
+          ${suggestions.map(product => {
+            const safeId = escapeHtml(product.id || '');
+            const safeRetailer = escapeHtml(retailerKey(product.retailer));
+            const safeRetailerLabel = escapeHtml(retailerLabel(product.retailer));
+            const safeRetailerIcon = escapeHtml(retailerIconPath(product.retailer));
+            const safeName = escapeHtml(product.name || 'Unnamed product');
+            const safeSourceUrl = sanitizeProductSourceUrl(product.source_url || '');
+            const safeImageUrl = sanitizeProductImageUrl(product.image_url || '');
+            const trackedByCount = Math.max(0, Number(product.tracked_by_count || 0));
+            const watcherLabel = `${trackedByCount} watcher${trackedByCount === 1 ? '' : 's'}`;
+            const lastTrackedDate = parseApiTimestamp(product.last_tracked_at);
+            const lastTrackedLabel = lastTrackedDate ? formatRelativeDuration(lastTrackedDate) : 'Recently tracked';
+            const isTracked = Boolean(product.is_tracked_by_user);
+            const isSelected = draft.productUrl.trim() === safeSourceUrl;
+
+            return `
+              <div class="onboarding-trending-item ${isSelected ? 'is-selected' : ''} trending-product-item" data-product-id="${safeId}" data-retailer="${safeRetailer}">
+                <div class="onboarding-trending-thumb">
+                  ${safeImageUrl
+                ? `<img src="${escapeHtml(safeImageUrl)}" alt="${safeName}">`
+                : `<img class="trending-product-thumb-fallback" src="${safeRetailerIcon}" alt="${safeRetailerLabel}">`
+              }
+                </div>
+                <div class="onboarding-trending-body">
+                  <div class="onboarding-trending-meta">
+                    <span class="trending-product-retailer">
+                      <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailerLabel}" title="${safeRetailerLabel}">
+                      <span>${safeRetailerLabel}</span>
+                    </span>
+                    <span class="trending-product-chip">${escapeHtml(watcherLabel)}</span>
+                    <span>${escapeHtml(lastTrackedLabel)}</span>
+                  </div>
+                  <div class="onboarding-trending-name">${safeName}</div>
+                  <div class="onboarding-trending-actions">
+                    <a class="result-card-link trending-product-link" href="${escapeHtml(safeSourceUrl)}" target="_blank" rel="noopener noreferrer">Open Link</a>
+                    <button class="btn btn-primary btn-sm trending-product-add-btn" type="button" data-action="use-onboarding-trending-product"${isTracked ? ' disabled' : ''}>${isTracked ? 'Already Tracking' : (isSelected ? 'Selected' : 'Use Suggestion')}</button>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
     }
 
     function renderTrendingProducts(products = trendingProductsCache, retentionHours = trendingRetentionHours) {
@@ -8967,6 +9129,9 @@
           return;
         case 'select-onboarding-map-address-suggestion':
           selectOnboardingMapAddressSuggestionByIndex(Number(actionElement.dataset.suggestionIndex || -1));
+          return;
+        case 'use-onboarding-trending-product':
+          useOnboardingTrendingProduct(actionElement);
           return;
         case 'show-my-location':
           await handleShowMyLocation();
