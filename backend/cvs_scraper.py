@@ -342,8 +342,12 @@ class CvsStockChecker:
             finally:
                 session.close()
 
-        if blocked_routes:
-            unique_blocked_routes = list(dict.fromkeys(blocked_routes))
+        unique_blocked_routes = list(dict.fromkeys(blocked_routes))
+        attempted_route_labels = [
+            self._proxy_label(proxy_url) if proxy_url else "direct server IP"
+            for proxy_url in proxy_candidates
+        ]
+        if unique_blocked_routes and len(unique_blocked_routes) == len(set(attempted_route_labels)):
             raise ValueError(
                 "CVS blocked every configured route from the inventory API "
                 f"(HTTP 403 Access Denied): {', '.join(unique_blocked_routes)}"

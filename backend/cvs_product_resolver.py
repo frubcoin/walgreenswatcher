@@ -7,8 +7,8 @@ import logging
 import random
 import re
 from html import unescape
-from typing import Any, Dict
-from urllib.parse import unquote, urlparse
+from typing import Any, Dict, List
+from urllib.parse import unquote, urlparse, urlsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -17,7 +17,7 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
 
-from config import CVS_PROXY_URL, USER_AGENTS
+from config import CVS_PROXY_URLS, USER_AGENTS
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +37,30 @@ class CvsProductResolver:
     """Resolve CVS product URLs into a product id plus lightweight metadata."""
 
     @staticmethod
-    def _new_session() -> requests.Session:
+    def _proxy_candidates() -> List[str]:
+        proxies = list(CVS_PROXY_URLS)
+        if len(proxies) <= 1:
+            return proxies
+        start = random.randrange(len(proxies))
+        return proxies[start:] + proxies[:start]
+
+    @staticmethod
+    def _proxy_label(proxy_url: str) -> str:
+        parsed = urlsplit(str(proxy_url or "").strip())
+        if not parsed.hostname:
+            return "configured proxy"
+        if parsed.port:
+            return f"{parsed.hostname}:{parsed.port}"
+        return parsed.hostname
+
+    @staticmethod
+    def _new_session(proxy_url: str = "") -> requests.Session:
         if curl_requests is not None:
             session = curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
         else:
             session = requests.Session()
-        if CVS_PROXY_URL:
-            session.proxies.update({"http": CVS_PROXY_URL, "https": CVS_PROXY_URL})
+        if proxy_url:
+            session.proxies.update({"http": proxy_url, "https": proxy_url})
         return session
 
     @staticmethod
@@ -97,35 +114,64 @@ class CvsProductResolver:
     def _fetch_html(cls, product_link: str) -> str:
         last_error: Exception | None = None
         accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+        proxy_candidates = cls._proxy_candidates() or [""]
+        blocked_routes: List[str] = []
 
-        for _ in range(CVS_RESOLVE_ATTEMPTS):
-            session = cls._new_session()
+        for proxy_url in proxy_candidates:
+            session = cls._new_session(proxy_url)
+            proxy_label = cls._proxy_label(proxy_url) if proxy_url else "direct server IP"
+            if proxy_url:
+                logger.info("CVS resolver is using proxy routing via %s", proxy_label)
             try:
-                bootstrap_headers = cls._request_headers(accept=accept)
-                for bootstrap_url in ("https://www.cvs.com/", product_link):
-                    try:
-                        response = session.get(
-                            bootstrap_url,
-                            headers=bootstrap_headers,
-                            timeout=CVS_BOOTSTRAP_TIMEOUT
-                            if bootstrap_url == "https://www.cvs.com/"
-                            else CVS_PRODUCT_TIMEOUT,
-                        )
-                        if response.status_code >= 400:
-                            last_error = ValueError(f"HTTP {response.status_code} for {bootstrap_url}")
-                            logger.warning("CVS resolver bootstrap blocked for %s with HTTP %s", bootstrap_url, response.status_code)
+                for _ in range(CVS_RESOLVE_ATTEMPTS):
+                    bootstrap_headers = cls._request_headers(accept=accept)
+                    route_blocked = False
+                    for bootstrap_url in ("https://www.cvs.com/", product_link):
+                        try:
+                            response = session.get(
+                                bootstrap_url,
+                                headers=bootstrap_headers,
+                                timeout=CVS_BOOTSTRAP_TIMEOUT
+                                if bootstrap_url == "https://www.cvs.com/"
+                                else CVS_PRODUCT_TIMEOUT,
+                            )
+                            if response.status_code >= 400:
+                                last_error = ValueError(f"HTTP {response.status_code} for {bootstrap_url}")
+                                logger.warning(
+                                    "CVS resolver bootstrap blocked for %s via %s with HTTP %s",
+                                    bootstrap_url,
+                                    proxy_label,
+                                    response.status_code,
+                                )
+                                if response.status_code == 403:
+                                    blocked_routes.append(proxy_label)
+                                    route_blocked = True
+                                    break
+                                if bootstrap_url == product_link:
+                                    break
+                                continue
+                            if bootstrap_url == product_link and "html" in response.headers.get("content-type", "").lower():
+                                return response.text
+                        except Exception as exc:
+                            last_error = exc
+                            logger.warning("CVS resolver bootstrap request failed for %s via %s: %s", bootstrap_url, proxy_label, exc)
                             if bootstrap_url == product_link:
                                 break
-                            continue
-                        if bootstrap_url == product_link and "html" in response.headers.get("content-type", "").lower():
-                            return response.text
-                    except Exception as exc:
-                        last_error = exc
-                        logger.warning("CVS resolver bootstrap request failed for %s: %s", bootstrap_url, exc)
-                        if bootstrap_url == product_link:
-                            break
+                    if route_blocked:
+                        break
             finally:
                 session.close()
+
+        unique_blocked_routes = list(dict.fromkeys(blocked_routes))
+        attempted_route_labels = [
+            cls._proxy_label(proxy_url) if proxy_url else "direct server IP"
+            for proxy_url in proxy_candidates
+        ]
+        if unique_blocked_routes and len(unique_blocked_routes) == len(set(attempted_route_labels)):
+            raise ValueError(
+                "CVS blocked every configured route while resolving that product link: "
+                + ", ".join(unique_blocked_routes)
+            )
 
         if last_error is not None:
             raise ValueError(
