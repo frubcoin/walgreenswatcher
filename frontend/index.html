@@ -9754,10 +9754,18 @@
           maxOffset: 120
         });
         resultsMap.setView(focusTarget, targetZoom, { animate: openFocusedLocation });
+      } else if (locations.length) {
+        const firstLocationLatLng = L.latLng(locations[0].latitude, locations[0].longitude);
+        const targetZoom = 14;
+        const focusTarget = getResultsMapFramedLatLng(firstLocationLatLng, targetZoom, {
+          mobileRatio: 0.24,
+          desktopRatio: 0.18,
+          minOffset: 48,
+          maxOffset: 120
+        });
+        resultsMap.setView(focusTarget, targetZoom, { animate: false });
       } else if (mapDistanceReference) {
         resultsMap.setView([mapDistanceReference.latitude, mapDistanceReference.longitude], 14);
-      } else if (locations.length) {
-        resultsMap.setView([locations[0].latitude, locations[0].longitude], 14);
       } else if (bounds.length === 1) {
         resultsMap.setView(bounds[0], 13);
       } else if (bounds.length > 1) {
@@ -9797,13 +9805,14 @@
         ? locations.some(location => location.location_key === previousActiveLocationKey)
         : false;
       const closestFilteredLocation = locations[0] || null;
+      const shouldDefaultToFirstLocation = !previousActiveLocationKey && Boolean(closestFilteredLocation);
       const focusLocationKey = hasActiveFilteredLocation
         ? previousActiveLocationKey
-        : (previousActiveLocationKey && closestFilteredLocation ? closestFilteredLocation.location_key : '');
+        : ((previousActiveLocationKey || shouldDefaultToFirstLocation) && closestFilteredLocation ? closestFilteredLocation.location_key : '');
       const selectedLocationKey = hasActiveFilteredLocation
         ? previousActiveLocationKey
-        : (previousActiveLocationKey && closestFilteredLocation ? closestFilteredLocation.location_key : '');
-      const shouldOpenFocusedLocation = Boolean(previousActiveLocationKey) && !hasActiveFilteredLocation && Boolean(closestFilteredLocation);
+        : ((previousActiveLocationKey || shouldDefaultToFirstLocation) && closestFilteredLocation ? closestFilteredLocation.location_key : '');
+      const shouldOpenFocusedLocation = Boolean(closestFilteredLocation) && (!hasActiveFilteredLocation || shouldDefaultToFirstLocation);
       const preserveActiveSelection = Boolean(selectedLocationKey);
       const fallbackLocationKey = !previousActiveLocationKey && locations.length
         ? locations[0].location_key
