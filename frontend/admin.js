@@ -120,7 +120,7 @@ function renderAuthorizedEmails(entries) {
     <article class="token-row">
       <div class="token-main">
         <strong>${escapeHtml(entry.email)}</strong>
-        <span>${escapeHtml(entry.note || 'No note')} • Added ${escapeHtml(formatDateTime(entry.added_at))}</span>
+        <span>${escapeHtml(entry.note || 'No note')} | Added ${escapeHtml(formatDateTime(entry.added_at))}</span>
       </div>
       <button class="danger-button" type="button" data-action="remove-authorized-email" data-email="${escapeHtml(entry.email)}">Remove</button>
     </article>
@@ -139,7 +139,7 @@ function renderUsers(users) {
       <div class="user-card-header">
         <div>
           <strong class="user-card-title">${escapeHtml(user.name || user.email)}</strong>
-          <div class="user-meta">${escapeHtml(user.email)} • Joined ${escapeHtml(formatDateTime(user.created_at))}</div>
+          <div class="user-meta">${escapeHtml(user.email)} | Joined ${escapeHtml(formatDateTime(user.created_at))}</div>
         </div>
         <div class="user-badges">
           <span class="badge ${user.is_banned ? 'badge-danger' : 'badge-success'}">${user.is_banned ? 'Banned' : 'Active'}</span>
@@ -196,7 +196,7 @@ function renderEvents(events) {
           <strong class="event-card-title">${escapeHtml(event.summary || event.event_type)}</strong>
           <span class="event-meta">${escapeHtml(formatDateTime(event.created_at))}</span>
         </div>
-        <div class="event-body">${escapeHtml(event.event_type)} • Actor: ${escapeHtml(actor)}</div>
+        <div class="event-body">${escapeHtml(event.event_type)} | Actor: ${escapeHtml(actor)}</div>
         ${target ? `<div class="event-meta">${target}</div>` : ''}
         ${metadata}
       </article>

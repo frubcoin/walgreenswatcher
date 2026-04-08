@@ -3875,12 +3875,34 @@
       }
 
       body.auth-gate-active .auth-panel-card {
-        padding: 20px;
-        gap: 14px;
+        padding: 18px;
+        gap: 12px;
+      }
+
+      body.auth-gate-active .auth-actions {
+        min-height: auto;
+        gap: 12px;
+      }
+
+      body.auth-gate-active #google-signin-button {
+        width: min(100%, 320px);
       }
 
       body.auth-gate-active .auth-note-list {
-        gap: 8px;
+        width: 100%;
+        gap: 10px;
+        justify-items: stretch;
+      }
+
+      body.auth-gate-active .auth-note-item {
+        width: 100%;
+        justify-content: flex-start;
+        align-items: flex-start;
+        text-align: left;
+      }
+
+      body.auth-gate-active .auth-note-copy {
+        flex: 1;
       }
 
       body.auth-gate-active .auth-legal-note {
