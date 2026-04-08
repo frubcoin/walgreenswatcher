@@ -8149,6 +8149,32 @@
       });
     }
 
+    function getResultsMapFramedLatLng(targetLatLng, zoom, options = {}) {
+      if (!resultsMap || !targetLatLng) return targetLatLng;
+
+      const {
+        mobileOnly = false,
+        mobileRatio = 0.24,
+        desktopRatio = 0.18,
+        minOffset = 48,
+        maxOffset = 120
+      } = options;
+
+      const isMobile = isMobileSignedInDashboard();
+      if (mobileOnly && !isMobile) {
+        return targetLatLng;
+      }
+
+      if (typeof resultsMap.project !== 'function' || typeof resultsMap.unproject !== 'function' || typeof resultsMap.getSize !== 'function') {
+        return targetLatLng;
+      }
+
+      const mapSize = resultsMap.getSize();
+      const ratio = isMobile ? mobileRatio : desktopRatio;
+      const verticalOffset = Math.round(Math.min(maxOffset, Math.max(minOffset, mapSize.y * ratio)));
+      return resultsMap.unproject(resultsMap.project(targetLatLng, zoom).subtract([0, verticalOffset]), zoom);
+    }
+
     function createResultsMapMarkerIcon(location) {
       const markerClasses = [
         'results-store-marker',
@@ -8178,11 +8204,12 @@
       const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
       const targetZoom = Math.max(currentZoom, 14);
       const targetLatLng = marker.getLatLng();
-      const mapSize = typeof resultsMap.getSize === 'function' ? resultsMap.getSize() : null;
-      const verticalOffset = mapSize ? Math.round(Math.min(96, Math.max(48, mapSize.y * 0.18))) : 64;
-      const focusTarget = typeof resultsMap.project === 'function' && typeof resultsMap.unproject === 'function'
-        ? resultsMap.unproject(resultsMap.project(targetLatLng, targetZoom).subtract([0, verticalOffset]), targetZoom)
-        : targetLatLng;
+      const focusTarget = getResultsMapFramedLatLng(targetLatLng, targetZoom, {
+        mobileRatio: 0.24,
+        desktopRatio: 0.18,
+        minOffset: 48,
+        maxOffset: 120
+      });
       resultsMap.once('moveend', () => {
         marker.openPopup();
       });
