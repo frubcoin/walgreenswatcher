@@ -118,7 +118,7 @@
           </article>
         </section>
 
-        <section class="panel app-window workspace-panel">
+        <section class="panel app-window workspace-panel" id="users-panel">
           <div class="section-head">
             <div>
               <p class="eyebrow">Users</p>
@@ -208,7 +208,7 @@
           </section>
         </section>
 
-        <section class="panel app-window events-panel">
+        <section class="panel app-window events-panel" id="events-panel">
           <div class="section-head">
             <div>
               <p class="eyebrow">Audit Log</p>
@@ -231,6 +231,22 @@
         </section>
       </section>
     </main>
+  </div>
+
+  <div class="review-modal" id="review-modal" hidden>
+    <div class="review-modal-backdrop" data-action="close-review-modal"></div>
+    <div class="review-modal-dialog panel app-window" role="dialog" aria-modal="true" aria-labelledby="review-modal-title">
+      <div class="review-modal-head">
+        <div>
+          <div class="eyebrow" id="review-modal-kicker">Review item</div>
+          <h2 id="review-modal-title">Needs attention</h2>
+        </div>
+        <button class="button button-muted button-compact" type="button" data-action="close-review-modal">Close</button>
+      </div>
+      <p class="review-modal-copy" id="review-modal-copy"></p>
+      <div class="review-modal-list" id="review-modal-list"></div>
+      <div class="form-actions" id="review-modal-actions"></div>
+    </div>
   </div>
 
   <div class="status-banner" id="status-banner" aria-live="polite"></div>
