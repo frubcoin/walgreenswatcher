@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+import shutil
 import sys
 import threading
 import time
@@ -76,6 +77,9 @@ SERVICE_UPTIME_HEARTBEAT_SECONDS = 30
 _uptime_tracker_started = False
 ADMIN_SESSION_KEY = "admin_authenticated"
 WAITLIST_SESSION_KEY = "waitlisted_user_id"
+_system_stats_lock = threading.Lock()
+_last_cpu_snapshot: Optional[tuple[float, float]] = None
+_last_network_snapshot: Optional[Dict[str, float]] = None
 
 
 def _is_allowed_walgreens_host(hostname: str) -> bool:
@@ -473,6 +477,178 @@ def _stop_user_scheduler_if_running(user_id: int) -> None:
         scheduler.stop()
 
 
+def _read_linux_cpu_totals() -> Optional[tuple[float, float]]:
+    try:
+        with open("/proc/stat", "r", encoding="utf-8") as handle:
+            first_line = handle.readline().strip()
+    except OSError:
+        return None
+
+    parts = first_line.split()
+    if len(parts) < 5 or parts[0] != "cpu":
+        return None
+
+    try:
+        values = [float(value) for value in parts[1:]]
+    except ValueError:
+        return None
+
+    idle = values[3] + (values[4] if len(values) > 4 else 0.0)
+    total = sum(values)
+    return total, idle
+
+
+def _read_linux_memory_stats() -> Dict[str, Any]:
+    values: Dict[str, int] = {}
+    try:
+        with open("/proc/meminfo", "r", encoding="utf-8") as handle:
+            for raw_line in handle:
+                if ":" not in raw_line:
+                    continue
+                key, raw_value = raw_line.split(":", 1)
+                numeric = raw_value.strip().split()[0]
+                values[key] = int(numeric) * 1024
+    except (OSError, ValueError):
+        return {
+            "total_bytes": 0,
+            "used_bytes": 0,
+            "available_bytes": 0,
+            "usage_percent": 0.0,
+        }
+
+    total_bytes = int(values.get("MemTotal", 0))
+    available_bytes = int(values.get("MemAvailable", values.get("MemFree", 0)))
+    used_bytes = max(total_bytes - available_bytes, 0)
+    usage_percent = round((used_bytes / total_bytes) * 100, 1) if total_bytes else 0.0
+    return {
+        "total_bytes": total_bytes,
+        "used_bytes": used_bytes,
+        "available_bytes": available_bytes,
+        "usage_percent": usage_percent,
+    }
+
+
+def _read_linux_network_totals() -> Dict[str, int]:
+    received_bytes = 0
+    transmitted_bytes = 0
+    try:
+        with open("/proc/net/dev", "r", encoding="utf-8") as handle:
+            lines = handle.readlines()[2:]
+    except OSError:
+        return {
+            "received_bytes": 0,
+            "transmitted_bytes": 0,
+        }
+
+    for line in lines:
+        if ":" not in line:
+            continue
+        interface, raw_values = line.split(":", 1)
+        if interface.strip() == "lo":
+            continue
+        parts = raw_values.split()
+        if len(parts) < 16:
+            continue
+        try:
+            received_bytes += int(parts[0])
+            transmitted_bytes += int(parts[8])
+        except ValueError:
+            continue
+
+    return {
+        "received_bytes": received_bytes,
+        "transmitted_bytes": transmitted_bytes,
+    }
+
+
+def _system_cpu_usage_percent() -> float:
+    global _last_cpu_snapshot
+
+    current = _read_linux_cpu_totals()
+    if current is None:
+        return 0.0
+
+    with _system_stats_lock:
+        previous = _last_cpu_snapshot
+        _last_cpu_snapshot = current
+
+    if previous is None:
+        return 0.0
+
+    total_delta = current[0] - previous[0]
+    idle_delta = current[1] - previous[1]
+    if total_delta <= 0:
+        return 0.0
+
+    busy_ratio = max(0.0, min(1.0, 1.0 - (idle_delta / total_delta)))
+    return round(busy_ratio * 100, 1)
+
+
+def _system_network_rates() -> Dict[str, float]:
+    global _last_network_snapshot
+
+    totals = _read_linux_network_totals()
+    now = time.time()
+
+    with _system_stats_lock:
+        previous = _last_network_snapshot
+        _last_network_snapshot = {
+            "timestamp": now,
+            "received_bytes": float(totals["received_bytes"]),
+            "transmitted_bytes": float(totals["transmitted_bytes"]),
+        }
+
+    if not previous:
+        return {
+            **totals,
+            "received_bytes_per_second": 0.0,
+            "transmitted_bytes_per_second": 0.0,
+        }
+
+    elapsed = max(now - float(previous.get("timestamp", now)), 0.001)
+    received_rate = max(float(totals["received_bytes"]) - float(previous.get("received_bytes", 0.0)), 0.0) / elapsed
+    transmitted_rate = max(
+        float(totals["transmitted_bytes"]) - float(previous.get("transmitted_bytes", 0.0)),
+        0.0,
+    ) / elapsed
+    return {
+        **totals,
+        "received_bytes_per_second": round(received_rate, 1),
+        "transmitted_bytes_per_second": round(transmitted_rate, 1),
+    }
+
+
+def _get_system_stats() -> Dict[str, Any]:
+    disk_total, disk_used, disk_free = shutil.disk_usage("/")
+    disk_usage_percent = round((disk_used / disk_total) * 100, 1) if disk_total else 0.0
+
+    load_average = (0.0, 0.0, 0.0)
+    try:
+        load_average = tuple(round(value, 2) for value in os.getloadavg())
+    except (AttributeError, OSError):
+        pass
+
+    return {
+        "cpu": {
+            "usage_percent": _system_cpu_usage_percent(),
+            "load_average": {
+                "one_minute": load_average[0],
+                "five_minutes": load_average[1],
+                "fifteen_minutes": load_average[2],
+            },
+        },
+        "memory": _read_linux_memory_stats(),
+        "disk": {
+            "mount": "/",
+            "total_bytes": disk_total,
+            "used_bytes": disk_used,
+            "free_bytes": disk_free,
+            "usage_percent": disk_usage_percent,
+        },
+        "network": _system_network_rates(),
+    }
+
+
 def _admin_overview_payload() -> Dict[str, Any]:
     settings = db.get_admin_settings()
     settings["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
@@ -482,6 +658,7 @@ def _admin_overview_payload() -> Dict[str, Any]:
     events = db.list_audit_events(limit=200)
     global_statistics = db.get_global_statistics()
     service_uptime = db.get_service_uptime_stats()
+    system_stats = _get_system_stats()
     return {
         "settings": settings,
         "authorized_google_emails": db.list_authorized_google_emails(),
@@ -490,6 +667,7 @@ def _admin_overview_payload() -> Dict[str, Any]:
         "platform": {
             "global_statistics": global_statistics,
             "service_uptime": service_uptime,
+            "system_stats": system_stats,
             "totals": {
                 "users": len(users),
                 "banned_users": sum(1 for user in users if user.get("is_banned")),

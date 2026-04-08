@@ -37,6 +37,24 @@ function formatPercent(value) {
   return `${numeric.toFixed(1)}%`;
 }
 
+function formatBytes(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = numeric;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const precision = size >= 100 || unitIndex === 0 ? 0 : size >= 10 ? 1 : 2;
+  return `${size.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function formatRate(value) {
+  return `${formatBytes(value)}/s`;
+}
+
 function formatInterval(value) {
   const minutes = Math.max(1, Number(value || 0));
   if (minutes % 60 === 0) {
@@ -170,12 +188,17 @@ function setSessionUi(session) {
 function renderPlatformSnapshot(platform) {
   const globalStats = platform?.global_statistics || {};
   const uptime = platform?.service_uptime || {};
+  const systemStats = platform?.system_stats || {};
+  const cpu = systemStats.cpu || {};
+  const memory = systemStats.memory || {};
+  const disk = systemStats.disk || {};
+  const network = systemStats.network || {};
   const totals = platform?.totals || {};
 
   document.getElementById('hero-uptime-label').textContent = uptime.label || 'Service uptime unavailable';
   document.getElementById('hero-users-total').textContent = `${totals.users || 0} users`;
   document.getElementById('hero-summary-copy').textContent =
-    `${totals.scheduler_enabled_users || 0} user schedulers are active, ${totals.login_denials || 0} recent login denials were recorded, and ${totals.alert_webhooks || 0} admin alert webhooks are configured.`;
+    `${totals.scheduler_enabled_users || 0} user schedulers are active, ${totals.login_denials || 0} recent login denials were recorded, ${totals.alert_webhooks || 0} admin alert webhooks are configured, and the VPS is currently at ${formatPercent(cpu.usage_percent || 0)} CPU with ${formatPercent(memory.usage_percent || 0)} memory in use.`;
 
   const metrics = [
     {
@@ -204,6 +227,40 @@ function renderPlatformSnapshot(platform) {
     <article class="metric-card">
       <div class="metric-label">${escapeHtml(metric.label)}</div>
       <div class="metric-value">${escapeHtml(metric.value)}</div>
+      <div class="metric-note">${escapeHtml(metric.note)}</div>
+    </article>
+  `).join('');
+
+  document.getElementById('platform-system-strip').innerHTML = [
+    {
+      label: 'CPU',
+      value: formatPercent(cpu.usage_percent || 0),
+      note: `Load avg ${cpu.load_average?.one_minute ?? 0} / ${cpu.load_average?.five_minutes ?? 0} / ${cpu.load_average?.fifteen_minutes ?? 0}`
+    },
+    {
+      label: 'Memory',
+      value: formatPercent(memory.usage_percent || 0),
+      note: `${formatBytes(memory.used_bytes || 0)} used of ${formatBytes(memory.total_bytes || 0)}`
+    },
+    {
+      label: 'Storage',
+      value: formatPercent(disk.usage_percent || 0),
+      note: `${formatBytes(disk.used_bytes || 0)} used of ${formatBytes(disk.total_bytes || 0)}`
+    },
+    {
+      label: 'Network In',
+      value: formatRate(network.received_bytes_per_second || 0),
+      note: `${formatBytes(network.received_bytes || 0)} received`
+    },
+    {
+      label: 'Network Out',
+      value: formatRate(network.transmitted_bytes_per_second || 0),
+      note: `${formatBytes(network.transmitted_bytes || 0)} sent`
+    }
+  ].map(metric => `
+    <article class="system-card">
+      <div class="metric-label">${escapeHtml(metric.label)}</div>
+      <div class="system-value">${escapeHtml(metric.value)}</div>
       <div class="metric-note">${escapeHtml(metric.note)}</div>
     </article>
   `).join('');

@@ -556,8 +556,31 @@ textarea {
   gap: 12px;
 }
 
+.system-strip-head {
+  margin-top: 18px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.system-strip {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .metric-card {
   padding: 14px;
+}
+
+.system-card {
+  padding: 13px 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 .metric-label {
@@ -570,6 +593,14 @@ textarea {
   font-size: 28px;
   font-family: var(--font-mono);
   line-height: 1;
+}
+
+.system-value {
+  margin-top: 10px;
+  color: var(--text-primary);
+  font-size: 19px;
+  font-family: var(--font-mono);
+  line-height: 1.1;
 }
 
 .metric-note {
@@ -921,6 +952,7 @@ textarea {
   .hero-grid,
   .operations-grid,
   .metric-strip,
+  .system-strip,
   .user-stats {
     grid-template-columns: 1fr 1fr;
   }
@@ -960,6 +992,7 @@ textarea {
   .hero-grid,
   .operations-grid,
   .metric-strip,
+  .system-strip,
   .user-stats {
     grid-template-columns: 1fr;
   }
