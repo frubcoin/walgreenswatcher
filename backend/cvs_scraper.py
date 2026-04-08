@@ -148,9 +148,23 @@ class CvsStockChecker:
 
     @staticmethod
     def _zendriver_browser_executable_path() -> str | None:
-        configured_path = os.getenv("CVS_ZENDRIVER_BROWSER_EXECUTABLE_PATH", "").strip()
-        if configured_path:
-            return configured_path
+        for env_var in (
+            "CVS_ZENDRIVER_BROWSER_EXECUTABLE_PATH",
+            "ZENDRIVER_BROWSER_EXECUTABLE_PATH",
+            "BROWSER_EXECUTABLE_PATH",
+            "CHROME_BINARY",
+            "CHROMIUM_BINARY",
+        ):
+            configured_path = os.getenv(env_var, "").strip()
+            if configured_path:
+                if os.path.exists(configured_path):
+                    logger.info("CVS zendriver browser path resolved from %s: %s", env_var, configured_path)
+                    return configured_path
+                logger.warning(
+                    "CVS zendriver browser path set via %s but file does not exist: %s",
+                    env_var,
+                    configured_path,
+                )
 
         for candidate in (
             shutil.which("google-chrome"),
@@ -165,7 +179,9 @@ class CvsStockChecker:
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
         ):
             if candidate and os.path.exists(candidate):
+                logger.info("CVS zendriver browser auto-detected at %s", candidate)
                 return candidate
+        logger.warning("CVS zendriver could not find a browser executable on PATH or known locations")
         return None
 
     @staticmethod
