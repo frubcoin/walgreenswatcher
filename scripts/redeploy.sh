@@ -3,7 +3,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SERVICE_NAME="${SERVICE_NAME:-gunicorn}"
-APP_USER="${APP_USER:-}"
+APP_USER="${APP_USER:-walgreens}"
 VENV_PATH="${VENV_PATH:-}"
 
 log() {

@@ -4031,9 +4031,12 @@
 
     .trending-product-add-btn {
       min-width: 136px;
-      min-height: 32px;
-      padding: 5px 12px;
+      height: 30px;
+      min-height: 30px;
+      padding: 0 12px;
       justify-content: center;
+      font-size: 11px;
+      letter-spacing: 0.9px;
       box-shadow: 0 10px 24px rgba(251, 1, 28, 0.16);
     }
 
@@ -7675,12 +7678,6 @@
 
       if (copy) {
         copy.textContent = `Recently tracked community links from the last ${normalizedHours} hours. Add any of them straight to your monitor without pasting the URL again.`;
-      }
-      if (highlightValue) {
-        highlightValue.textContent = normalizedHours === 24 ? 'Last 24 Hours' : `Last ${normalizedHours} Hours`;
-      }
-      if (highlightLabel) {
-        highlightLabel.textContent = 'Stored community picks';
       }
     }
 
