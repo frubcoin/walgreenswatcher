@@ -2022,6 +2022,8 @@
       font-size: 11px;
       color: var(--text-muted);
       margin-top: 4px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
     }
 
     .stat-sub-detail {
@@ -6238,10 +6240,10 @@
           <div id="products-list"></div>
           <div class="tracked-products-controls">
             <div class="form-group">
-              <input type="url" class="form-input" id="new-product-url" placeholder="Paste a product link">
+              <input type="url" class="form-input" id="new-product-url" placeholder="Paste a product link" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             </div>
             <div class="form-group" style="margin-top:10px;">
-              <input type="text" class="form-input" id="new-product-name"
+              <input type="text" class="form-input" id="new-product-name" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
                 placeholder="Optional custom name (e.g., Pokemon Booster Bundle)">
             </div>
             <div class="form-hint" style="margin-bottom:12px;">Paste a supported product link
@@ -7220,11 +7222,11 @@
                 ` : ''}
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-url">Product URL</label>
-                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a product link" value="${escapeHtml(draft.productUrl)}">
+                  <input type="url" class="form-input" id="onboarding-product-url" placeholder="Paste a product link" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="${escapeHtml(draft.productUrl)}">
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-product-name">Custom Name</label>
-                  <input type="text" class="form-input" id="onboarding-product-name" maxlength="160" placeholder="Optional custom name" value="${escapeHtml(draft.productName)}">
+                  <input type="text" class="form-input" id="onboarding-product-name" maxlength="160" placeholder="Optional custom name" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="${escapeHtml(draft.productName)}">
                   <span class="form-hint">Optional, but useful if the retailer title is messy.</span>
                 </div>
                 <div class="form-group">
@@ -10113,7 +10115,7 @@
       if (mapDistanceReference?.label) {
         return {
           value: 'Saved map address',
-          detail: shortenLabel(mapDistanceReference.label, 40) || 'Using your saved local map address',
+          detail: String(mapDistanceReference.label || '').trim() || 'Using your saved local map address',
         };
       }
 
