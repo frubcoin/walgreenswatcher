@@ -19,6 +19,24 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
+service_status_summary() {
+  local service_name="$1"
+  local active_state=""
+  local sub_state=""
+
+  active_state="$(systemctl is-active "$service_name" 2>/dev/null || true)"
+  sub_state="$(systemctl show "$service_name" --property=SubState --value 2>/dev/null || true)"
+
+  active_state="$(trim "$active_state")"
+  sub_state="$(trim "$sub_state")"
+
+  if [[ -n "$sub_state" ]]; then
+    log "Service status for ${service_name}: ${active_state:-unknown} (${sub_state})"
+  else
+    log "Service status for ${service_name}: ${active_state:-unknown}"
+  fi
+}
+
 trim() {
   local value="${1:-}"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -224,6 +242,7 @@ main() {
       systemctl reset-failed "$service_name" >/dev/null 2>&1 || true
       log "Restarting ${service_name}"
       systemctl restart "$service_name"
+      service_status_summary "$service_name"
       systemctl --no-pager --full status "$service_name" || true
       log "Recent ${service_name} logs"
       journalctl -u "$service_name" -n 30 --no-pager || true
