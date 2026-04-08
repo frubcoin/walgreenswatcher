@@ -2871,21 +2871,6 @@
         0 8px 18px rgba(0, 0, 0, 0.34);
     }
 
-    .results-store-marker::after {
-      content: '';
-      position: absolute;
-      left: 50%;
-      bottom: -3px;
-      width: 10px;
-      height: 10px;
-      background: rgba(191, 44, 13, 0.96);
-      border-right: 2px solid rgba(18, 22, 27, 0.82);
-      border-bottom: 2px solid rgba(18, 22, 27, 0.82);
-      transform: translateX(-50%) rotate(45deg);
-      border-radius: 1px;
-      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.22);
-    }
-
     .results-store-marker__halo {
       position: absolute;
       inset: -4px;
@@ -3085,12 +3070,6 @@
       box-shadow:
         0 0 0 1px rgba(72, 156, 212, 0.18),
         0 10px 20px rgba(30, 42, 56, 0.2);
-    }
-
-    .results-map-card[data-map-theme="light"] .results-store-marker::after,
-    .results-map-card[data-map-theme="streets"] .results-store-marker::after {
-      border-right-color: rgba(247, 250, 252, 0.95);
-      border-bottom-color: rgba(247, 250, 252, 0.95);
     }
 
     .results-map-card[data-map-theme="light"] .results-store-marker__halo,
@@ -8279,8 +8258,8 @@
           </div>
         `,
         iconSize: [24, 24],
-        iconAnchor: [12, 23],
-        popupAnchor: [0, -16]
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -14]
       });
     }
 
