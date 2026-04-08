@@ -8798,32 +8798,6 @@
       });
     }
 
-    function getResultsMapFramedLatLng(targetLatLng, zoom, options = {}) {
-      if (!resultsMap || !targetLatLng) return targetLatLng;
-
-      const {
-        mobileOnly = false,
-        mobileRatio = 0.24,
-        desktopRatio = 0.18,
-        minOffset = 48,
-        maxOffset = 120
-      } = options;
-
-      const isMobile = isMobileSignedInDashboard();
-      if (mobileOnly && !isMobile) {
-        return targetLatLng;
-      }
-
-      if (typeof resultsMap.project !== 'function' || typeof resultsMap.unproject !== 'function' || typeof resultsMap.getSize !== 'function') {
-        return targetLatLng;
-      }
-
-      const mapSize = resultsMap.getSize();
-      const ratio = isMobile ? mobileRatio : desktopRatio;
-      const verticalOffset = Math.round(Math.min(maxOffset, Math.max(minOffset, mapSize.y * ratio)));
-      return resultsMap.unproject(resultsMap.project(targetLatLng, zoom).subtract([0, verticalOffset]), zoom);
-    }
-
     function createResultsMapMarkerIcon(location) {
       const markerClasses = [
         'results-store-marker',
@@ -8870,12 +8844,6 @@
           const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
           const targetZoom = Math.max(currentZoom, 14);
           const targetLatLng = marker.getLatLng();
-          const focusTarget = getResultsMapFramedLatLng(targetLatLng, targetZoom, {
-            mobileRatio: 0.24,
-            desktopRatio: 0.18,
-            minOffset: 48,
-            maxOffset: 120
-          });
 
           resultsMap.once('moveend', () => {
             window.requestAnimationFrame(() => {
@@ -8886,13 +8854,13 @@
           });
 
           if (typeof resultsMap.flyTo === 'function') {
-            resultsMap.flyTo(focusTarget, targetZoom, {
+            resultsMap.flyTo(targetLatLng, targetZoom, {
               animate,
               duration,
               easeLinearity: 0.25
             });
           } else {
-            resultsMap.setView(focusTarget, targetZoom, { animate });
+            resultsMap.setView(targetLatLng, targetZoom, { animate });
           }
         });
       };
@@ -9903,23 +9871,11 @@
       if (preferredLocation) {
         const targetZoom = 14;
         const preferredLatLng = L.latLng(preferredLocation.latitude, preferredLocation.longitude);
-        const focusTarget = getResultsMapFramedLatLng(preferredLatLng, targetZoom, {
-          mobileRatio: 0.24,
-          desktopRatio: 0.18,
-          minOffset: 48,
-          maxOffset: 120
-        });
-        resultsMap.setView(focusTarget, targetZoom, { animate: openFocusedLocation });
+        resultsMap.setView(preferredLatLng, targetZoom, { animate: openFocusedLocation });
       } else if (locations.length) {
         const firstLocationLatLng = L.latLng(locations[0].latitude, locations[0].longitude);
         const targetZoom = 14;
-        const focusTarget = getResultsMapFramedLatLng(firstLocationLatLng, targetZoom, {
-          mobileRatio: 0.24,
-          desktopRatio: 0.18,
-          minOffset: 48,
-          maxOffset: 120
-        });
-        resultsMap.setView(focusTarget, targetZoom, { animate: false });
+        resultsMap.setView(firstLocationLatLng, targetZoom, { animate: false });
       } else if (mapDistanceReference) {
         resultsMap.setView([mapDistanceReference.latitude, mapDistanceReference.longitude], 14);
       } else if (bounds.length === 1) {
