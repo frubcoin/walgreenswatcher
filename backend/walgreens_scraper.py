@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+import threading
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -13,6 +14,7 @@ import requests
 from config import (
     DEFAULT_TRACKED_PRODUCTS,
     SEARCH_RADIUS_MILES,
+    STORE_LOCATOR_CACHE_TTL_SECONDS,
     TARGET_ZIP_CODE,
     USER_AGENTS,
     WALGREENS_PRODUCT_NAMES,
@@ -23,6 +25,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 PROGRESS_UI_YIELD_SECONDS = 0.02
+_shared_store_locator_cache: Dict[str, Dict[str, Any]] = {}
+_shared_store_locator_cache_lock = threading.RLock()
 
 
 class WalgreensStockChecker:
@@ -33,6 +37,52 @@ class WalgreensStockChecker:
         self.custom_product_names: Dict[str, str] = {}
         self.current_zip_code = TARGET_ZIP_CODE
         self.location_cache: Dict[str, Dict[str, str]] = {}
+
+    @staticmethod
+    def _cache_expiry_time() -> float:
+        return time.monotonic() + float(STORE_LOCATOR_CACHE_TTL_SECONDS)
+
+    def _get_cached_store_locator_entry(self, zip_code: str) -> Optional[Dict[str, Any]]:
+        if STORE_LOCATOR_CACHE_TTL_SECONDS <= 0:
+            return None
+
+        with _shared_store_locator_cache_lock:
+            entry = _shared_store_locator_cache.get(zip_code)
+            if not entry:
+                return None
+            if float(entry.get("expires_at", 0.0)) <= time.monotonic():
+                _shared_store_locator_cache.pop(zip_code, None)
+                return None
+            return dict(entry)
+
+    def _remember_location_context(self, zip_code: str, filter_data: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        lat = filter_data.get("lat")
+        lng = filter_data.get("lng")
+        if not lat or not lng:
+            return None
+
+        context = {"lat": str(lat), "lng": str(lng)}
+        self.location_cache[zip_code] = context
+        return context
+
+    def _store_cached_store_locator_entry(
+        self,
+        zip_code: str,
+        *,
+        location: Optional[Dict[str, str]] = None,
+        stores: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
+        if STORE_LOCATOR_CACHE_TTL_SECONDS <= 0:
+            return
+
+        with _shared_store_locator_cache_lock:
+            existing = _shared_store_locator_cache.get(zip_code, {})
+            entry = {
+                "expires_at": self._cache_expiry_time(),
+                "location": location or existing.get("location"),
+                "stores": stores if stores is not None else existing.get("stores"),
+            }
+            _shared_store_locator_cache[zip_code] = entry
 
     def _emit_progress(self, progress_info: Dict[str, Any]) -> None:
         """Send a progress update to the scheduler/UI when available."""
@@ -157,6 +207,16 @@ class WalgreensStockChecker:
         if zip_code in self.location_cache:
             return self.location_cache[zip_code]
 
+        cached_entry = self._get_cached_store_locator_entry(zip_code)
+        if cached_entry and cached_entry.get("location"):
+            context = {
+                "lat": str(cached_entry["location"]["lat"]),
+                "lng": str(cached_entry["location"]["lng"]),
+            }
+            self.location_cache[zip_code] = context
+            logger.info("Using cached Walgreens location context for ZIP %s", zip_code)
+            return context
+
         url = "https://www.walgreens.com/locator/v1/stores/search"
         payload = {
             "r": str(SEARCH_RADIUS_MILES),
@@ -170,19 +230,16 @@ class WalgreensStockChecker:
 
         data = self._post_json(url, payload)
         filter_data = data.get("filter", {})
-        lat = filter_data.get("lat")
-        lng = filter_data.get("lng")
-
-        if not lat or not lng:
+        context = self._remember_location_context(zip_code, filter_data)
+        if not context:
             raise ValueError(f"Walgreens did not return lat/lng for ZIP {zip_code}")
 
-        context = {"lat": str(lat), "lng": str(lng)}
-        self.location_cache[zip_code] = context
+        self._store_cached_store_locator_entry(zip_code, location=context)
         return context
 
     @rate_limited
-    def _fetch_stores_near_zip(self, zip_code: str) -> List[Dict[str, Any]]:
-        """Fetch nearby stores for a ZIP code."""
+    def _fetch_stores_near_zip_remote(self, zip_code: str) -> List[Dict[str, Any]]:
+        """Fetch nearby stores for a ZIP code from Walgreens."""
         logger.info("Fetching stores near ZIP %s...", zip_code)
 
         url = "https://www.walgreens.com/locator/v1/stores/search"
@@ -198,14 +255,40 @@ class WalgreensStockChecker:
 
         data = self._post_json(url, payload)
         stores = data.get("results", [])
+        context = self._remember_location_context(zip_code, data.get("filter", {}))
 
         if not stores:
             logger.warning("No stores found near ZIP %s", zip_code)
             return []
 
         formatted_stores = [self._format_store(store) for store in stores]
+        self._store_cached_store_locator_entry(
+            zip_code,
+            location=context,
+            stores=formatted_stores,
+        )
         logger.info("Found %s stores near %s", len(formatted_stores), zip_code)
         return formatted_stores
+
+    def _fetch_stores_near_zip(self, zip_code: str) -> List[Dict[str, Any]]:
+        """Fetch nearby stores for a ZIP code, reusing a short shared cache when possible."""
+        cached_entry = self._get_cached_store_locator_entry(zip_code)
+        cached_stores = cached_entry.get("stores") if cached_entry else None
+        if cached_stores:
+            cached_location = cached_entry.get("location") or {}
+            if cached_location.get("lat") and cached_location.get("lng"):
+                self.location_cache[zip_code] = {
+                    "lat": str(cached_location["lat"]),
+                    "lng": str(cached_location["lng"]),
+                }
+            logger.info(
+                "Using cached Walgreens store list for ZIP %s (%s stores)",
+                zip_code,
+                len(cached_stores),
+            )
+            return list(cached_stores)
+
+        return self._fetch_stores_near_zip_remote(zip_code)
 
     @rate_limited
     def _fetch_stores_with_inventory(

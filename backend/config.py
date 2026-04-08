@@ -22,6 +22,16 @@ def _env_csv(name: str, default: str = "") -> List[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
 
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value.strip())
+    except (TypeError, ValueError):
+        return default
+
+
 # App / Auth Configuration
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "change-me-in-production")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
@@ -49,6 +59,7 @@ WALGREENS_PRODUCT_NAMES = {
 # Location Configuration
 TARGET_ZIP_CODE = ""
 SEARCH_RADIUS_MILES = 20
+STORE_LOCATOR_CACHE_TTL_SECONDS = max(0, _env_int("STORE_LOCATOR_CACHE_TTL_SECONDS", 900))
 
 # Rate Limiting Configuration
 RATE_LIMIT_DELAY = 2
