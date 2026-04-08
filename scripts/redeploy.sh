@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-SERVICE_NAME="${SERVICE_NAME:-gunicorn}"
+SERVICE_NAMES_RAW="${SERVICE_NAMES:-${SERVICE_NAME:-walgreenswatcher gunicorn}}"
 APP_USER="${APP_USER:-walgreens}"
 VENV_PATH="${VENV_PATH:-}"
 
@@ -28,6 +28,9 @@ trim() {
 
 detect_app_user() {
   local detected=""
+  local primary_service_name=""
+
+  primary_service_name="${SERVICE_NAMES_RAW%% *}"
 
   if [[ -n "${APP_USER}" ]]; then
     printf '%s' "$APP_USER"
@@ -44,7 +47,7 @@ detect_app_user() {
   fi
 
   if command -v systemctl >/dev/null 2>&1; then
-    detected="$(systemctl show "$SERVICE_NAME" --property=User --value 2>/dev/null || true)"
+    detected="$(systemctl show "$primary_service_name" --property=User --value 2>/dev/null || true)"
     detected="$(trim "$detected")"
     if [[ -n "$detected" && "$detected" != "root" ]]; then
       printf '%s' "$detected"
@@ -166,9 +169,13 @@ main() {
   target_user="$(detect_app_user)"
   [[ -n "$target_user" ]] || fail "Could not determine app user"
 
+  local -a service_names=()
+  read -r -a service_names <<<"$SERVICE_NAMES_RAW"
+  [[ ${#service_names[@]} -gt 0 ]] || fail "No systemd service names configured"
+
   log "App dir: $APP_DIR"
   log "App user: $target_user"
-  log "Service: $SERVICE_NAME"
+  log "Services: ${service_names[*]}"
 
   git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
   run_as_app_user "$target_user" git config --global --add safe.directory "$APP_DIR" >/dev/null 2>&1 || true
@@ -201,12 +208,14 @@ main() {
   if command -v systemctl >/dev/null 2>&1; then
     log "Reloading systemd units"
     systemctl daemon-reload
-    systemctl reset-failed "$SERVICE_NAME" >/dev/null 2>&1 || true
-    log "Restarting ${SERVICE_NAME}"
-    systemctl restart "$SERVICE_NAME"
-    systemctl --no-pager --full status "$SERVICE_NAME" || true
-    log "Recent ${SERVICE_NAME} logs"
-    journalctl -u "$SERVICE_NAME" -n 30 --no-pager || true
+    for service_name in "${service_names[@]}"; do
+      systemctl reset-failed "$service_name" >/dev/null 2>&1 || true
+      log "Restarting ${service_name}"
+      systemctl restart "$service_name"
+      systemctl --no-pager --full status "$service_name" || true
+      log "Recent ${service_name} logs"
+      journalctl -u "$service_name" -n 30 --no-pager || true
+    done
   else
     log "systemctl not found, skipping service restart"
   fi
