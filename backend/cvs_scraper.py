@@ -215,6 +215,14 @@ class CvsStockChecker:
             return 30 * 60
         return max(0, minutes) * 60
 
+    @classmethod
+    def _zendriver_proxy_url(cls) -> str:
+        explicit_proxy = os.getenv("CVS_ZENDRIVER_PROXY_URL", "").strip()
+        if explicit_proxy:
+            return explicit_proxy
+        candidates = cls._proxy_candidates()
+        return str(candidates[0] if candidates else "").strip()
+
     @staticmethod
     def _run_async(coro: Any) -> Any:
         try:
@@ -268,8 +276,24 @@ class CvsStockChecker:
         if user_data_dir:
             browser_kwargs["user_data_dir"] = user_data_dir
             logger.info("CVS zendriver using persistent user data dir: %s", user_data_dir)
+        if cls._env_bool("CVS_ZENDRIVER_USE_PROXY", False):
+            proxy_url = cls._zendriver_proxy_url()
+            if proxy_url:
+                proxy_label = cls._proxy_label(proxy_url)
+                proxy_arg = f"--proxy-server={proxy_url}"
+                browser_kwargs["browser_args"] = [proxy_arg]
+                logger.info("CVS zendriver browser-context using proxy routing via %s", proxy_label)
 
-        browser = await zd.start(**browser_kwargs)
+        try:
+            browser = await zd.start(**browser_kwargs)
+        except TypeError as exc:
+            browser_args = browser_kwargs.pop("browser_args", None)
+            if browser_args:
+                logger.warning("CVS zendriver rejected browser_args, retrying with args: %s", exc)
+                browser_kwargs["args"] = browser_args
+                browser = await zd.start(**browser_kwargs)
+            else:
+                raise
         try:
             page = await browser.get(referer)
             await page.sleep(8)
