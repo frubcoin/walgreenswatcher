@@ -4004,7 +4004,8 @@
     .trending-product-footer {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: right;
+      justify-self: end;
       gap: 8px;
       flex-shrink: 0;
     }
@@ -4786,13 +4787,13 @@
 
       .trending-product-footer {
         align-items: center;
-        justify-content: flex-start;
+        justify-content: right;
         flex-wrap: wrap;
       }
 
       .trending-product-footer .btn,
       .trending-product-footer .result-card-link {
-        justify-content: center;
+        justify-content: right;
         flex: 0 0 auto;
       }
 
@@ -8177,17 +8178,22 @@
       const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
       const targetZoom = Math.max(currentZoom, 14);
       const targetLatLng = marker.getLatLng();
+      const mapSize = typeof resultsMap.getSize === 'function' ? resultsMap.getSize() : null;
+      const verticalOffset = mapSize ? Math.round(Math.min(96, Math.max(48, mapSize.y * 0.18))) : 64;
+      const focusTarget = typeof resultsMap.project === 'function' && typeof resultsMap.unproject === 'function'
+        ? resultsMap.unproject(resultsMap.project(targetLatLng, targetZoom).subtract([0, verticalOffset]), targetZoom)
+        : targetLatLng;
       resultsMap.once('moveend', () => {
         marker.openPopup();
       });
       if (typeof resultsMap.flyTo === 'function') {
-        resultsMap.flyTo(targetLatLng, targetZoom, {
+        resultsMap.flyTo(focusTarget, targetZoom, {
           animate: true,
           duration: 0.8,
           easeLinearity: 0.25
         });
       } else {
-        resultsMap.setView(targetLatLng, targetZoom, { animate: true });
+        resultsMap.setView(focusTarget, targetZoom, { animate: true });
       }
       setActiveResultsMapItem(locationKey);
     }
