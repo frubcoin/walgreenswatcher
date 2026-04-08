@@ -9790,20 +9790,6 @@
         setActiveResultsMapItem(selectedKey);
       }
 
-      if (openFocusedLocation && preferredLocationKey) {
-        resultsMap.whenReady(() => {
-          window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => {
-              focusResultsMapMarker(preferredLocationKey, {
-                animate: false,
-                scrollIntoView: false,
-                duration: 0
-              });
-            });
-          });
-        });
-      }
-
       observeResultsMapSize();
       scheduleResultsMapInvalidate({
         preserveActive: preserveActiveSelection,
@@ -9836,10 +9822,25 @@
         activeLocationKey: previousActiveLocationKey,
         focusLocationKey,
         selectedLocationKey,
-        openFocusedLocation: shouldOpenFocusedLocation,
+        openFocusedLocation: false,
         preserveActiveSelection,
         fallbackLocationKey
       });
+
+      if (shouldOpenFocusedLocation && focusLocationKey) {
+        const shouldAnimateFocus = Boolean(previousActiveLocationKey);
+        resultsMap?.whenReady?.(() => {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              focusResultsMapMarker(focusLocationKey, {
+                animate: shouldAnimateFocus,
+                scrollIntoView: false,
+                duration: shouldAnimateFocus ? 0.8 : 0
+              });
+            });
+          });
+        });
+      }
     }
 
     function getResultsMapProductOptions(locations = []) {
