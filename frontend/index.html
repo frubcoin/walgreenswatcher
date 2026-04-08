@@ -2307,6 +2307,76 @@
       flex: 1;
       height: 100%;
       min-height: 0;
+      background: #181d22;
+      position: relative;
+    }
+
+    .results-map-card {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .map-locate-btn {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(30, 34, 40, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      transition: all 0.2s ease;
+      padding: 0;
+    }
+
+    .map-locate-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent-soft-border);
+      transform: scale(1.05);
+      box-shadow: 0 0 15px var(--accent-ring);
+    }
+
+    .map-locate-btn:active {
+      transform: scale(0.95);
+    }
+
+    .map-locate-btn img {
+      width: 22px;
+      height: 22px;
+      filter: invert(1) brightness(2); /* Make the black icon white */
+    }
+
+    .user-location-pulse {
+      width: 14px;
+      height: 14px;
+      background: #489cd4;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+
+    .user-location-pulse::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      background: rgba(72, 156, 212, 0.4);
+      animation: pulse-ring-user 1.8s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+    }
+
+    @keyframes pulse-ring-user {
+      0% { transform: scale(0.7); opacity: 0.8; }
+      100% { transform: scale(2.5); opacity: 0; }
     }
 
     .results-map-sidebar {
@@ -4604,6 +4674,7 @@
     let resultsMapBaseLayer = null;
     let resultsMapMarkers = [];
     let resultsMapMarkersByKey = new Map();
+    let userLocationMarker = null;
     let activeResultsMapKey = null;
     let currentResultsMapTheme = loadStoredResultsMapTheme();
     let trackedProductsCache = [];
@@ -6269,6 +6340,10 @@
       resultsMapMarkers = [];
       resultsMapMarkersByKey = new Map();
       activeResultsMapKey = null;
+      if (userLocationMarker) {
+        userLocationMarker.remove();
+        userLocationMarker = null;
+      }
       if (!resultsMap) return;
       resultsMap.remove();
       resultsMap = null;
@@ -6337,6 +6412,9 @@
         case 'onboarding-next':
           await handleOnboardingNext();
           return;
+        case 'show-my-location':
+          await handleShowMyLocation();
+          return;
         case 'start-scheduler':
           await startScheduler();
           return;
@@ -6403,6 +6481,54 @@
         default:
           return;
       }
+    }
+
+    async function handleShowMyLocation() {
+      if (!navigator.geolocation) {
+        showToast('Location services are not supported by your browser', 'error');
+        return;
+      }
+
+      showToast('Finding your location...', 'info');
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+
+          if (!resultsMap) return;
+
+          if (userLocationMarker) {
+            userLocationMarker.setLatLng([lat, lng]);
+          } else {
+            const userPulseIcon = L.divIcon({
+              className: 'user-location-pulse-wrapper',
+              html: '<div class="user-location-pulse"></div>',
+              iconSize: [14, 14],
+              iconAnchor: [7, 7]
+            });
+            userLocationMarker = L.marker([lat, lng], { icon: userPulseIcon }).addTo(resultsMap);
+          }
+
+          resultsMap.setView([lat, lng], 14, { animate: true });
+          showToast('Located', 'success');
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          let msg = 'Failed to get location';
+          if (error.code === error.PERMISSION_DENIED) {
+            msg = 'Permission denied. Please enable location services.';
+          } else if (error.code === error.TIMEOUT) {
+            msg = 'Location request timed out. Try again.';
+          }
+          showToast(msg, 'error');
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 0
+        }
+      );
     }
 
     function renderResultsMap(locations = []) {
@@ -6515,6 +6641,9 @@
               <div class="results-map-shell">
                 <div class="results-map-card">
                   <div class="results-map-canvas" id="results-map"></div>
+                  <button class="map-locate-btn" type="button" data-action="show-my-location" title="Show my location">
+                    <img src="/location.png" alt="Locate me">
+                  </button>
                 </div>
                 <aside class="results-map-sidebar">
                   <div class="results-map-sidebar-head">
