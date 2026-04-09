@@ -878,7 +878,7 @@
       margin-inline: auto;
       justify-self: center;
       align-self: center;
-          left: -9px;
+      overflow: hidden;
     }
 
     #google-signin-button:empty::before,
@@ -6788,6 +6788,7 @@
     let authStateRefreshTimer = null;
     let authSessionRefreshInFlight = false;
     let googleButtonRendered = false;
+    let currentGoogleClientId = '';
     let latestStatusSnapshot = null;
     let onboardingStepIndex = 0;
     let onboardingAutoPrompted = false;
@@ -8245,6 +8246,12 @@
       return true;
     }
 
+    function getGoogleSignInButtonWidth(container) {
+      if (!container) return 320;
+      const measuredWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || 320);
+      return Math.max(220, Math.min(320, measuredWidth));
+    }
+
     function renderGoogleSignInButton(clientId) {
       const container = document.getElementById('google-signin-button');
       if (!container) return;
@@ -8252,10 +8259,12 @@
         window.clearTimeout(googleButtonRevealTimer);
         googleButtonRevealTimer = 0;
       }
+      currentGoogleClientId = clientId || '';
 
       if (!clientId) {
         container.innerHTML = '';
         container.classList.remove('is-pending');
+        container.style.removeProperty('--google-signin-render-width');
         updateAuthStatus('');
         return;
       }
@@ -8266,8 +8275,10 @@
         return;
       }
 
+      const buttonWidth = getGoogleSignInButtonWidth(container);
       container.innerHTML = '';
       container.classList.add('is-pending');
+      container.style.setProperty('--google-signin-render-width', `${buttonWidth}px`);
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: handleGoogleCredentialResponse,
@@ -8278,7 +8289,7 @@
         size: 'large',
         shape: 'rectangular',
         text: 'continue_with',
-        width: 320
+        width: buttonWidth
       });
       googleButtonRevealTimer = window.setTimeout(() => {
         container.classList.remove('is-pending');
