@@ -22,7 +22,7 @@ const APP_SHELL = [
   '/no-power.webp',
   '/out-of-stock.webp',
   '/ready-stock.webp',
-  '/trash.webp'
+  '/delete.png'
 ];
 const DOCUMENT_FALLBACKS = {
   '/': '/index.html',
