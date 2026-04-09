@@ -224,35 +224,32 @@ class DiscordNotifier:
             return f"http://maps.apple.com/?daddr={quote(normalized_address)}"
         return f"https://www.google.com/maps/dir/?api=1&destination={quote(normalized_address)}"
 
-    @classmethod
-    def _address_link(cls, address: object, label: Optional[str] = None) -> str:
+    def _address_link(self, address: object, label: Optional[str] = None) -> str:
         """Render a Discord-friendly markdown link when an address is available."""
         normalized_address = str(address or "").strip()
         if not normalized_address:
             return "Address unavailable"
 
-        directions_url = cls._directions_url(normalized_address)
+        directions_url = self._directions_url(normalized_address)
         safe_label = str(label or normalized_address).replace("[", "\\[").replace("]", "\\]")
         return f"[{safe_label}]({directions_url})" if directions_url else normalized_address
 
-    @classmethod
-    def _store_line(cls, store: Dict) -> str:
+    def _store_line(self, store: Dict) -> str:
         """Format a single store entry for Discord."""
         address = store.get("address", "Address unavailable")
         inventory_count = store.get("inventory_count", 0)
         distance = store.get("distance")
-        distance_text = cls._distance_text(distance)
-        return f"{cls._address_link(address)}\nQty: **{inventory_count}** | Distance: {distance_text}"
+        distance_text = self._distance_text(distance)
+        return f"{self._address_link(address)}\nQty: **{inventory_count}** | Distance: {distance_text}"
 
-    @classmethod
-    def _chunk_store_lines(cls, stores: List[Dict], limit: int = 3000) -> List[str]:
+    def _chunk_store_lines(self, stores: List[Dict], limit: int = 3000) -> List[str]:
         """Chunk formatted store lines so each embed fits Discord limits."""
         chunks: List[str] = []
         current_lines: List[str] = []
         current_len = 0
 
         for index, store in enumerate(stores, start=1):
-            line = f"{index}. {cls._store_line(store)}"
+            line = f"{index}. {self._store_line(store)}"
             projected = current_len + len(line) + (2 if current_lines else 0)
             if current_lines and projected > limit:
                 chunks.append("\n\n".join(current_lines))
@@ -395,8 +392,7 @@ class DiscordNotifier:
 
         return embeds
 
-    @classmethod
-    def _nearest_store_text(cls, stores: List[Dict]) -> str:
+    def _nearest_store_text(self, stores: List[Dict]) -> str:
         """Summarize the nearest in-stock store."""
         if not stores:
             return "No stores found"
@@ -409,8 +405,8 @@ class DiscordNotifier:
             ),
         )
         address = nearest.get("address", "Address unavailable")
-        distance_text = cls._distance_text(nearest.get("distance"))
-        return f"{cls._address_link(address)} ({distance_text})"
+        distance_text = self._distance_text(nearest.get("distance"))
+        return f"{self._address_link(address)} ({distance_text})"
 
     def notify_stock_found(self, products_with_stock: Dict, configured_zip: str) -> bool:
         """Notify when stock is found."""
