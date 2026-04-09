@@ -797,6 +797,15 @@
       font-size: 14px;
     }
 
+    #auth-signin-content,
+    .auth-waitlist-card {
+      display: grid;
+      width: 100%;
+      min-width: 0;
+      justify-items: center;
+      text-align: center;
+    }
+
     .auth-actions {
       display: flex;
       flex-direction: column;
@@ -5041,6 +5050,7 @@
         min-height: auto;
         max-height: none;
         overflow: visible;
+        overflow-x: clip;
         border: none;
         border-radius: 0;
         box-shadow: none;
@@ -5054,6 +5064,14 @@
         background-size: cover, cover;
       }
 
+      body.auth-gate-active .auth-layout,
+      body.auth-gate-active .auth-panel,
+      body.auth-gate-active .auth-panel-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
       body.auth-gate-active .auth-showcase,
       body.auth-gate-active .auth-panel {
         border-radius: 0;
@@ -5064,8 +5082,9 @@
       }
 
       body.auth-gate-active .auth-panel {
-        padding-left: 20px;
-        padding-right: 20px;
+        justify-items: center;
+        padding-left: 16px;
+        padding-right: 16px;
         padding-bottom: 12px;
       }
 
@@ -5110,8 +5129,14 @@
       }
 
       body.auth-gate-active .auth-panel-card {
+        width: 100%;
+        max-width: 820px;
         padding: 18px;
         gap: 12px;
+        margin-inline: auto;
+        justify-self: center;
+        justify-items: center;
+        text-align: center;
       }
 
       body.auth-gate-active .auth-actions {
@@ -5121,7 +5146,15 @@
 
       body.auth-gate-active #google-signin-button {
         width: min(100%, 320px);
-        margin-left: -18px;
+        margin-inline: auto;
+        margin-left: 0;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      body.auth-gate-active #google-signin-button:empty::before,
+      body.auth-gate-active #google-signin-button.is-pending::before {
+        left: 0;
       }
 
       body.auth-gate-active .auth-note-list {
@@ -5152,8 +5185,10 @@
         right: auto;
         top: auto;
         bottom: auto;
-        width: auto;
-        margin: 0 20px;
+        width: calc(100% - 32px);
+        max-width: 100%;
+        min-width: 0;
+        margin: 0 16px;
         padding: 16px 0 0;
         transform: none;
         justify-content: center;
@@ -5592,6 +5627,43 @@
 
       body.cookie-banner-active .site-footer {
         bottom: calc(166px + env(safe-area-inset-bottom, 0px));
+      }
+    }
+
+    @media (max-width: 420px) {
+      body.auth-gate-active .auth-panel-card {
+        padding: 16px 14px;
+      }
+
+      body.auth-gate-active .auth-panel-title {
+        font-size: 17px;
+        line-height: 1.24;
+        letter-spacing: 0.04em;
+        max-width: 14ch;
+        margin-inline: auto;
+        text-wrap: balance;
+      }
+
+      body.auth-gate-active .auth-panel-copy {
+        font-size: 13px;
+        line-height: 1.5;
+        max-width: 26ch;
+        margin-inline: auto;
+        text-wrap: pretty;
+      }
+
+      body.auth-gate-active .auth-note-item {
+        font-size: 13px;
+        gap: 9px;
+      }
+
+      body.auth-gate-active .auth-legal-note {
+        font-size: 9px;
+        line-height: 1.55;
+        letter-spacing: 0.03em;
+        max-width: 30ch;
+        margin-inline: auto;
+        text-wrap: pretty;
       }
     }
   </style>
