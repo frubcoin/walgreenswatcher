@@ -11,8 +11,12 @@ const state = {
   activeReviewKey: ''
 };
 
+const LIVE_OVERVIEW_POLL_MS = 30000;
+
 let bannerTimer = 0;
 let csrfToken = null;
+let liveOverviewTimer = 0;
+let liveOverviewRefreshInFlight = false;
 
 function apiUrl(path) {
   return path.startsWith('http') ? path : `${apiBase}${path}`;
@@ -949,6 +953,45 @@ function renderOverview(overview) {
   renderDashboard();
 }
 
+function stopLiveOverviewRefresh() {
+  if (liveOverviewTimer) {
+    window.clearTimeout(liveOverviewTimer);
+    liveOverviewTimer = 0;
+  }
+}
+
+function scheduleLiveOverviewRefresh(delayMs = LIVE_OVERVIEW_POLL_MS) {
+  stopLiveOverviewRefresh();
+  if (!state.session?.authenticated) return;
+  liveOverviewTimer = window.setTimeout(() => {
+    void refreshLiveOverviewPanel();
+  }, Math.max(5000, Number(delayMs) || LIVE_OVERVIEW_POLL_MS));
+}
+
+async function refreshLiveOverviewPanel() {
+  if (liveOverviewRefreshInFlight) return;
+  if (!state.session?.authenticated) return;
+  if (document.hidden) {
+    scheduleLiveOverviewRefresh();
+    return;
+  }
+
+  liveOverviewRefreshInFlight = true;
+  try {
+    const overview = await apiRequest('/api/admin/overview');
+    if (!state.session?.authenticated) return;
+    state.overview = {
+      ...(state.overview || {}),
+      platform: overview?.platform || {}
+    };
+    renderPlatformSnapshot(state.overview.platform || {});
+  } catch (error) {
+  } finally {
+    liveOverviewRefreshInFlight = false;
+    scheduleLiveOverviewRefresh();
+  }
+}
+
 async function waitForGoogleIdentity(timeoutMs = 10000) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
@@ -1023,6 +1066,7 @@ async function loadAdminOverview(showSuccessBanner = false) {
   const overview = await apiRequest('/api/admin/overview');
   renderOverview(overview);
   refreshActiveReviewModal();
+  scheduleLiveOverviewRefresh();
   if (showSuccessBanner) {
     showBanner('Admin data refreshed', 'success');
   }
@@ -1036,7 +1080,10 @@ async function refreshAdminSession({ loadOverviewIfUnlocked = true } = {}) {
   if (state.session.authenticated && loadOverviewIfUnlocked) {
     await loadAdminOverview();
   } else if (!state.session.authenticated) {
+    stopLiveOverviewRefresh();
     document.getElementById('admin-dashboard').hidden = true;
+  } else if (state.session.authenticated) {
+    scheduleLiveOverviewRefresh();
   }
 
   return state.session;
@@ -1082,6 +1129,7 @@ async function handleFullSignOut() {
 
   state.session = null;
   state.overview = null;
+  stopLiveOverviewRefresh();
   document.getElementById('admin-password').value = '';
   await refreshAdminSession({ loadOverviewIfUnlocked: false });
   showBanner('Signed out of the admin session', 'success');
@@ -1347,6 +1395,15 @@ document.getElementById('user-filter-select').addEventListener('change', event =
 document.getElementById('event-filter-select').addEventListener('change', event => {
   state.eventFilter = event.target.value || 'all';
   if (state.overview) renderEvents(state.overview.events || []);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!state.session?.authenticated) return;
+  if (document.hidden) {
+    stopLiveOverviewRefresh();
+    return;
+  }
+  scheduleLiveOverviewRefresh(500);
 });
 
 document.addEventListener('click', event => {
