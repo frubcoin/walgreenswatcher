@@ -693,38 +693,40 @@ class StockCheckScheduler:
             self.check_in_progress = False
 
     def start(self, *, run_immediately: bool = True) -> bool:
-        if self.is_running:
-            return False
+        with self.state_lock:
+            if self.is_running:
+                return True
 
-        self.refresh_from_db()
-        self.scheduler = BackgroundScheduler()
-        self.scheduler.add_job(
-            self._check_stock,
-            "interval",
-            minutes=self.check_interval_minutes,
-            id=self._job_id,
-            name=f"Retail Stock Check (user {self.user_id})",
-            replace_existing=True,
-        )
-        self.scheduler.start()
-        self.is_running = True
-        self.db.update_user_settings(self.user_id, {"scheduler_enabled": True})
+            self.refresh_from_db()
+            self.scheduler = BackgroundScheduler()
+            self.scheduler.add_job(
+                self._check_stock,
+                "interval",
+                minutes=self.check_interval_minutes,
+                id=self._job_id,
+                name=f"Retail Stock Check (user {self.user_id})",
+                replace_existing=True,
+            )
+            self.scheduler.start()
+            self.is_running = True
+            self.db.update_user_settings(self.user_id, {"scheduler_enabled": True})
 
-        if run_immediately:
-            thread = threading.Thread(target=self._check_stock, daemon=True)
-            thread.start()
-        return True
+            if run_immediately:
+                thread = threading.Thread(target=self._check_stock, daemon=True)
+                thread.start()
+            return True
 
     def stop(self) -> bool:
-        if not self.is_running:
-            return False
+        with self.state_lock:
+            if not self.is_running:
+                return True
 
-        if self.scheduler is not None:
-            self.scheduler.shutdown(wait=False)
-            self.scheduler = None
-        self.is_running = False
-        self.db.update_user_settings(self.user_id, {"scheduler_enabled": False})
-        return True
+            if self.scheduler is not None:
+                self.scheduler.shutdown(wait=False)
+                self.scheduler = None
+            self.is_running = False
+            self.db.update_user_settings(self.user_id, {"scheduler_enabled": False})
+            return True
 
     def manual_check(self) -> Dict[str, Any]:
         if self.check_in_progress:
