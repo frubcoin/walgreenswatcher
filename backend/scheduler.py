@@ -386,8 +386,8 @@ class StockCheckScheduler:
         products_with_stock: Dict[str, Dict[str, Any]] = {}
 
         for product_id, product_data in check_results.items():
-            product_key = self._tracked_product_key(product_id, product_data.get("retailer", "walgreens"))
-            tracked_product = tracked_products.get(product_key, {})
+            # product_id is already the key (retailer:article_id), use it directly
+            tracked_product = tracked_products.get(product_id, {})
 
             if tracked_product.get("exclude_from_discord"):
                 continue
