@@ -446,7 +446,7 @@ class StockDatabase:
         }
 
     def _ensure_user_settings(self, conn: sqlite3.Connection, user_id: int) -> None:
-        self._add_column_if_not_exists(
+        StockDatabase._add_column_if_not_exists(
             conn, "user_settings", "map_provider", "TEXT NOT NULL DEFAULT 'google'"
         )
         conn.execute(
