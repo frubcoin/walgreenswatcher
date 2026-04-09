@@ -142,7 +142,18 @@
                 <p class="eyebrow">Overview</p>
                 <h2 id="hero-uptime-label">Service status</h2>
               </div>
-              <div class="hero-badge" id="hero-users-total">0 users</div>
+              <div class="hero-head-actions">
+                <label class="inline-field hero-inline-field" for="overview-poll-select">
+                  <span>Live poll</span>
+                  <select id="overview-poll-select">
+                    <option value="30000">30s</option>
+                    <option value="15000">15s</option>
+                    <option value="10000">10s</option>
+                    <option value="5000">5s</option>
+                  </select>
+                </label>
+                <div class="hero-badge" id="hero-users-total">0 users</div>
+              </div>
             </div>
             <p class="hero-copy" id="hero-summary-copy">Loading platform overview...</p>
             <div class="metric-strip" id="platform-metrics-strip"></div>
