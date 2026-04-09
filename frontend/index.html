@@ -398,8 +398,7 @@
 
     body:not(.auth-gate-active) .app-window {
       max-height: calc(100dvh - 40px);
-      overflow-y: auto;
-      overscroll-behavior: contain;
+      overflow: hidden;
     }
 
     header {
@@ -11049,7 +11048,7 @@
 
       resultsMap = L.map(mapElement, {
         zoomControl: true,
-        scrollWheelZoom: true
+        scrollWheelZoom: false
       });
 
       createResultsMapThemeControl().addTo(resultsMap);
