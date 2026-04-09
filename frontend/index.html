@@ -868,13 +868,15 @@
 
     #google-signin-button {
       position: relative;
-      width: 320px;
+      width: min(100%, 320px);
+      max-width: 320px;
       height: var(--google-signin-slot-height);
-      display: flex;
+      display: block;
       justify-content: center;
       align-items: center;
       line-height: 0;
-      margin-left: -18px;
+      margin-inline: auto;
+      align-self: center;
     }
 
     #google-signin-button:empty::before,
@@ -885,7 +887,7 @@
       height: var(--google-signin-slot-height);
       box-sizing: border-box;
       position: absolute;
-      left: 10px;
+      left: 0;
       top: 0;
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -902,7 +904,7 @@
     #google-signin-button>* {
       max-width: 100%;
       display: block;
-      margin: 0 !important;
+      margin: 0 auto !important;
       align-self: center;
       transition: opacity 0.18s ease;
     }
@@ -914,7 +916,7 @@
     #google-signin-button iframe,
     #google-signin-button div[role="button"] {
       display: block !important;
-      margin: 0 !important;
+      margin: 0 auto !important;
       min-height: var(--google-signin-slot-height);
     }
 
@@ -4651,7 +4653,7 @@
       }
 
       #google-signin-button {
-        margin-left: -17px;
+        margin-inline: auto;
       }
 
       body.auth-gate-active .auth-gate {
@@ -5666,6 +5668,7 @@
         text-wrap: pretty;
       }
     }
+
   </style>
 </head>
 
