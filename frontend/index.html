@@ -4790,18 +4790,16 @@
     }
 
     body.cookie-banner-active:not(.auth-gate-active) .site-footer {
-      padding-bottom: 68px;
+      bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+      top: auto;
+      transform: translateX(-50%);
     }
 
     body:not(.auth-gate-active) .site-footer {
-      position: static;
-      left: auto;
-      bottom: auto;
-      transform: none;
-      margin-top: auto;
-      padding: 16px 0 0;
-      flex-shrink: 0;
-      width: 100%;
+      position: fixed;
+      left: 50%;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%);
     }
 
     .site-footer-copy {
@@ -6903,19 +6901,19 @@
           </div>
         </div>
       </div>
-      <footer class="site-footer" aria-label="Site footer">
-        <span class="site-footer-copy">© <span id="footer-year">2026</span> Local Pick-up Monitor by frub • Independent project •
-          Not affiliated with Walgreens</span>
-        <a class="site-footer-link" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>
-        <span aria-hidden="true">•</span>
-        <a class="site-footer-link" href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
-        <span aria-hidden="true">•</span>
-        <a class="site-footer-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>
-        <span aria-hidden="true">•</span>
-        <button class="site-footer-link" type="button" data-action="open-tech-stack">TECH &amp; CREDITS</button>
-      </footer>
     </div>
   </div>
+  <footer class="site-footer" aria-label="Site footer">
+    <span class="site-footer-copy">© <span id="footer-year">2026</span> Local Pick-up Monitor by frub • Independent project •
+      Not affiliated with Walgreens</span>
+    <a class="site-footer-link" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>
+    <span aria-hidden="true">•</span>
+    <a class="site-footer-link" href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+    <span aria-hidden="true">•</span>
+    <a class="site-footer-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>
+    <span aria-hidden="true">•</span>
+    <button class="site-footer-link" type="button" data-action="open-tech-stack">TECH &amp; CREDITS</button>
+  </footer>
   <section id="cookie-banner" class="cookie-banner" aria-label="Cookie notice" hidden>
     <div class="cookie-banner-copy">
       <div class="cookie-banner-kicker">Cookie Notice</div>
