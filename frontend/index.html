@@ -9118,7 +9118,7 @@
               </div>
               <div class="product-actions">
                 <label class="product-discord-exclusion-toggle" title="Exclude from Discord notifications">
-                  <input type="checkbox" class="product-discord-exclusion-checkbox" ${excludeFromDiscord ? 'checked' : ''} data-product-key="${safeProductKey}">
+                  <input type="checkbox" class="product-discord-exclusion-checkbox" ${excludeFromDiscord ? 'checked' : ''} data-product-key="${safeProductKey}" data-action="toggle-product-discord-exclusion">
                   <span class="toggle-label">Disable notifications</span>
                 </label>
                 ${isEditing
