@@ -2562,6 +2562,7 @@
     .results-map-card {
       flex: 1;
       min-height: 0;
+      max-height: 520px;
       display: flex;
       flex-direction: column;
       position: relative;
@@ -4788,16 +4789,18 @@
     }
 
     body.cookie-banner-active:not(.auth-gate-active) .site-footer {
-      bottom: calc(68px + env(safe-area-inset-bottom, 0px));
-      top: auto;
-      transform: translateX(-50%);
+      padding-bottom: 68px;
     }
 
     body:not(.auth-gate-active) .site-footer {
-      position: sticky;
-      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-      top: auto;
-      transform: translateX(-50%);
+      position: static;
+      left: auto;
+      bottom: auto;
+      transform: none;
+      margin-top: auto;
+      padding: 16px 0 0;
+      flex-shrink: 0;
+      width: 100%;
     }
 
     .site-footer-copy {
@@ -6169,6 +6172,11 @@
       };
     }
 
+    function createThemeTokensFromCurrentAccent() {
+      const currentAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || DEFAULT_THEME_TOKENS.accent;
+      return createBackgroundThemeTokens(currentAccent);
+    }
+
     function applyAccentTheme(tokens = DEFAULT_THEME_TOKENS) {
       const root = document.documentElement;
       root.style.setProperty('--accent', tokens.accent);
@@ -6273,7 +6281,7 @@
       );
       document.body.style.setProperty('--pokemon-bg-size', `${normalizedTileSize}px auto`);
       document.body.style.setProperty('--pokemon-bg-opacity', background.opacity || '1');
-      applyAccentTheme(enabled ? createBackgroundThemeTokens(background.accent) : DEFAULT_THEME_TOKENS);
+      applyAccentTheme(enabled ? createBackgroundThemeTokens(background.accent) : createThemeTokensFromCurrentAccent());
 
       try {
         localStorage.setItem('local_theme_prefs', JSON.stringify({
@@ -6894,6 +6902,17 @@
           </div>
         </div>
       </div>
+      <footer class="site-footer" aria-label="Site footer">
+        <span class="site-footer-copy">© <span id="footer-year">2026</span> Local Pick-up Monitor by frub • Independent project •
+          Not affiliated with Walgreens</span>
+        <a class="site-footer-link" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>
+        <span aria-hidden="true">•</span>
+        <a class="site-footer-link" href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+        <span aria-hidden="true">•</span>
+        <a class="site-footer-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>
+        <span aria-hidden="true">•</span>
+        <button class="site-footer-link" type="button" data-action="open-tech-stack">TECH &amp; CREDITS</button>
+      </footer>
     </div>
   </div>
   <section id="cookie-banner" class="cookie-banner" aria-label="Cookie notice" hidden>
@@ -6909,17 +6928,6 @@
       <button class="btn cookie-banner-dismiss" type="button" data-action="dismiss-cookie-banner">Got it</button>
     </div>
   </section>
-  <footer class="site-footer" aria-label="Site footer">
-    <span class="site-footer-copy">© <span id="footer-year">2026</span> Local Pick-up Monitor by frub • Independent project •
-      Not affiliated with Walgreens</span>
-    <a class="site-footer-link" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>
-    <span aria-hidden="true">•</span>
-    <a class="site-footer-link" href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
-    <span aria-hidden="true">•</span>
-    <a class="site-footer-link" href="/disclosures" target="_blank" rel="noopener noreferrer">Disclosures</a>
-    <span aria-hidden="true">•</span>
-    <button class="site-footer-link" type="button" data-action="open-tech-stack">TECH &amp; CREDITS</button>
-  </footer>
   <div id="shell-scrollbar" class="shell-scrollbar is-hidden" aria-hidden="true">
     <div class="shell-scrollbar-track"></div>
     <div class="shell-scrollbar-thumb"></div>
