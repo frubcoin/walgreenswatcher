@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Sequence, Union
 
 import requests
 
-from config import DISCORD_ROLE_ID, DISCORD_WEBHOOK_URL
+from config import DISCORD_ROLE_ID, DISCORD_WEBHOOK_URL, FRONTEND_BASE_URL
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -336,7 +336,7 @@ class DiscordNotifier:
                     0,
                     {
                         "name": "Check Summary",
-                        "value": f"{total_inventory} total units across {total_store_hits} store hits\n🗺️ [Open map view](https://walgreens.frub.dev/map)",
+                        "value": f"{total_inventory} total units across {total_store_hits} store hits\n🗺️ [Open map view]({FRONTEND_BASE_URL}/map)",
                         "inline": False,
                     },
                 )
@@ -382,7 +382,7 @@ class DiscordNotifier:
                             0,
                             {
                                 "name": "Check Summary",
-                                "value": f"{total_inventory} total units across {total_store_hits} store hits\n🗺️ [Open map view](https://walgreens.frub.dev/map)",
+                                "value": f"{total_inventory} total units across {total_store_hits} store hits\n🗺️ [Open map view]({FRONTEND_BASE_URL}/map)",
                                 "inline": False,
                             },
                         )

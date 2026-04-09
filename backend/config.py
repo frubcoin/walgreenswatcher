@@ -44,6 +44,7 @@ CORS_ALLOWED_ORIGINS = _env_csv(
     "CORS_ALLOWED_ORIGINS",
     "http://localhost:5000,http://127.0.0.1:5000,http://localhost:8788,http://127.0.0.1:8788",
 )
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://walgreens.frub.dev").rstrip("/")
 
 # Discord Configuration
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
