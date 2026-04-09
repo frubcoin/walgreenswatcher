@@ -167,16 +167,32 @@ def _is_allowed_cvs_host(hostname: str) -> bool:
     )
 
 
+def _is_allowed_fivebelow_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return bool(normalized) and (normalized == "fivebelow.com" or normalized.endswith(".fivebelow.com"))
+
+
+def _is_allowed_fivebelow_image_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return bool(normalized) and (
+        normalized == "fbres.fivebelow.com" or normalized.endswith(".fbres.fivebelow.com")
+    )
+
+
 
 
 
 def _is_allowed_product_source_host(hostname: str) -> bool:
-    return _is_allowed_walgreens_host(hostname) or _is_allowed_cvs_host(hostname)
+    return (
+        _is_allowed_walgreens_host(hostname)
+        or _is_allowed_cvs_host(hostname)
+        or _is_allowed_fivebelow_host(hostname)
+    )
 
 
 def _is_allowed_product_image_host(hostname: str) -> bool:
     normalized = str(hostname or "").strip().lower()
-    return _is_allowed_product_source_host(normalized)
+    return _is_allowed_product_source_host(normalized) or _is_allowed_fivebelow_image_host(normalized)
 
 
 def _normalize_external_url(

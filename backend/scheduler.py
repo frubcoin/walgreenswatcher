@@ -19,6 +19,7 @@ from config import (
 from cvs_scraper import CvsBlockedError, CvsDisabledError, CvsStockChecker
 from database import StockDatabase
 from discord_notifier import DiscordNotifier
+from fivebelow_scraper import FiveBelowStockChecker
 from walgreens_scraper import WalgreensStockChecker
 
 logging.basicConfig(level=logging.INFO)
@@ -66,6 +67,7 @@ class StockCheckScheduler:
 
         self.walgreens_checker = WalgreensStockChecker()
         self.cvs_checker = CvsStockChecker()
+        self.fivebelow_checker = FiveBelowStockChecker()
 
         self.notifier = DiscordNotifier([])
         self.is_running = False
@@ -162,6 +164,7 @@ class StockCheckScheduler:
         self.walgreens_checker.current_zip_code = self.current_zipcode
         self.walgreens_checker.search_radius_miles = self.max_notification_distance_miles
         self.cvs_checker.current_zip_code = self.current_zipcode
+        self.fivebelow_checker.current_zip_code = self.current_zipcode
 
     @staticmethod
     def _validate_interval_minutes(interval_minutes: Any) -> int:
@@ -551,11 +554,17 @@ class StockCheckScheduler:
             self.walgreens_checker.search_radius_miles = self.max_notification_distance_miles
             self.cvs_checker.progress_callback = update_progress
             self.cvs_checker.current_zip_code = self.current_zipcode
+            self.fivebelow_checker.progress_callback = update_progress
+            self.fivebelow_checker.current_zip_code = self.current_zipcode
 
             walgreens_products = [
                 product for product in product_specs if product.get("retailer", "walgreens") == "walgreens"
             ]
+            fivebelow_products = [
+                product for product in product_specs if product.get("retailer", "walgreens") == "fivebelow"
+            ]
             walgreens_stores: List[Dict[str, Any]] = []
+            fivebelow_stores: List[Dict[str, Any]] = []
             scanned_store_keys = set()
 
             if walgreens_products:
@@ -585,6 +594,38 @@ class StockCheckScheduler:
                 self._set_progress(
                     current_phase="stores_loaded",
                     progress_message=f"Found {len(walgreens_stores)} Walgreens stores near {self.current_zipcode}",
+                    current_store="Store list ready",
+                    progress_completed_units=1.0,
+                    progress_total_units=progress_total_units,
+                )
+
+            if fivebelow_products:
+                self._set_progress(
+                    current_phase="locating_stores",
+                    progress_message=f"Finding Five Below stores near {self.current_zipcode}...",
+                    current_store="Store locator",
+                    progress_completed_units=1.0,
+                    progress_total_units=progress_total_units,
+                )
+                fivebelow_stores = self.fivebelow_checker._fetch_stores_near_zip(self.current_zipcode)
+                if not fivebelow_stores:
+                    self._set_progress(
+                        current_phase="error",
+                        progress_message=f"No Five Below stores found near {self.current_zipcode}",
+                        current_store="Store locator",
+                        progress_completed_units=progress_total_units,
+                    )
+                    return
+
+                scanned_store_keys.update(
+                    f"fivebelow:{store.get('store_id')}"
+                    for store in fivebelow_stores
+                    if store.get("store_id")
+                )
+                self.total_stores = max(self.total_stores, len(fivebelow_stores))
+                self._set_progress(
+                    current_phase="stores_loaded",
+                    progress_message=f"Found {len(fivebelow_stores)} Five Below stores near {self.current_zipcode}",
                     current_store="Store list ready",
                     progress_completed_units=1.0,
                     progress_total_units=progress_total_units,
@@ -643,6 +684,13 @@ class StockCheckScheduler:
                             "stores": {},
                             "location_ids": [],
                         }
+                elif retailer == "fivebelow":
+                    product_result = self.fivebelow_checker.check_product_availability(
+                        product,
+                        fivebelow_stores,
+                        product_index=index,
+                        product_total=len(product_specs),
+                    )
                 else:
                     raise ValueError(f"Unsupported retailer: {retailer}")
 

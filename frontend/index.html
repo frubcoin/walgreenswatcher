@@ -8884,13 +8884,29 @@
       );
     }
 
+    function isAllowedFiveBelowHost(hostname) {
+      const normalized = String(hostname || '').trim().toLowerCase();
+      return Boolean(normalized) && (
+        normalized === 'fivebelow.com' ||
+        normalized.endsWith('.fivebelow.com')
+      );
+    }
+
+    function isAllowedFiveBelowImageHost(hostname) {
+      const normalized = String(hostname || '').trim().toLowerCase();
+      return Boolean(normalized) && (
+        normalized === 'fbres.fivebelow.com' ||
+        normalized.endsWith('.fbres.fivebelow.com')
+      );
+    }
+
     function isAllowedProductSourceHost(hostname) {
-      return isAllowedWalgreensHost(hostname) || isAllowedCvsHost(hostname);
+      return isAllowedWalgreensHost(hostname) || isAllowedCvsHost(hostname) || isAllowedFiveBelowHost(hostname);
     }
 
     function isAllowedProductImageHost(hostname) {
       const normalized = String(hostname || '').trim().toLowerCase();
-      return isAllowedProductSourceHost(normalized);
+      return isAllowedProductSourceHost(normalized) || isAllowedFiveBelowImageHost(normalized);
     }
 
     function sanitizeHttpUrl(value, { hostValidator = null } = {}) {
@@ -8918,6 +8934,7 @@
     function retailerKey(retailer) {
       const normalized = String(retailer || '').trim().toLowerCase();
       if (normalized === 'cvs') return 'cvs';
+      if (normalized === 'fivebelow') return 'fivebelow';
       return 'walgreens';
     }
 
@@ -8925,6 +8942,8 @@
       switch (retailerKey(retailer)) {
         case 'cvs':
           return 'CVS';
+        case 'fivebelow':
+          return 'Five Below';
         default:
           return 'Walgreens';
       }
@@ -8934,6 +8953,8 @@
       switch (retailerKey(retailer)) {
         case 'cvs':
           return '/icons/cvs.svg';
+        case 'fivebelow':
+          return '/icons/fivebelow.svg';
         default:
           return '/icons/walgreens.png';
       }

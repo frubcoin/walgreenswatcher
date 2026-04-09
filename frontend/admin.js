@@ -108,6 +108,7 @@ function retailerLabel(retailer) {
   const normalized = String(retailer || 'walgreens').trim().toLowerCase();
   if (normalized === 'cvs') return 'CVS';
   if (normalized === 'bestbuy') return 'Best Buy';
+  if (normalized === 'fivebelow') return 'Five Below';
   return 'Walgreens';
 }
 
