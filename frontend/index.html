@@ -5896,6 +5896,13 @@
       }
     }
 
+    function updateMaxRangeValueLabel(value = 20) {
+      const rangeValueLabel = document.getElementById('cfg-max-range-value');
+      if (rangeValueLabel) {
+        rangeValueLabel.textContent = `${Math.max(1, Math.min(50, Number(value) || 20))} mi`;
+      }
+    }
+
     function applyPokemonBackgroundSettings({
       enabled = DEFAULT_POKEMON_BACKGROUND_ENABLED,
       theme = DEFAULT_POKEMON_BACKGROUND_THEME,
@@ -6383,9 +6390,9 @@
             <span class="form-hint">Minutes between automatic checks</span>
           </div>
           <div class="form-group">
-            <label class="form-label">Max Search Range</label>
-            <input type="number" class="form-input" id="cfg-max-range" min="1" max="100" step="1" placeholder="20">
-            <span class="form-hint">Miles from your ZIP. Stores outside this range are excluded from results and Discord alerts.</span>
+            <label class="form-label" for="cfg-max-range">Max Search Range</label>
+            <input type="range" class="form-input" id="cfg-max-range" min="1" max="50" step="1" value="20">
+            <span class="form-hint">Miles from your ZIP. Stores outside this range are excluded from results and Discord alerts. <span id="cfg-max-range-value">20 mi</span></span>
           </div>
           <div class="form-group">
             <label class="form-label">Install App</label>
@@ -7564,8 +7571,8 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-range">Max Search Range</label>
-                  <input type="number" class="form-input" id="onboarding-range" min="1" max="100" step="1" placeholder="20" value="${escapeHtml(draft.range)}">
-                  <span class="form-hint">Miles from ZIP to search.</span>
+                  <input type="range" class="form-input" id="onboarding-range" min="1" max="50" step="1" value="${escapeHtml(draft.range || 20)}">
+                  <span class="form-hint">Miles from ZIP to search. <span id="onboarding-range-value">${escapeHtml(draft.range || 20)} mi</span></span>
                 </div>
               </div>
               <div class="onboarding-form-card">
@@ -7739,6 +7746,17 @@
         const formHtml = step.renderForm ? step.renderForm(ensureOnboardingDraft()) : '';
         formNode.innerHTML = formHtml;
         formNode.hidden = !formHtml;
+
+        // Attach real-time range slider listener for onboarding
+        const rangeInput = document.getElementById('onboarding-range');
+        if (rangeInput) {
+          rangeInput.addEventListener('input', (e) => {
+            const valueLabel = document.getElementById('onboarding-range-value');
+            if (valueLabel) {
+              valueLabel.textContent = `${Math.max(1, Math.min(50, Number(e.target.value) || 20))} mi`;
+            }
+          });
+        }
       }
       if (backButton) backButton.disabled = onboardingBusy || onboardingStepIndex === 0;
       if (nextButton) {
@@ -7914,8 +7932,8 @@
         return false;
       }
 
-      if (!Number.isFinite(range) || range < 1 || range > 100) {
-        setOnboardingFeedback('Choose a search range between 1 and 100 miles.', 'error');
+      if (!Number.isFinite(range) || range < 1 || range > 50) {
+        setOnboardingFeedback('Choose a search range between 1 and 50 miles.', 'error');
         return false;
       }
 
@@ -8381,7 +8399,7 @@
       const autoSaveFields = [
         { id: 'cfg-zip', event: 'blur' },
         { id: 'cfg-interval', event: 'blur' },
-        { id: 'cfg-max-range', event: 'blur' },
+        { id: 'cfg-max-range', event: 'input' },
         { id: 'cfg-map-provider', event: 'change' },
         { id: 'cfg-pokemon-bg-enabled', event: 'change' },
         { id: 'cfg-pokemon-bg-theme', event: 'change' },
@@ -11582,6 +11600,7 @@
       document.getElementById('cfg-zip').value = status.current_zipcode || '';
       document.getElementById('cfg-interval').value = status.check_interval_minutes || 60;
       document.getElementById('cfg-max-range').value = status.max_notification_distance_miles || 20;
+      updateMaxRangeValueLabel(status.max_notification_distance_miles || 20);
       document.getElementById('cfg-map-provider').value = status.map_provider || 'google';
       applyPokemonBackgroundSettings({
         enabled: status.pokemon_background_enabled ?? DEFAULT_POKEMON_BACKGROUND_ENABLED,
