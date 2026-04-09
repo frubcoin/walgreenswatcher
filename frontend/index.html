@@ -7445,6 +7445,7 @@
       return {
         zipcode: document.getElementById('cfg-zip')?.value.trim() || status.current_zipcode || '',
         interval: String(document.getElementById('cfg-interval')?.value || status.check_interval_minutes || 60),
+        range: String(document.getElementById('cfg-max-range')?.value || status.max_notification_distance_miles || 20),
         mapAddress: document.getElementById('cfg-map-address')?.value.trim() || loadStoredMapAddress(),
         webhookUrl: primaryDestination.url || '',
         webhookRoleId: primaryDestination.role_id || '',
@@ -7474,6 +7475,7 @@
       const draft = ensureOnboardingDraft();
       const zipInput = document.getElementById('onboarding-zip');
       const intervalInput = document.getElementById('onboarding-interval');
+      const rangeInput = document.getElementById('onboarding-range');
       const mapAddressInput = document.getElementById('onboarding-map-address');
       const webhookInput = document.getElementById('onboarding-webhook-url');
       const webhookRoleInput = document.getElementById('onboarding-webhook-role');
@@ -7484,6 +7486,7 @@
 
       if (zipInput) draft.zipcode = zipInput.value.trim();
       if (intervalInput) draft.interval = intervalInput.value.trim();
+      if (rangeInput) draft.range = rangeInput.value.trim();
       if (mapAddressInput) draft.mapAddress = mapAddressInput.value.trim();
       if (webhookInput) draft.webhookUrl = webhookInput.value.trim();
       if (webhookRoleInput) draft.webhookRoleId = webhookRoleInput.value.replace(/[^\d]/g, '');
@@ -7550,6 +7553,11 @@
                   <label class="form-label" for="onboarding-interval">Check Interval</label>
                   <input type="number" class="form-input" id="onboarding-interval" min="30" max="1440" step="1" placeholder="60" value="${escapeHtml(draft.interval)}">
                   <span class="form-hint">Minutes between automatic checks.</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="onboarding-range">Max Search Range</label>
+                  <input type="number" class="form-input" id="onboarding-range" min="1" max="100" step="1" placeholder="20" value="${escapeHtml(draft.range)}">
+                  <span class="form-hint">Miles from ZIP to search.</span>
                 </div>
               </div>
               <div class="onboarding-form-card">
@@ -7659,6 +7667,7 @@
               <div class="onboarding-summary">
                 <div class="onboarding-summary-row"><span>ZIP code</span><strong>${escapeHtml(configuredZip)}</strong></div>
                 <div class="onboarding-summary-row"><span>Check interval</span><strong>${escapeHtml(draft.interval || '60')} min</strong></div>
+                <div class="onboarding-summary-row"><span>Max range</span><strong>${escapeHtml(draft.range || '20')} mi</strong></div>
                 <div class="onboarding-summary-row"><span>Map view address</span><strong>${draft.mapAddress ? 'Saved locally' : 'Add later'}</strong></div>
                 <div class="onboarding-summary-row"><span>Discord</span><strong>${draft.webhookUrl ? 'Configured' : 'Add later'}</strong></div>
                 <div class="onboarding-summary-row"><span>Tracked products</span><strong>${trackedCount}</strong></div>
@@ -7882,6 +7891,7 @@
       const draft = ensureOnboardingDraft();
       const zip = draft.zipcode.trim();
       const interval = Number(draft.interval);
+      const range = Number(draft.range) || 20;
       const mapAddress = storeMapAddress(draft.mapAddress || '');
       const destinations = [];
       let mapAddressResolved = true;
@@ -7893,6 +7903,11 @@
 
       if (!Number.isFinite(interval) || interval < 30 || interval > 1440) {
         setOnboardingFeedback('Choose an interval between 30 and 1440 minutes.', 'error');
+        return false;
+      }
+
+      if (!Number.isFinite(range) || range < 1 || range > 100) {
+        setOnboardingFeedback('Choose a search range between 1 and 100 miles.', 'error');
         return false;
       }
 
@@ -7921,6 +7936,7 @@
       const result = await apiCall('/api/configure', 'POST', {
         zipcode: zip,
         check_interval_minutes: interval,
+        max_notification_distance_miles: range,
         discord_destinations: destinations
       });
 
@@ -7931,6 +7947,7 @@
 
       document.getElementById('cfg-zip').value = zip;
       document.getElementById('cfg-interval').value = interval;
+      document.getElementById('cfg-max-range').value = range;
       document.getElementById('cfg-map-address').value = mapAddress;
       setSettingsMapAddressStatus(
         mapAddress && mapAddressResolved
