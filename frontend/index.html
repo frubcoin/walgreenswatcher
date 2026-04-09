@@ -11892,6 +11892,7 @@
         }<span class="stat-sub-detail">${escapeHtml(formatIntervalLabel(intervalMinutes))}</span>`;
         document.getElementById('stat-products').textContent = trackedProducts.length;
         document.getElementById('stat-products-sub').textContent = `${Object.keys(lastProductsFound).length} in stock last check`;
+        renderTrackedProducts(trackedProducts);
 
         const statistics = data.statistics || {};
         if (statistics) {

@@ -155,6 +155,7 @@ class StockCheckScheduler:
                 "image_url": product.get("image_url", ""),
                 "source_url": product.get("source_url", ""),
                 "product_id": product.get("product_id", ""),
+                "exclude_from_discord": product.get("exclude_from_discord", False),
             }
             for product in products
         }
@@ -819,6 +820,7 @@ class StockCheckScheduler:
                 "image_url": product.get("image_url", ""),
                 "source_url": product.get("source_url", ""),
                 "product_id": product.get("product_id", ""),
+                "exclude_from_discord": product.get("exclude_from_discord", False),
             }
             for key, product in self.tracked_products.items()
         ]
