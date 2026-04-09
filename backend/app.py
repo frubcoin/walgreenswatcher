@@ -19,6 +19,10 @@ from urllib.parse import quote, urlparse
 from urllib.request import urlopen
 
 from flask import Flask, Response, abort, g, jsonify, request, send_from_directory, session
+try:
+    from flask_compress import Compress
+except ImportError:  # pragma: no cover - optional until dependencies are installed
+    Compress = None
 from flask_cors import CORS
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -65,6 +69,18 @@ NO_CACHE_FRONTEND_FILES = {
 STATIC_ASSET_CACHE_MAX_AGE_SECONDS = 24 * 60 * 60
 app.secret_key = FLASK_SECRET_KEY
 app.config.update(
+    COMPRESS_LEVEL=6,
+    COMPRESS_MIN_SIZE=1024,
+    COMPRESS_MIMETYPES=[
+        "text/html",
+        "text/css",
+        "text/plain",
+        "text/javascript",
+        "application/javascript",
+        "application/json",
+        "application/xml",
+        "image/svg+xml",
+    ],
     SESSION_COOKIE_NAME=SESSION_COOKIE_NAME,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SECURE=SESSION_COOKIE_SECURE,
@@ -72,6 +88,11 @@ app.config.update(
 )
 if SESSION_COOKIE_DOMAIN:
     app.config["SESSION_COOKIE_DOMAIN"] = SESSION_COOKIE_DOMAIN
+
+if Compress is not None:
+    Compress(app)
+else:
+    logger.warning("Flask-Compress is not installed; responses will be sent without app-level compression")
 
 CORS(
     app,

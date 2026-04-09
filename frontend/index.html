@@ -35,8 +35,6 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <script src="/runtime-config.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -2506,6 +2504,24 @@
       min-height: 0;
       background: #181d22;
       position: relative;
+    }
+
+    .results-map-canvas.is-loading {
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .results-map-loading {
+      max-width: 220px;
+      padding: 16px 18px;
+      border: 1px solid rgba(72, 156, 212, 0.24);
+      border-radius: 12px;
+      background: rgba(17, 21, 25, 0.88);
+      color: var(--text-secondary);
+      font-size: 14px;
+      text-align: center;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
     }
 
     .results-map-card {
@@ -5700,6 +5716,10 @@
     const STATUS_REFRESH_INTERVAL_HIDDEN_MS = 60000;
     const AUTH_REFRESH_INTERVAL_VISIBLE_MS = 15000;
     const AUTH_REFRESH_INTERVAL_HIDDEN_MS = 60000;
+    const LEAFLET_STYLE_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    const LEAFLET_STYLE_INTEGRITY = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+    const LEAFLET_SCRIPT_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    const LEAFLET_SCRIPT_INTEGRITY = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
     const MIN_POKEMON_BACKGROUND_TILE_SIZE = 200;
     const MAX_POKEMON_BACKGROUND_TILE_SIZE = 1200;
     const DEFAULT_THEME_TOKENS = {
@@ -6673,6 +6693,7 @@
     let lastResultsSignature = '';
     let lastLoadedCheckTimestamp = undefined;
     let currentResultsView = 'map';
+    let leafletLoadPromise = null;
     let latestRenderedResults = null;
     let resultsMap = null;
     let resultsMapBaseLayer = null;
@@ -7274,6 +7295,94 @@
       try {
         localStorage.setItem(RESULTS_MAP_THEME_STORAGE_KEY, normalizeResultsMapTheme(theme));
       } catch (error) {
+      }
+    }
+
+    function setResultsMapLoadingState(message = '') {
+      const mapElement = document.getElementById('results-map');
+      if (!mapElement) return;
+
+      const normalizedMessage = String(message || '').trim();
+      mapElement.classList.toggle('is-loading', Boolean(normalizedMessage));
+      mapElement.innerHTML = normalizedMessage
+        ? `<div class="results-map-loading" role="status" aria-live="polite">${escapeHtml(normalizedMessage)}</div>`
+        : '';
+    }
+
+    function loadExternalStylesheet(id, href, integrity = '') {
+      return new Promise((resolve, reject) => {
+        const existing = document.getElementById(id);
+        if (existing) {
+          existing.addEventListener('load', () => resolve(existing), { once: true });
+          existing.addEventListener('error', () => reject(new Error(`Failed to load stylesheet: ${href}`)), { once: true });
+          if (existing.sheet) {
+            resolve(existing);
+          }
+          return;
+        }
+
+        const link = document.createElement('link');
+        link.id = id;
+        link.rel = 'stylesheet';
+        link.href = href;
+        if (integrity) {
+          link.integrity = integrity;
+          link.crossOrigin = 'anonymous';
+          link.referrerPolicy = 'no-referrer';
+        }
+        link.addEventListener('load', () => resolve(link), { once: true });
+        link.addEventListener('error', () => reject(new Error(`Failed to load stylesheet: ${href}`)), { once: true });
+        document.head.appendChild(link);
+      });
+    }
+
+    function loadExternalScript(id, src, integrity = '') {
+      return new Promise((resolve, reject) => {
+        const existing = document.getElementById(id);
+        if (existing) {
+          existing.addEventListener('load', () => resolve(existing), { once: true });
+          existing.addEventListener('error', () => reject(new Error(`Failed to load script: ${src}`)), { once: true });
+          if (existing.dataset.loaded === 'true') {
+            resolve(existing);
+          }
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.id = id;
+        script.src = src;
+        script.async = true;
+        if (integrity) {
+          script.integrity = integrity;
+          script.crossOrigin = 'anonymous';
+          script.referrerPolicy = 'no-referrer';
+        }
+        script.addEventListener('load', () => {
+          script.dataset.loaded = 'true';
+          resolve(script);
+        }, { once: true });
+        script.addEventListener('error', () => reject(new Error(`Failed to load script: ${src}`)), { once: true });
+        document.body.appendChild(script);
+      });
+    }
+
+    async function ensureLeafletLoaded() {
+      if (typeof window.L !== 'undefined') {
+        return window.L;
+      }
+
+      if (!leafletLoadPromise) {
+        leafletLoadPromise = Promise.all([
+          loadExternalStylesheet('leaflet-stylesheet', LEAFLET_STYLE_URL, LEAFLET_STYLE_INTEGRITY),
+          loadExternalScript('leaflet-script', LEAFLET_SCRIPT_URL, LEAFLET_SCRIPT_INTEGRITY)
+        ]).then(() => window.L);
+      }
+
+      try {
+        return await leafletLoadPromise;
+      } catch (error) {
+        leafletLoadPromise = null;
+        throw error;
       }
     }
 
@@ -8811,14 +8920,14 @@
               <div class="onboarding-trending-item ${isSelected ? 'is-selected' : ''} trending-product-item" data-product-id="${safeId}" data-retailer="${safeRetailer}">
                 <div class="onboarding-trending-thumb">
                   ${safeImageUrl
-                ? `<img src="${escapeHtml(safeImageUrl)}" alt="${safeName}">`
-                : `<img class="trending-product-thumb-fallback" src="${safeRetailerIcon}" alt="${safeRetailerLabel}">`
+                ? `<img src="${escapeHtml(safeImageUrl)}" alt="${safeName}" loading="lazy" decoding="async">`
+                : `<img class="trending-product-thumb-fallback" src="${safeRetailerIcon}" alt="${safeRetailerLabel}" loading="lazy" decoding="async">`
               }
                 </div>
                 <div class="onboarding-trending-body">
                   <div class="onboarding-trending-meta">
                     <span class="trending-product-retailer">
-                      <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailerLabel}" title="${safeRetailerLabel}">
+                      <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailerLabel}" title="${safeRetailerLabel}" loading="lazy" decoding="async">
                       <span>${safeRetailerLabel}</span>
                     </span>
                     <span class="trending-product-chip">${escapeHtml(watcherLabel)}</span>
@@ -8869,14 +8978,14 @@
           <div class="trending-product-item" data-product-id="${safeId}" data-retailer="${safeRetailer}">
             <div class="trending-product-thumb">
               ${safeImageUrl
-            ? `<img src="${escapeHtml(safeImageUrl)}" alt="${safeName}">`
-            : `<img class="trending-product-thumb-fallback" src="${safeRetailerIcon}" alt="${escapeHtml(retailerLabel(product.retailer))}">`
+            ? `<img src="${escapeHtml(safeImageUrl)}" alt="${safeName}" loading="lazy" decoding="async">`
+            : `<img class="trending-product-thumb-fallback" src="${safeRetailerIcon}" alt="${escapeHtml(retailerLabel(product.retailer))}" loading="lazy" decoding="async">`
           }
             </div>
             <div class="trending-product-body">
               <div class="trending-product-meta">
                 <span class="trending-product-retailer">
-                  <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailerLabel}" title="${safeRetailerLabel}">
+                  <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailerLabel}" title="${safeRetailerLabel}" loading="lazy" decoding="async">
                   <span>${safeRetailerLabel}</span>
                 </span>
                 <span class="trending-product-chip">${escapeHtml(watcherLabel)}</span>
@@ -8915,7 +9024,7 @@
             <div class="product-item${isEditing ? ' is-editing' : ''}" data-product-id="${safeId}" data-retailer="${safeRetailerKey}" data-product-key="${safeProductKey}">
               <div class="product-info">
                 <div class="product-name-row">
-                  <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailer}" title="${safeRetailer}">
+                  <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailer}" title="${safeRetailer}" loading="lazy" decoding="async">
                   ${isEditing
             ? `<input type="text" class="form-input product-name-input" value="${safeName}" maxlength="160" placeholder="Product name">`
             : `<div class="product-name">${safeName}</div>`
@@ -10802,9 +10911,25 @@
         `;
 
       if (currentResultsView === 'map' && mapData.locations.length) {
-        rerenderResultsMapForFilteredLocations(filteredMapLocations);
+        if (typeof window.L === 'undefined') {
+          setResultsMapLoadingState('Loading map...');
+          void ensureLeafletLoaded()
+            .then(() => {
+              if (!latestRenderedResults || currentResultsView !== 'map') return;
+              renderResultsContent(latestRenderedResults.data, latestRenderedResults.configuredZip);
+            })
+            .catch(error => {
+              console.error('Leaflet failed to load:', error);
+              setResultsMapLoadingState('Map failed to load.');
+              showToast('Map failed to load', 'error');
+            });
+        } else {
+          setResultsMapLoadingState('');
+          rerenderResultsMapForFilteredLocations(filteredMapLocations);
+        }
       } else {
         destroyResultsMap();
+        setResultsMapLoadingState('');
       }
 
       syncManualLocationSearchUi();
@@ -11117,7 +11242,7 @@
         </div>
         ${imageUrl ? `
           <div class="result-card-thumb">
-            <img src="${escapeHtml(imageUrl)}" alt="${productName}">
+            <img src="${escapeHtml(imageUrl)}" alt="${productName}" loading="lazy" decoding="async">
           </div>
         ` : ''}
       </div>
@@ -12107,9 +12232,6 @@
       finalizeInitialReveal();
     });
   </script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-
 </body>
 
 </html>
