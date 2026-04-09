@@ -1233,6 +1233,7 @@ def configure(user: Dict[str, Any]):
     pokemon_background_enabled = data.get("pokemon_background_enabled")
     pokemon_background_theme = data.get("pokemon_background_theme")
     pokemon_background_tile_size = data.get("pokemon_background_tile_size")
+    map_provider = data.get("map_provider")
 
     try:
         if webhook_value is not None:
@@ -1249,6 +1250,8 @@ def configure(user: Dict[str, Any]):
             scheduler.set_pokemon_background_theme(pokemon_background_theme)
         if pokemon_background_tile_size is not None:
             scheduler.set_pokemon_background_tile_size(pokemon_background_tile_size)
+        if map_provider is not None:
+            scheduler.set_map_provider(map_provider)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -1277,6 +1280,7 @@ def configure(user: Dict[str, Any]):
             "pokemon_background_enabled": scheduler.pokemon_background_enabled,
             "pokemon_background_theme": scheduler.pokemon_background_theme,
             "pokemon_background_tile_size": scheduler.pokemon_background_tile_size,
+            "map_provider": scheduler.map_provider,
         }
     )
 

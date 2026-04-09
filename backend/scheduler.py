@@ -79,6 +79,7 @@ class StockCheckScheduler:
         self.pokemon_background_enabled = DEFAULT_POKEMON_BACKGROUND_ENABLED
         self.pokemon_background_theme = DEFAULT_POKEMON_BACKGROUND_THEME
         self.pokemon_background_tile_size = DEFAULT_POKEMON_BACKGROUND_TILE_SIZE
+        self.map_provider = "google"
         self.tracked_products: Dict[str, Dict[str, str]] = {}
 
         self.check_in_progress = False
@@ -141,7 +142,8 @@ class StockCheckScheduler:
         self.pokemon_background_enabled = settings["pokemon_background_enabled"]
         self.pokemon_background_theme = settings["pokemon_background_theme"]
         self.pokemon_background_tile_size = settings["pokemon_background_tile_size"]
-        self.notifier = DiscordNotifier(self.discord_destinations or None)
+        self.map_provider = settings.get("map_provider", "google")
+        self.notifier = DiscordNotifier(self.discord_destinations or None, map_provider=self.map_provider)
         self.tracked_products = {
             self._tracked_product_key(product["id"], product.get("retailer", "walgreens")): {
                 "key": product.get("key")
@@ -320,6 +322,15 @@ class StockCheckScheduler:
         value = self._validate_pokemon_background_tile_size(tile_size)
         self._update_setting(pokemon_background_tile_size=value)
         return self.pokemon_background_tile_size
+
+    def set_map_provider(self, provider: Any) -> str:
+        normalized = str(provider or "google").strip().lower()
+        if normalized not in ("google", "apple"):
+            raise ValueError("Map provider must be 'google' or 'apple'")
+        self._update_setting(map_provider=normalized)
+        self.map_provider = normalized
+        self.notifier = DiscordNotifier(self.discord_destinations or None, map_provider=normalized)
+        return self.map_provider
 
     def _product_specs(self) -> List[Dict[str, str]]:
         return [
@@ -813,6 +824,7 @@ class StockCheckScheduler:
             "pokemon_background_enabled": self.pokemon_background_enabled,
             "pokemon_background_theme": self.pokemon_background_theme,
             "pokemon_background_tile_size": self.pokemon_background_tile_size,
+            "map_provider": self.map_provider,
             "tracked_products": products_list,
         }
 

@@ -84,6 +84,7 @@ class StockDatabase:
                     pokemon_background_theme TEXT NOT NULL DEFAULT 'gyra',
                     pokemon_background_tile_size INTEGER NOT NULL DEFAULT 645,
                     scheduler_enabled INTEGER NOT NULL DEFAULT 0,
+                    map_provider TEXT NOT NULL DEFAULT 'google',
                     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
 
@@ -445,6 +446,9 @@ class StockDatabase:
         }
 
     def _ensure_user_settings(self, conn: sqlite3.Connection, user_id: int) -> None:
+        self._add_column_if_not_exists(
+            conn, "user_settings", "map_provider", "TEXT NOT NULL DEFAULT 'google'"
+        )
         conn.execute(
             """
             INSERT INTO user_settings (
@@ -456,9 +460,10 @@ class StockDatabase:
                 pokemon_background_enabled,
                 pokemon_background_theme,
                 pokemon_background_tile_size,
-                scheduler_enabled
+                scheduler_enabled,
+                map_provider
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'google')
             ON CONFLICT(user_id) DO NOTHING
             """,
             (
@@ -548,6 +553,7 @@ class StockDatabase:
                 "pokemon_background_theme": DEFAULT_POKEMON_BACKGROUND_THEME,
                 "pokemon_background_tile_size": DEFAULT_POKEMON_BACKGROUND_TILE_SIZE,
                 "scheduler_enabled": False,
+                "map_provider": "google",
             }
 
         data = dict(row)
@@ -562,6 +568,7 @@ class StockDatabase:
             "pokemon_background_theme": data["pokemon_background_theme"] or DEFAULT_POKEMON_BACKGROUND_THEME,
             "pokemon_background_tile_size": int(data["pokemon_background_tile_size"] or DEFAULT_POKEMON_BACKGROUND_TILE_SIZE),
             "scheduler_enabled": bool(data["scheduler_enabled"]),
+            "map_provider": data.get("map_provider") or "google",
         }
 
     def update_user_settings(self, user_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -583,7 +590,8 @@ class StockDatabase:
                     pokemon_background_enabled = ?,
                     pokemon_background_theme = ?,
                     pokemon_background_tile_size = ?,
-                    scheduler_enabled = ?
+                    scheduler_enabled = ?,
+                    map_provider = ?
                 WHERE user_id = ?
                 """,
                 (
@@ -595,6 +603,7 @@ class StockDatabase:
                     merged["pokemon_background_theme"],
                     int(merged["pokemon_background_tile_size"]),
                     int(bool(merged.get("scheduler_enabled"))),
+                    merged.get("map_provider", "google"),
                     user_id,
                 ),
             )

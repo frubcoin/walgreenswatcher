@@ -6418,6 +6418,14 @@
             <span class="form-hint">Used only for the map view when live location fails or when you want a quick saved
               place. Stored in this browser only.</span>
           </div>
+          <div class="form-group">
+            <label class="form-label" for="cfg-map-provider">Map Provider</label>
+            <select class="form-input" id="cfg-map-provider">
+              <option value="google">Google Maps</option>
+              <option value="apple">Apple Maps</option>
+            </select>
+            <span class="form-hint">Choose which map provider to use for store directions in Discord alerts.</span>
+          </div>
         </div>
 
         <!-- Cosmetic Settings -->
@@ -8374,6 +8382,7 @@
         { id: 'cfg-zip', event: 'blur' },
         { id: 'cfg-interval', event: 'blur' },
         { id: 'cfg-max-range', event: 'blur' },
+        { id: 'cfg-map-provider', event: 'change' },
         { id: 'cfg-pokemon-bg-enabled', event: 'change' },
         { id: 'cfg-pokemon-bg-theme', event: 'change' },
         { id: 'cfg-pokemon-bg-size', event: 'change' }
@@ -10836,9 +10845,12 @@
 
     function buildDirectionsUrl(address) {
       const normalizedAddress = String(address || '').trim();
-      return normalizedAddress
-        ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(normalizedAddress)}`
-        : '';
+      if (!normalizedAddress) return '';
+      const mapProvider = document.getElementById('cfg-map-provider')?.value || 'google';
+      if (mapProvider === 'apple') {
+        return `http://maps.apple.com/?daddr=${encodeURIComponent(normalizedAddress)}`;
+      }
+      return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(normalizedAddress)}`;
     }
 
     function renderAddressLink(address) {
@@ -11570,6 +11582,7 @@
       document.getElementById('cfg-zip').value = status.current_zipcode || '';
       document.getElementById('cfg-interval').value = status.check_interval_minutes || 60;
       document.getElementById('cfg-max-range').value = status.max_notification_distance_miles || 20;
+      document.getElementById('cfg-map-provider').value = status.map_provider || 'google';
       applyPokemonBackgroundSettings({
         enabled: status.pokemon_background_enabled ?? DEFAULT_POKEMON_BACKGROUND_ENABLED,
         theme: status.pokemon_background_theme || DEFAULT_POKEMON_BACKGROUND_THEME,
@@ -11591,6 +11604,7 @@
       const pokemonBackgroundEnabled = document.getElementById('cfg-pokemon-bg-enabled').checked;
       const pokemonBackgroundTheme = document.getElementById('cfg-pokemon-bg-theme').value || DEFAULT_POKEMON_BACKGROUND_THEME;
       const pokemonBackgroundTileSize = normalizePokemonBackgroundTileSize(document.getElementById('cfg-pokemon-bg-size').value);
+      const mapProvider = document.getElementById('cfg-map-provider').value || 'google';
       manualLocationQuery = mapAddress;
       syncManualLocationSearchUi();
       let mapAddressResolved = true;
@@ -11610,6 +11624,7 @@
       data.pokemon_background_enabled = pokemonBackgroundEnabled;
       data.pokemon_background_theme = pokemonBackgroundTheme;
       data.pokemon_background_tile_size = pokemonBackgroundTileSize;
+      data.map_provider = mapProvider;
 
       const result = await apiCall('/api/configure', 'POST', data);
       if (result) {

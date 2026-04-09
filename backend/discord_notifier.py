@@ -34,10 +34,11 @@ class DiscordNotifier:
     EMBED_FIELD_VALUE_LIMIT = 1024
     MAX_EMBEDS_PER_MESSAGE = 10
 
-    def __init__(self, webhook_url: Optional[Union[str, Sequence[str]]] = None):
+    def __init__(self, webhook_url: Optional[Union[str, Sequence[str]]] = None, map_provider: str = "google"):
         self.destinations = self._normalize_destinations(webhook_url or DISCORD_WEBHOOK_URL)
         self.webhook_urls = [destination["url"] for destination in self.destinations]
         self.is_configured = bool(self.destinations)
+        self.map_provider = map_provider if map_provider in ("google", "apple") else "google"
         self.brand_logo_filename = "frubgreens.webp"
         self.brand_logo_path = os.path.join(
             os.path.dirname(__file__), "..", "frontend", self.brand_logo_filename
@@ -214,12 +215,13 @@ class DiscordNotifier:
             return f"{distance:.2f} mi"
         return "Distance unavailable"
 
-    @staticmethod
-    def _directions_url(address: object) -> str:
-        """Build a Google Maps directions URL for a store address."""
+    def _directions_url(self, address: object) -> str:
+        """Build a directions URL for a store address using the configured map provider."""
         normalized_address = str(address or "").strip()
         if not normalized_address:
             return ""
+        if self.map_provider == "apple":
+            return f"http://maps.apple.com/?daddr={quote(normalized_address)}"
         return f"https://www.google.com/maps/dir/?api=1&destination={quote(normalized_address)}"
 
     @classmethod
