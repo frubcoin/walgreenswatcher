@@ -878,8 +878,6 @@
       margin-inline: auto;
       justify-self: center;
       align-self: center;
-          left: -10px;
-
     }
 
     #google-signin-button>* {
@@ -5126,6 +5124,19 @@
       body.auth-gate-active .auth-actions {
         min-height: auto;
         gap: 12px;
+      }
+
+      body.auth-gate-active .auth-install-slot {
+        display: none;
+        min-height: 0;
+      }
+
+      body.auth-gate-active.install-slot-active .auth-actions {
+        min-height: auto;
+      }
+
+      body.auth-gate-active.install-slot-active .auth-install-slot {
+        min-height: 0;
       }
 
       body.auth-gate-active #google-signin-button {
