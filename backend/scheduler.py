@@ -387,11 +387,6 @@ class StockCheckScheduler:
 
         for product_id, product_data in check_results.items():
             # product_id is already the key (retailer:article_id), use it directly
-            tracked_product = tracked_products.get(product_id, {})
-
-            if tracked_product.get("exclude_from_discord"):
-                continue
-
             availability = dict(product_data.get("availability") or {})
             in_stock_stores = [store_id for store_id, in_stock in availability.items() if in_stock]
             if not in_stock_stores:
@@ -694,14 +689,20 @@ class StockCheckScheduler:
             self.last_products_with_stock = products_with_stock
 
             if products_with_stock:
-                self._set_progress(
-                    current_phase="notifying",
-                    progress_message=f"Sending Discord alerts for {len(products_with_stock)} product(s)...",
-                    current_store="Discord notifications",
-                    progress_completed_units=max(progress_total_units - 0.5, 0),
-                    progress_total_units=progress_total_units,
-                )
-                self.notifier.notify_stock_found(products_with_stock, self.current_zipcode)
+                # Filter out products excluded from Discord notifications
+                discord_products = {
+                    k: v for k, v in products_with_stock.items()
+                    if not self.tracked_products.get(k, {}).get("exclude_from_discord", False)
+                }
+                if discord_products:
+                    self._set_progress(
+                        current_phase="notifying",
+                        progress_message=f"Sending Discord alerts for {len(discord_products)} product(s)...",
+                        current_store="Discord notifications",
+                        progress_completed_units=max(progress_total_units - 0.5, 0),
+                        progress_total_units=progress_total_units,
+                    )
+                    self.notifier.notify_stock_found(discord_products, self.current_zipcode)
 
             self._set_progress(
                 current_phase="complete",
