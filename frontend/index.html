@@ -878,19 +878,19 @@
       margin-inline: auto;
       justify-self: center;
       align-self: center;
-      overflow: hidden;
     }
 
     #google-signin-button:empty::before,
     #google-signin-button.is-pending::before {
       content: '';
       display: block;
-      width: 100%;
+      width: min(var(--google-signin-render-width, 320px), 100%);
       height: var(--google-signin-slot-height);
       box-sizing: border-box;
       position: absolute;
-      left: 0;
+      left: 50%;
       top: 0;
+      transform: translateX(-50%);
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       background:
@@ -5159,7 +5159,7 @@
 
       body.auth-gate-active #google-signin-button:empty::before,
       body.auth-gate-active #google-signin-button.is-pending::before {
-        left: 0;
+        left: 50%;
       }
 
       body.auth-gate-active .auth-note-list {
