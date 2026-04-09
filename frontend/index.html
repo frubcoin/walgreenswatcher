@@ -4507,22 +4507,35 @@
     }
 
     .cookie-banner-dismiss {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 34px;
       min-height: 34px;
-      padding: 0 14px;
+      padding: 0 16px;
       border-radius: 999px;
-      border: 1px solid var(--accent-soft-border);
-      background: var(--accent-soft);
+      border: 1px solid rgba(244, 99, 31, 0.82);
+      background: rgba(244, 99, 31, 0.08);
       color: var(--text-primary);
       font-size: 12px;
       font-weight: 700;
       letter-spacing: 0.04em;
       text-transform: uppercase;
+      transition:
+        border-color 0.18s ease,
+        background 0.18s ease,
+        color 0.18s ease,
+        transform 0.18s ease,
+        box-shadow 0.18s ease;
     }
 
     .cookie-banner-dismiss:hover,
     .cookie-banner-dismiss:focus-visible {
-      border-color: var(--accent);
-      background: rgba(255, 255, 255, 0.1);
+      border-color: #f4631f;
+      background: #f4631f;
+      color: #171b1f;
+      box-shadow: 0 10px 24px rgba(244, 99, 31, 0.28);
+      transform: translateY(-1px);
       outline: none;
     }
 
