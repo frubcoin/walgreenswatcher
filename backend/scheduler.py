@@ -282,6 +282,17 @@ class StockCheckScheduler:
             self.refresh_from_db()
         return success
 
+    def set_product_discord_exclusion(self, product_id: str, exclude: bool, retailer: str = "") -> bool:
+        success = self.db.update_product_discord_exclusion(
+            self.user_id,
+            product_id,
+            exclude,
+            retailer.strip(),
+        )
+        if success:
+            self.refresh_from_db()
+        return success
+
     def set_zipcode(self, zipcode: str) -> None:
         normalized_zipcode = str(zipcode).strip() or TARGET_ZIP_CODE
         self._update_setting(current_zipcode=normalized_zipcode)
@@ -368,11 +379,18 @@ class StockCheckScheduler:
     def _job_id(self) -> str:
         return f"stock_check_user_{self.user_id}"
 
-    @staticmethod
-    def _extract_products_with_stock(check_results: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    def _extract_products_with_stock(
+        self, check_results: Dict[str, Dict[str, Any]], tracked_products: Dict[str, Dict[str, str]]
+    ) -> Dict[str, Dict[str, Any]]:
         products_with_stock: Dict[str, Dict[str, Any]] = {}
 
         for product_id, product_data in check_results.items():
+            product_key = self._tracked_product_key(product_id, product_data.get("retailer", "walgreens"))
+            tracked_product = tracked_products.get(product_key, {})
+
+            if tracked_product.get("exclude_from_discord"):
+                continue
+
             availability = dict(product_data.get("availability") or {})
             in_stock_stores = [store_id for store_id, in_stock in availability.items() if in_stock]
             if not in_stock_stores:
@@ -652,7 +670,7 @@ class StockCheckScheduler:
                     "stores": product_result["stores"],
                 }
 
-            products_with_stock = self._extract_products_with_stock(check_results)
+            products_with_stock = self._extract_products_with_stock(check_results, self.tracked_products)
 
             timestamp = datetime.utcnow().isoformat()
             self._set_progress(

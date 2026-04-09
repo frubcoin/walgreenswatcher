@@ -1490,31 +1490,41 @@ def update_product(user: Dict[str, Any]):
     product_id = str(data.get("id", "")).strip()
     retailer = str(data.get("retailer", "")).strip()
     product_name = str(data.get("name", "")).strip()
+    exclude_from_discord = data.get("exclude_from_discord")
 
     if not product_id:
         return jsonify({"error": "Product ID required"}), 400
-    if not product_name:
-        return jsonify({"error": "Product name required"}), 400
 
-    try:
-        success = scheduler.update_product_name(product_id, product_name, retailer=retailer)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    success = True
+    if product_name:
+        try:
+            success = scheduler.update_product_name(product_id, product_name, retailer=retailer)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    if exclude_from_discord is not None:
+        try:
+            exclude_success = scheduler.set_product_discord_exclusion(product_id, bool(exclude_from_discord), retailer=retailer)
+            success = success and exclude_success
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     if success:
-        _record_audit_event(
-            "user.product_renamed",
-            f"Tracked product renamed by {user['email']}: {product_name}",
-            actor_user=user,
-            metadata={"product_id": product_id, "retailer": retailer or "walgreens", "name": product_name},
-            alert_category="user_action",
-        )
+        if product_name:
+            _record_audit_event(
+                "user.product_renamed",
+                f"Tracked product renamed by {user['email']}: {product_name}",
+                actor_user=user,
+                metadata={"product_id": product_id, "retailer": retailer or "walgreens", "name": product_name},
+                alert_category="user_action",
+            )
         return jsonify(
             {
                 "message": "Product updated",
                 "id": product_id,
                 "retailer": retailer or "walgreens",
                 "name": product_name,
+                "exclude_from_discord": exclude_from_discord,
             }
         )
     return jsonify({"error": "Product not found"}), 404

@@ -4097,6 +4097,39 @@
       justify-content: flex-end;
     }
 
+    .product-discord-exclusion-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      transition: background 0.16s ease, border-color 0.16s ease;
+    }
+
+    .product-discord-exclusion-toggle:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .product-discord-exclusion-checkbox {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+
+    .toggle-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
     .product-id {
       font-size: 11px;
       color: var(--text-muted);
@@ -6446,7 +6479,7 @@
         </div>
         <div class="stat-card">
           <div class="stat-label">Next Check</div>
-          <div class="stat-value stat-value-copy" id="stat-next-check">-</div>
+          <div class="stat-value" id="stat-next-check">-</div>
           <div class="stat-sub" id="stat-next-check-sub">Scheduler inactive</div>
         </div>
         <div class="stat-card">
@@ -9062,6 +9095,7 @@
         const safeRetailer = escapeHtml(retailerLabel(p.retailer));
         const safeRetailerIcon = escapeHtml(retailerIconPath(p.retailer));
         const safeProductKey = escapeHtml(productKey);
+        const excludeFromDiscord = Boolean(p.exclude_from_discord || false);
 
         return `
             <div class="product-item${isEditing ? ' is-editing' : ''}" data-product-id="${safeId}" data-retailer="${safeRetailerKey}" data-product-key="${safeProductKey}">
@@ -9076,6 +9110,10 @@
                 <div class="product-id">${safeId} | ${safePlanogram}</div>
               </div>
               <div class="product-actions">
+                <label class="product-discord-exclusion-toggle" title="Exclude from Discord notifications">
+                  <input type="checkbox" class="product-discord-exclusion-checkbox" ${excludeFromDiscord ? 'checked' : ''} data-product-key="${safeProductKey}" data-action="toggle-product-discord-exclusion">
+                  <span class="toggle-label">No Discord</span>
+                </label>
                 ${isEditing
             ? `
                     <button class="btn btn-secondary btn-sm" type="button" data-action="cancel-product-name-edit">Cancel</button>
@@ -9161,6 +9199,24 @@
         await loadSettings();
       } else {
         showToast('Failed to update product name', 'error');
+      }
+    }
+
+    async function toggleProductDiscordExclusion(productKey, exclude) {
+      const product = trackedProductsCache.find(p => p.key === productKey);
+      if (!product) return;
+
+      const success = await apiCall('/api/products/update', 'POST', {
+        id: product.id,
+        retailer: product.retailer,
+        exclude_from_discord: exclude,
+      });
+
+      if (success) {
+        await loadStatus();
+        showFeedback(exclude ? 'Product excluded from Discord notifications' : 'Product included in Discord notifications', 'success');
+      } else {
+        showFeedback('Failed to update Discord notification setting', 'error');
       }
     }
 
@@ -10383,6 +10439,15 @@
           const retailer = getProductRetailerFromElement(actionElement);
           if (productId) {
             await saveProductName(productId, retailer, actionElement);
+          }
+          return;
+        }
+        case 'toggle-product-discord-exclusion': {
+          const checkbox = actionElement;
+          const productKey = checkbox.dataset?.productKey || '';
+          const exclude = checkbox.checked;
+          if (productKey) {
+            await toggleProductDiscordExclusion(productKey, exclude);
           }
           return;
         }

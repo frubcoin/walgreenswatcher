@@ -463,6 +463,9 @@ class StockDatabase:
         StockDatabase._add_column_if_not_exists(
             conn, "user_settings", "map_provider", "TEXT NOT NULL DEFAULT 'google'"
         )
+        StockDatabase._add_column_if_not_exists(
+            conn, "tracked_products", "exclude_from_discord", "INTEGER NOT NULL DEFAULT 0"
+        )
         conn.execute(
             """
             INSERT INTO user_settings (
@@ -628,7 +631,7 @@ class StockDatabase:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT article_id, retailer, name, planogram, image_url, source_url, product_id
+                SELECT article_id, retailer, name, planogram, image_url, source_url, product_id, exclude_from_discord
                 FROM tracked_products
                 WHERE user_id = ?
                 ORDER BY created_at ASC, article_id ASC
@@ -645,6 +648,7 @@ class StockDatabase:
                 "planogram": row["planogram"],
                 "image_url": row["image_url"] or "",
                 "source_url": row["source_url"] or "",
+                "exclude_from_discord": bool(row["exclude_from_discord"] or 0),
                 "product_id": row["product_id"] or "",
             }
             for row in rows
@@ -1211,6 +1215,35 @@ class StockDatabase:
                     WHERE user_id = ? AND article_id = ?
                     """,
                     (name, user_id, article_id),
+                )
+        return cursor.rowcount > 0
+
+    def update_product_discord_exclusion(
+        self,
+        user_id: int,
+        article_id: str,
+        exclude_from_discord: bool,
+        retailer: str = "",
+    ) -> bool:
+        with self._connect() as conn:
+            exclude_value = 1 if exclude_from_discord else 0
+            if retailer:
+                cursor = conn.execute(
+                    """
+                    UPDATE tracked_products
+                    SET exclude_from_discord = ?
+                    WHERE user_id = ? AND article_id = ? AND retailer = ?
+                    """,
+                    (exclude_value, user_id, article_id, retailer),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    UPDATE tracked_products
+                    SET exclude_from_discord = ?
+                    WHERE user_id = ? AND article_id = ?
+                    """,
+                    (exclude_value, user_id, article_id),
                 )
         return cursor.rowcount > 0
 

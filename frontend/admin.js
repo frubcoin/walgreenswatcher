@@ -99,7 +99,7 @@ function formatInterval(value) {
   const minutes = Math.max(1, Number(value || 0));
   if (minutes % 60 === 0) {
     const hours = minutes / 60;
-    return hours === 1 ? 'Checks every 1 hour' : `Every ${hours} hours`;
+    return hours === 1 ? 'Checks every 1 hour' : `every ${hours} hours`;
   }
   return `Checks every ${minutes} min`;
 }
