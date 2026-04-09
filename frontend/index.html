@@ -5903,6 +5903,22 @@
       }
     }
 
+    function formatIntervalLabel(minutes) {
+      const m = Math.max(30, Math.min(1440, Number(minutes) || 60));
+      const hrs = Math.floor(m / 60);
+      const mins = m % 60;
+      if (hrs > 0 && mins > 0) return `${m} min (${hrs} hr ${mins} min)`;
+      if (hrs > 0) return `${m} min (${hrs} hr)`;
+      return `${m} min`;
+    }
+
+    function updateIntervalValueLabel(value = 60) {
+      const intervalValueLabel = document.getElementById('cfg-interval-value');
+      if (intervalValueLabel) {
+        intervalValueLabel.textContent = formatIntervalLabel(value);
+      }
+    }
+
     function applyPokemonBackgroundSettings({
       enabled = DEFAULT_POKEMON_BACKGROUND_ENABLED,
       theme = DEFAULT_POKEMON_BACKGROUND_THEME,
@@ -6385,14 +6401,15 @@
             <span class="form-hint">Search location</span>
           </div>
           <div class="form-group">
-            <label class="form-label">Check Interval</label>
-            <input type="number" class="form-input" id="cfg-interval" min="30" max="1440" step="1" placeholder="60">
-            <span class="form-hint">Minutes between automatic checks</span>
+            <label class="form-label" for="cfg-interval">Check Interval</label>
+            <input type="range" class="form-input" id="cfg-interval" min="30" max="1440" step="30" value="60">
+            <span class="form-hint">Time between automatic checks. <span id="cfg-interval-value">60 min (1 hr)</span></span>
           </div>
           <div class="form-group">
             <label class="form-label" for="cfg-max-range">Max Search Range</label>
             <input type="range" class="form-input" id="cfg-max-range" min="1" max="50" step="1" value="20">
-            <span class="form-hint">Miles from your ZIP. Stores outside this range are excluded from results and Discord alerts. <span id="cfg-max-range-value">20 mi</span></span>
+            <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;"><span id="cfg-max-range-value">20</span> miles</div>
+            <span class="form-hint">Stores outside this range are excluded from results and Discord alerts.</span>
           </div>
           <div class="form-group">
             <label class="form-label">Install App</label>
@@ -7566,8 +7583,8 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-interval">Check Interval</label>
-                  <input type="number" class="form-input" id="onboarding-interval" min="30" max="1440" step="1" placeholder="60" value="${escapeHtml(draft.interval)}">
-                  <span class="form-hint">Minutes between automatic checks.</span>
+                  <input type="range" class="form-input" id="onboarding-interval" min="30" max="1440" step="30" value="${escapeHtml(draft.interval || 60)}">
+                  <span class="form-hint">Time between automatic checks. <span id="onboarding-interval-value">${escapeHtml(draft.interval || 60)} min (1 hr)</span></span>
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-range">Max Search Range</label>
@@ -7754,6 +7771,23 @@
             const valueLabel = document.getElementById('onboarding-range-value');
             if (valueLabel) {
               valueLabel.textContent = `${Math.max(1, Math.min(50, Number(e.target.value) || 20))} mi`;
+            }
+          });
+        }
+
+        // Attach real-time interval slider listener for onboarding
+        const intervalInput = document.getElementById('onboarding-interval');
+        if (intervalInput) {
+          intervalInput.addEventListener('input', (e) => {
+            const valueLabel = document.getElementById('onboarding-interval-value');
+            if (valueLabel) {
+              const m = Math.max(30, Math.min(1440, Number(e.target.value) || 60));
+              const hrs = Math.floor(m / 60);
+              const mins = m % 60;
+              let label = `${m} min`;
+              if (hrs > 0 && mins > 0) label += ` (${hrs} hr ${mins} min)`;
+              else if (hrs > 0) label += ` (${hrs} hr)`;
+              valueLabel.textContent = label;
             }
           });
         }
@@ -8398,8 +8432,8 @@
     function initializeSettingsAutoSave() {
       const autoSaveFields = [
         { id: 'cfg-zip', event: 'blur' },
-        { id: 'cfg-interval', event: 'blur' },
-        { id: 'cfg-max-range', event: 'input' },
+        { id: 'cfg-interval', event: 'change' },
+        { id: 'cfg-max-range', event: 'change' },
         { id: 'cfg-map-provider', event: 'change' },
         { id: 'cfg-pokemon-bg-enabled', event: 'change' },
         { id: 'cfg-pokemon-bg-theme', event: 'change' },
@@ -11599,6 +11633,7 @@
       const status = data.status || {};
       document.getElementById('cfg-zip').value = status.current_zipcode || '';
       document.getElementById('cfg-interval').value = status.check_interval_minutes || 60;
+      updateIntervalValueLabel(status.check_interval_minutes || 60);
       document.getElementById('cfg-max-range').value = status.max_notification_distance_miles || 20;
       updateMaxRangeValueLabel(status.max_notification_distance_miles || 20);
       document.getElementById('cfg-map-provider').value = status.map_provider || 'google';
