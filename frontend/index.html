@@ -496,7 +496,8 @@
       z-index: 1;
     }
 
-    .auth-gate[hidden] {
+    .auth-gate[hidden],
+    #app-shell[hidden] {
       display: none;
     }
 
@@ -508,6 +509,8 @@
     body:not(.auth-gate-active) .wrapper {
       min-height: 100dvh;
       padding-bottom: var(--shell-footer-gap);
+      display: flex;
+      flex-direction: column;
     }
 
     body.auth-gate-active .auth-gate {
@@ -4795,10 +4798,10 @@
     }
 
     body:not(.auth-gate-active) .site-footer {
-      position: fixed;
-      left: 50%;
-      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-      transform: translateX(-50%);
+      position: static;
+      margin-top: auto;
+      padding: 24px 0 12px;
+      width: 100%;
     }
 
     .site-footer-copy {
