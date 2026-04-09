@@ -9,10 +9,14 @@ import shutil
 import sys
 import threading
 import time
+import ipaddress
+import json
 from functools import wraps
 from pathlib import Path
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlparse
+from urllib.request import urlopen
 
 from flask import Flask, Response, abort, g, jsonify, request, send_from_directory, session
 from flask_cors import CORS
@@ -82,6 +86,43 @@ CSRF_SESSION_KEY = "csrf_token"
 _system_stats_lock = threading.Lock()
 _last_cpu_snapshot: Optional[tuple[float, float]] = None
 _last_network_snapshot: Optional[Dict[str, float]] = None
+COOKIE_NOTICE_COUNTRY_CODES = {
+    "AT",
+    "BE",
+    "BG",
+    "HR",
+    "CY",
+    "CZ",
+    "DE",
+    "DK",
+    "EE",
+    "ES",
+    "FI",
+    "FR",
+    "GB",
+    "GR",
+    "HU",
+    "IE",
+    "IS",
+    "IT",
+    "LI",
+    "LT",
+    "LU",
+    "LV",
+    "MT",
+    "NL",
+    "NO",
+    "PL",
+    "PT",
+    "RO",
+    "SE",
+    "SI",
+    "SK",
+}
+COUNTRY_LOOKUP_CACHE_TTL_SECONDS = 24 * 60 * 60
+COUNTRY_LOOKUP_TIMEOUT_SECONDS = 2.5
+_country_lookup_cache_lock = threading.Lock()
+_country_lookup_cache: Dict[str, tuple[float, str]] = {}
 
 
 def _is_allowed_walgreens_host(hostname: str) -> bool:
@@ -303,6 +344,96 @@ def _request_origin_allowed() -> bool:
     return False
 
 
+def _normalize_country_code(value: Any) -> str:
+    normalized = str(value or "").strip().upper()
+    if len(normalized) != 2 or not normalized.isalpha():
+        return ""
+    return normalized
+
+
+def _normalize_public_ip(value: Any) -> str:
+    candidate = str(value or "").strip()
+    if not candidate:
+        return ""
+
+    try:
+        ip = ipaddress.ip_address(candidate)
+    except ValueError:
+        return ""
+
+    if (
+        ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_private
+        or ip.is_reserved
+        or ip.is_unspecified
+    ):
+        return ""
+
+    return str(ip)
+
+
+def _request_ip_for_country_lookup() -> str:
+    remote_addr = _normalize_public_ip(request.remote_addr)
+    if remote_addr:
+        return remote_addr
+
+    # Only trust forwarded addresses when the direct peer is local/private.
+    forwarded_for = str(request.headers.get("X-Forwarded-For") or "").strip()
+    if not forwarded_for:
+        return ""
+
+    for candidate in forwarded_for.split(","):
+        normalized = _normalize_public_ip(candidate)
+        if normalized:
+            return normalized
+
+    return ""
+
+
+def _lookup_country_code_for_ip(ip_address: str) -> str:
+    normalized_ip = _normalize_public_ip(ip_address)
+    if not normalized_ip:
+        return ""
+
+    now = time.time()
+    with _country_lookup_cache_lock:
+        cached = _country_lookup_cache.get(normalized_ip)
+        if cached and cached[0] > now:
+            return cached[1]
+
+    country_code = ""
+    try:
+        with urlopen(
+            f"https://api.country.is/{quote(normalized_ip, safe='')}",
+            timeout=COUNTRY_LOOKUP_TIMEOUT_SECONDS,
+        ) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            country_code = _normalize_country_code(payload.get("country"))
+    except (HTTPError, URLError, TimeoutError, ValueError, OSError, json.JSONDecodeError) as exc:
+        logger.debug("Country lookup failed for %s: %s", normalized_ip, exc)
+
+    with _country_lookup_cache_lock:
+        _country_lookup_cache[normalized_ip] = (now + COUNTRY_LOOKUP_CACHE_TTL_SECONDS, country_code)
+
+    return country_code
+
+
+def _request_country_code() -> str:
+    cached = getattr(g, "request_country_code", None)
+    if cached is not None:
+        return cached
+
+    country_code = _lookup_country_code_for_ip(_request_ip_for_country_lookup())
+    g.request_country_code = country_code
+    return country_code
+
+
+def _cookie_notice_required_for_request() -> bool:
+    return _request_country_code() in COOKIE_NOTICE_COUNTRY_CODES
+
+
 @app.before_request
 def enforce_api_csrf() -> Optional[Response]:
     if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
@@ -496,12 +627,16 @@ def _public_auth_payload(user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     elif waitlisted_user:
         access_state = "waitlisted"
 
+    country_code = _request_country_code()
+
     return {
         "authenticated": bool(user),
         "google_client_id": GOOGLE_CLIENT_ID or "",
         "google_allowlist_enabled": True,
         "admin_panel_configured": _admin_panel_configured(),
         "csrf_token": _get_or_create_csrf_token(),
+        "country_code": country_code,
+        "cookie_notice_required": _cookie_notice_required_for_request(),
         "access_denied_reason": access_denied_reason,
         "access_state": access_state,
         "user": _serialized_user(user),
@@ -520,6 +655,7 @@ def _public_admin_payload() -> Dict[str, Any]:
     password_authenticated = bool(user) and _session_admin_authenticated(user)
     if user and not password_authenticated and session.get(ADMIN_SESSION_KEY) not in (None, ""):
         _clear_admin_session()
+    country_code = _request_country_code()
 
     return {
         "authenticated": password_authenticated,
@@ -528,6 +664,8 @@ def _public_admin_payload() -> Dict[str, Any]:
         "password_authenticated": password_authenticated,
         "google_client_id": GOOGLE_CLIENT_ID or "",
         "csrf_token": _get_or_create_csrf_token(),
+        "country_code": country_code,
+        "cookie_notice_required": _cookie_notice_required_for_request(),
         "access_denied_reason": access_denied_reason or "",
         "user": _serialized_user(user),
     }
