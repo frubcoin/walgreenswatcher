@@ -9118,7 +9118,7 @@
               </div>
               <div class="product-actions">
                 <label class="product-discord-exclusion-toggle" title="Exclude from Discord notifications">
-                  <input type="checkbox" class="product-discord-exclusion-checkbox" ${excludeFromDiscord ? 'checked' : ''} data-product-key="${safeProductKey}" data-action="toggle-product-discord-exclusion">
+                  <input type="checkbox" class="product-discord-exclusion-checkbox" ${excludeFromDiscord ? 'checked' : ''} data-product-key="${safeProductKey}">
                   <span class="toggle-label">Disable notifications</span>
                 </label>
                 ${isEditing
@@ -9149,6 +9149,7 @@
 
       list.querySelectorAll('.product-discord-exclusion-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', async (e) => {
+          console.log('Checkbox changed:', checkbox.dataset?.productKey, checkbox.checked);
           const productKey = checkbox.dataset?.productKey || '';
           const exclude = checkbox.checked;
           if (productKey) {
@@ -9220,15 +9221,21 @@
     }
 
     async function toggleProductDiscordExclusion(productKey, exclude) {
+      console.log('toggleProductDiscordExclusion called:', productKey, exclude);
       const product = trackedProductsCache.find(p => p.key === productKey);
-      if (!product) return;
+      if (!product) {
+        console.log('Product not found in cache');
+        return;
+      }
 
+      console.log('Calling API with:', product.id, retailerKey(product.retailer), exclude);
       const success = await apiCall('/api/products/update', 'POST', {
         id: product.id,
-        retailer: product.retailer,
+        retailer: retailerKey(product.retailer),
         exclude_from_discord: exclude,
       });
 
+      console.log('API call result:', success);
       if (success) {
         await loadStatus();
         showFeedback(exclude ? 'Product excluded from Discord notifications' : 'Product included in Discord notifications', 'success');
@@ -10456,15 +10463,6 @@
           const retailer = getProductRetailerFromElement(actionElement);
           if (productId) {
             await saveProductName(productId, retailer, actionElement);
-          }
-          return;
-        }
-        case 'toggle-product-discord-exclusion': {
-          const checkbox = actionElement;
-          const productKey = checkbox.dataset?.productKey || '';
-          const exclude = checkbox.checked;
-          if (productKey) {
-            await toggleProductDiscordExclusion(productKey, exclude);
           }
           return;
         }
