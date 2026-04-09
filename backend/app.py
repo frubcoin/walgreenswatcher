@@ -57,6 +57,12 @@ FRONTEND_HTML_PAGES = {
     "terms.html",
     "disclosures.html",
 }
+NO_CACHE_FRONTEND_FILES = {
+    "runtime-config.js",
+    "sw.js",
+    "manifest.webmanifest",
+}
+STATIC_ASSET_CACHE_MAX_AGE_SECONDS = 24 * 60 * 60
 app.secret_key = FLASK_SECRET_KEY
 app.config.update(
     SESSION_COOKIE_NAME=SESSION_COOKIE_NAME,
@@ -259,7 +265,25 @@ def _serve_frontend_html_file(file_name: str) -> Response:
         INLINE_SCRIPT_NONCE_TOKEN,
         nonce,
     )
-    return Response(html, mimetype="text/html")
+    response = Response(html, mimetype="text/html")
+    response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
+    return response
+
+
+def _apply_frontend_cache_headers(response: Response, path: str) -> Response:
+    normalized_path = str(path or "").lstrip("/")
+    if not normalized_path:
+        return response
+
+    if normalized_path in FRONTEND_HTML_PAGES or normalized_path in NO_CACHE_FRONTEND_FILES:
+        response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
+        return response
+
+    response.headers.setdefault(
+        "Cache-Control",
+        f"public, max-age={STATIC_ASSET_CACHE_MAX_AGE_SECONDS}",
+    )
+    return response
 
 
 def _session_user() -> Optional[Dict[str, Any]]:
@@ -576,6 +600,12 @@ def apply_security_headers(response: Response) -> Response:
     nonce = getattr(g, "csp_nonce", "")
     if nonce and response.mimetype == "text/html":
         response.headers["Content-Security-Policy"] = _build_content_security_policy(nonce)
+
+    if request.method == "GET" and request.path.startswith("/api/"):
+        if request.path == "/api/public-stats":
+            response.headers.setdefault("Cache-Control", "public, max-age=60")
+        else:
+            response.headers.setdefault("Cache-Control", "no-store")
 
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -1797,7 +1827,8 @@ def disclosures():
 def serve_static(path: str):
     if path in FRONTEND_HTML_PAGES:
         return _serve_frontend_html_file(path)
-    return send_from_directory(str(FRONTEND_DIR), path)
+    response = send_from_directory(str(FRONTEND_DIR), path)
+    return _apply_frontend_cache_headers(response, path)
 
 
 @app.errorhandler(404)

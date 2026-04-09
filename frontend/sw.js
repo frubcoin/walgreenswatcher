@@ -1,4 +1,4 @@
-const CACHE_NAME = 'walgreens-watcher-v2';
+const CACHE_NAME = 'walgreens-watcher-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -102,6 +102,12 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // Avoid caching authenticated or user-specific API payloads in the shared service-worker cache.
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   if (url.pathname === '/runtime-config.js') {
     event.respondWith(
