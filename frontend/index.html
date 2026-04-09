@@ -3248,6 +3248,16 @@
       object-fit: contain;
     }
 
+    .map-popup-retailer-icon {
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 4px;
+      margin-top: -2px;
+    }
+
     .map-popup-product-copy {
       min-width: 0;
       flex: 1;
@@ -4239,6 +4249,46 @@
       font-size: 11px;
       color: var(--text-muted);
       font-family: 'Space Mono', monospace;
+    }
+
+    .product-drag-handle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      cursor: grab;
+      color: var(--text-muted);
+      opacity: 0.6;
+      transition: opacity 0.18s ease, color 0.18s ease;
+      flex-shrink: 0;
+    }
+
+    .product-drag-handle:hover {
+      opacity: 1;
+      color: var(--text-secondary);
+    }
+
+    .product-drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .product-item.is-dragging {
+      opacity: 0.5;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(243, 117, 32, 0.3);
+    }
+
+    .product-item.is-drag-over {
+      border-top: 2px solid var(--accent);
+    }
+
+    .product-item.is-drag-over-below {
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .product-item.is-editing .product-drag-handle {
+      display: none;
     }
 
     .tracked-products-panel {
@@ -9232,8 +9282,16 @@
         const safeProductKey = escapeHtml(productKey);
         const excludeFromDiscord = Boolean(p.exclude_from_discord || false);
 
+        const dragHandleHtml = isEditing ? '' : `
+              <div class="product-drag-handle" draggable="true" data-product-key="${safeProductKey}" title="Drag to reorder">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d="M4 6h8v1H4V6zm0 3h8v1H4V9z"/>
+                </svg>
+              </div>`;
+
         return `
             <div class="product-item${isEditing ? ' is-editing' : ''}" data-product-id="${safeId}" data-retailer="${safeRetailerKey}" data-product-key="${safeProductKey}">
+              ${dragHandleHtml}
               <div class="product-info">
                 <div class="product-name-row">
                   <img class="product-retailer-icon" src="${safeRetailerIcon}" alt="${safeRetailer}" title="${safeRetailer}" loading="lazy" decoding="async">
@@ -9284,6 +9342,123 @@
           }
         });
       });
+
+      // Setup drag and drop
+      setupProductDragAndDrop(list);
+    }
+
+    function setupProductDragAndDrop(container) {
+      let draggedItem = null;
+      let draggedProductKey = null;
+
+      container.querySelectorAll('.product-drag-handle').forEach(handle => {
+        handle.addEventListener('dragstart', (e) => {
+          draggedProductKey = handle.dataset.productKey;
+          draggedItem = handle.closest('.product-item');
+          if (draggedItem) {
+            draggedItem.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedProductKey);
+          }
+        });
+
+        handle.addEventListener('dragend', () => {
+          if (draggedItem) {
+            draggedItem.classList.remove('is-dragging');
+          }
+          container.querySelectorAll('.product-item').forEach(item => {
+            item.classList.remove('is-drag-over', 'is-drag-over-below');
+          });
+          draggedItem = null;
+          draggedProductKey = null;
+        });
+      });
+
+      container.querySelectorAll('.product-item').forEach(item => {
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          if (!draggedItem || item === draggedItem) return;
+
+          const rect = item.getBoundingClientRect();
+          const midpoint = rect.top + rect.height / 2;
+
+          item.classList.remove('is-drag-over', 'is-drag-over-below');
+          if (e.clientY < midpoint) {
+            item.classList.add('is-drag-over');
+          } else {
+            item.classList.add('is-drag-over-below');
+          }
+        });
+
+        item.addEventListener('dragleave', () => {
+          item.classList.remove('is-drag-over', 'is-drag-over-below');
+        });
+
+        item.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          if (!draggedItem || item === draggedItem) return;
+
+          item.classList.remove('is-drag-over', 'is-drag-over-below');
+
+          const rect = item.getBoundingClientRect();
+          const midpoint = rect.top + rect.height / 2;
+          const insertBefore = e.clientY < midpoint;
+
+          // Reorder in DOM
+          if (insertBefore) {
+            container.insertBefore(draggedItem, item);
+          } else {
+            container.insertBefore(draggedItem, item.nextSibling);
+          }
+
+          // Get new order and save
+          await saveProductOrder(container);
+        });
+      });
+
+      // Allow dropping on the container itself (at the end)
+      container.addEventListener('dragover', (e) => {
+        const lastItem = container.lastElementChild;
+        if (lastItem && draggedItem && lastItem !== draggedItem) {
+          e.preventDefault();
+        }
+      });
+
+      container.addEventListener('drop', async (e) => {
+        if (e.target === container) {
+          e.preventDefault();
+          if (draggedItem) {
+            container.appendChild(draggedItem);
+            await saveProductOrder(container);
+          }
+        }
+      });
+    }
+
+    async function saveProductOrder(container) {
+      const productKeys = Array.from(container.querySelectorAll('.product-item')).map(
+        item => item.dataset.productKey
+      ).filter(Boolean);
+
+      if (productKeys.length === 0) return;
+
+      try {
+        const result = await apiCall('/api/products/reorder', 'POST', { product_keys: productKeys });
+        if (result && result.success) {
+          // Update cache to match new order
+          const orderedProducts = productKeys.map(key => {
+            return trackedProductsCache.find(p => {
+              const pKey = p.key || productIdentityKey(p.id, p.retailer);
+              return pKey === key;
+            });
+          }).filter(Boolean);
+          trackedProductsCache = orderedProducts;
+        }
+      } catch (err) {
+        console.error('Failed to save product order:', err);
+        // Re-render to restore original order on error
+        renderTrackedProducts();
+      }
     }
 
     function startProductNameEdit(productKey) {
@@ -9607,9 +9782,9 @@
         `).join('');
 
       return `
-          <div class="map-popup-title">${escapeHtml(location.name)}</div>
+          <div class="map-popup-title">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(location.name)}</div>
           <div class="map-popup-address">${renderAddressLink(location.address)}</div>
-          <div class="map-popup-meta">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(retailerLabel(location.retailer))} | ${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
+          <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
           <div class="map-popup-products">${productsHtml}</div>
         `;
     }

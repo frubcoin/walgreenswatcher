@@ -466,6 +466,9 @@ class StockDatabase:
         StockDatabase._add_column_if_not_exists(
             conn, "tracked_products", "exclude_from_discord", "INTEGER NOT NULL DEFAULT 0"
         )
+        StockDatabase._add_column_if_not_exists(
+            conn, "tracked_products", "sort_order", "INTEGER NOT NULL DEFAULT 0"
+        )
         conn.execute(
             """
             INSERT INTO user_settings (
@@ -631,10 +634,10 @@ class StockDatabase:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT article_id, retailer, name, planogram, image_url, source_url, product_id, exclude_from_discord
+                SELECT article_id, retailer, name, planogram, image_url, source_url, product_id, exclude_from_discord, sort_order
                 FROM tracked_products
                 WHERE user_id = ?
-                ORDER BY created_at ASC, article_id ASC
+                ORDER BY sort_order ASC, created_at ASC, article_id ASC
                 """,
                 (user_id,),
             ).fetchall()
@@ -650,6 +653,7 @@ class StockDatabase:
                 "source_url": row["source_url"] or "",
                 "exclude_from_discord": bool(row["exclude_from_discord"] or 0),
                 "product_id": row["product_id"] or "",
+                "sort_order": row["sort_order"] or 0,
             }
             for row in rows
         ]
@@ -1246,6 +1250,27 @@ class StockDatabase:
                     (exclude_value, user_id, article_id),
                 )
         return cursor.rowcount > 0
+
+    def reorder_tracked_products(
+        self,
+        user_id: int,
+        product_keys: List[str],
+    ) -> bool:
+        """Update sort_order for tracked products based on the provided ordered list of product keys."""
+        with self._connect() as conn:
+            for sort_order, product_key in enumerate(product_keys):
+                parts = product_key.split(":", 1)
+                retailer = parts[0] if len(parts) > 1 else "walgreens"
+                article_id = parts[1] if len(parts) > 1 else product_key
+                conn.execute(
+                    """
+                    UPDATE tracked_products
+                    SET sort_order = ?
+                    WHERE user_id = ? AND article_id = ? AND retailer = ?
+                    """,
+                    (sort_order, user_id, article_id, retailer),
+                )
+        return True
 
     def add_check_result(
         self,

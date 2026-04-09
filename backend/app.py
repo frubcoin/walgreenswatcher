@@ -1546,6 +1546,30 @@ def update_product(user: Dict[str, Any]):
     return jsonify({"error": "Product not found"}), 404
 
 
+@app.route("/api/products/reorder", methods=["POST"])
+@require_auth
+def reorder_products(user: Dict[str, Any]):
+    data = request.json or {}
+    product_keys = data.get("product_keys", [])
+
+    if not isinstance(product_keys, list) or len(product_keys) == 0:
+        return jsonify({"error": "product_keys array required"}), 400
+
+    try:
+        db.reorder_tracked_products(int(user["id"]), product_keys)
+        _record_audit_event(
+            "user.products_reordered",
+            f"Tracked products reordered by {user['email']}: {len(product_keys)} products",
+            actor_user=user,
+            metadata={"count": len(product_keys)},
+            alert_category="user_action",
+        )
+        return jsonify({"message": "Products reordered", "count": len(product_keys)})
+    except Exception as exc:
+        logger.error("Error reordering products for user %s: %s", user.get("id"), exc)
+        return jsonify({"error": "Failed to reorder products"}), 500
+
+
 @app.route("/api/admin/overview", methods=["GET"])
 @require_admin
 def get_admin_overview():
