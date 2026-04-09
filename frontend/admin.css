@@ -713,6 +713,30 @@ textarea {
   gap: 14px;
 }
 
+.hero-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.hero-inline-field {
+  min-width: 96px;
+}
+
+.hero-inline-field span {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.hero-inline-field select {
+  min-width: 88px;
+  padding: 8px 12px;
+}
+
 .workspace-panel .section-head,
 .settings-panel .section-head,
 .allowlist-panel .section-head,

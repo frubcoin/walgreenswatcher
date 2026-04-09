@@ -8,10 +8,13 @@ const state = {
   userSearch: '',
   userFilter: 'all',
   eventFilter: 'all',
-  activeReviewKey: ''
+  activeReviewKey: '',
+  liveOverviewPollMs: 30000
 };
 
 const LIVE_OVERVIEW_POLL_MS = 30000;
+const LIVE_OVERVIEW_POLL_STORAGE_KEY = 'admin-live-overview-poll-ms';
+const LIVE_OVERVIEW_POLL_OPTIONS = [5000, 10000, 15000, 30000];
 
 let bannerTimer = 0;
 let csrfToken = null;
@@ -20,6 +23,26 @@ let liveOverviewRefreshInFlight = false;
 
 function apiUrl(path) {
   return path.startsWith('http') ? path : `${apiBase}${path}`;
+}
+
+function normalizeLiveOverviewPollMs(value) {
+  const numeric = Number(value || LIVE_OVERVIEW_POLL_MS);
+  return LIVE_OVERVIEW_POLL_OPTIONS.includes(numeric) ? numeric : LIVE_OVERVIEW_POLL_MS;
+}
+
+function setLiveOverviewPollMs(value, { reschedule = true } = {}) {
+  state.liveOverviewPollMs = normalizeLiveOverviewPollMs(value);
+  const select = document.getElementById('overview-poll-select');
+  if (select) {
+    select.value = String(state.liveOverviewPollMs);
+  }
+  try {
+    window.localStorage.setItem(LIVE_OVERVIEW_POLL_STORAGE_KEY, String(state.liveOverviewPollMs));
+  } catch (error) {
+  }
+  if (reschedule && state.session?.authenticated) {
+    scheduleLiveOverviewRefresh(state.liveOverviewPollMs);
+  }
 }
 
 function updateCsrfToken(nextToken) {
@@ -965,7 +988,7 @@ function scheduleLiveOverviewRefresh(delayMs = LIVE_OVERVIEW_POLL_MS) {
   if (!state.session?.authenticated) return;
   liveOverviewTimer = window.setTimeout(() => {
     void refreshLiveOverviewPanel();
-  }, Math.max(5000, Number(delayMs) || LIVE_OVERVIEW_POLL_MS));
+  }, Math.max(5000, Number(delayMs) || state.liveOverviewPollMs || LIVE_OVERVIEW_POLL_MS));
 }
 
 async function refreshLiveOverviewPanel() {
@@ -1091,6 +1114,12 @@ async function refreshAdminSession({ loadOverviewIfUnlocked = true } = {}) {
 
 async function initializeAdminPage() {
   try {
+    let storedPollMs = LIVE_OVERVIEW_POLL_MS;
+    try {
+      storedPollMs = window.localStorage.getItem(LIVE_OVERVIEW_POLL_STORAGE_KEY) || LIVE_OVERVIEW_POLL_MS;
+    } catch (error) {
+    }
+    setLiveOverviewPollMs(storedPollMs, { reschedule: false });
     await refreshAdminSession();
   } catch (error) {
     showBanner(error.message, 'error');
@@ -1395,6 +1424,10 @@ document.getElementById('user-filter-select').addEventListener('change', event =
 document.getElementById('event-filter-select').addEventListener('change', event => {
   state.eventFilter = event.target.value || 'all';
   if (state.overview) renderEvents(state.overview.events || []);
+});
+
+document.getElementById('overview-poll-select').addEventListener('change', event => {
+  setLiveOverviewPollMs(event.target.value || LIVE_OVERVIEW_POLL_MS);
 });
 
 document.addEventListener('visibilitychange', () => {
