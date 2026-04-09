@@ -3283,11 +3283,10 @@
       display: inline-flex;
       gap: 4px;
       padding: 4px;
-      border-radius: 999px;
+      border-radius: 999px !important;
       background: rgba(27, 31, 36, 0.9);
       border: 1px solid rgba(255, 255, 255, 0.08);
       box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
-      overflow: hidden;
     }
 
     .results-map-card[data-map-theme="light"] .results-map-theme-control,
@@ -3295,6 +3294,10 @@
       background: rgba(247, 250, 252, 0.95);
       border: 1px solid rgba(62, 81, 98, 0.2);
       box-shadow: 0 8px 16px rgba(30, 42, 56, 0.15);
+    }
+
+    .leaflet-bar .results-map-theme-btn {
+      border-radius: 999px !important;
     }
 
     .results-map-theme-btn {
