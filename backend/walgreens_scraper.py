@@ -36,7 +36,31 @@ class WalgreensStockChecker:
         self.progress_callback = None
         self.custom_product_names: Dict[str, str] = {}
         self.current_zip_code = TARGET_ZIP_CODE
+        self.search_radius_miles = int(SEARCH_RADIUS_MILES)
         self.location_cache: Dict[str, Dict[str, str]] = {}
+
+    def _effective_search_radius_miles(self) -> int:
+        try:
+            value = int(self.search_radius_miles)
+        except (TypeError, ValueError):
+            value = int(SEARCH_RADIUS_MILES)
+        return max(1, value)
+
+    @staticmethod
+    def _normalize_distance(distance: Any) -> float | None:
+        try:
+            return float(distance) if distance is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def _filter_stores_by_radius(self, stores: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        radius_miles = float(self._effective_search_radius_miles())
+        filtered: List[Dict[str, Any]] = []
+        for store in stores or []:
+            distance = self._normalize_distance(store.get("distance"))
+            if distance is None or distance <= radius_miles:
+                filtered.append(store)
+        return filtered
 
     @staticmethod
     def _cache_expiry_time() -> float:
@@ -71,6 +95,7 @@ class WalgreensStockChecker:
         *,
         location: Optional[Dict[str, str]] = None,
         stores: Optional[List[Dict[str, Any]]] = None,
+        radius_miles: Optional[int] = None,
     ) -> None:
         if STORE_LOCATOR_CACHE_TTL_SECONDS <= 0:
             return
@@ -81,6 +106,7 @@ class WalgreensStockChecker:
                 "expires_at": self._cache_expiry_time(),
                 "location": location or existing.get("location"),
                 "stores": stores if stores is not None else existing.get("stores"),
+                "radius_miles": int(radius_miles or existing.get("radius_miles") or self._effective_search_radius_miles()),
             }
             _shared_store_locator_cache[zip_code] = entry
 
@@ -219,7 +245,7 @@ class WalgreensStockChecker:
 
         url = "https://www.walgreens.com/locator/v1/stores/search"
         payload = {
-            "r": str(SEARCH_RADIUS_MILES),
+            "r": str(self._effective_search_radius_miles()),
             "requestType": "locator",
             "s": "1",
             "p": "1",
@@ -244,7 +270,7 @@ class WalgreensStockChecker:
 
         url = "https://www.walgreens.com/locator/v1/stores/search"
         payload = {
-            "r": str(SEARCH_RADIUS_MILES),
+            "r": str(self._effective_search_radius_miles()),
             "requestType": "locator",
             "s": "50",
             "p": "1",
@@ -262,19 +288,22 @@ class WalgreensStockChecker:
             return []
 
         formatted_stores = [self._format_store(store) for store in stores]
+        filtered_stores = self._filter_stores_by_radius(formatted_stores)
         self._store_cached_store_locator_entry(
             zip_code,
             location=context,
             stores=formatted_stores,
+            radius_miles=self._effective_search_radius_miles(),
         )
-        logger.info("Found %s stores near %s", len(formatted_stores), zip_code)
-        return formatted_stores
+        logger.info("Found %s stores near %s within %s miles", len(filtered_stores), zip_code, self._effective_search_radius_miles())
+        return filtered_stores
 
     def _fetch_stores_near_zip(self, zip_code: str) -> List[Dict[str, Any]]:
         """Fetch nearby stores for a ZIP code, reusing a short shared cache when possible."""
         cached_entry = self._get_cached_store_locator_entry(zip_code)
         cached_stores = cached_entry.get("stores") if cached_entry else None
-        if cached_stores:
+        cached_radius_miles = int(cached_entry.get("radius_miles") or 0) if cached_entry else 0
+        if cached_stores and cached_radius_miles >= self._effective_search_radius_miles():
             cached_location = cached_entry.get("location") or {}
             if cached_location.get("lat") and cached_location.get("lng"):
                 self.location_cache[zip_code] = {
@@ -286,7 +315,7 @@ class WalgreensStockChecker:
                 zip_code,
                 len(cached_stores),
             )
-            return list(cached_stores)
+            return self._filter_stores_by_radius(list(cached_stores))
 
         return self._fetch_stores_near_zip_remote(zip_code)
 
@@ -305,7 +334,7 @@ class WalgreensStockChecker:
             "requestType": "filterInStockStores",
             "p": "1",
             "s": "50",
-            "r": str(SEARCH_RADIUS_MILES),
+            "r": str(self._effective_search_radius_miles()),
             "excludeEmergencyClosed": True,
             "articles": [
                 {
@@ -330,8 +359,15 @@ class WalgreensStockChecker:
             raise ValueError(data.get("message", "Walgreens inventory API returned an error"))
 
         stores = data.get("results", [])
-        logger.info("Found %s in-stock stores for %s near %s", len(stores), product_name, zip_code)
-        return stores
+        filtered_stores = self._filter_stores_by_radius(stores)
+        logger.info(
+            "Found %s in-stock stores for %s near %s within %s miles",
+            len(filtered_stores),
+            product_name,
+            zip_code,
+            self._effective_search_radius_miles(),
+        )
+        return filtered_stores
 
     def check_product_at_store(self, product: Dict[str, Any], store_id: str) -> bool:
         """Check whether a product is in stock at a specific store."""
@@ -526,7 +562,7 @@ class WalgreensStockChecker:
             logger.info("=" * 60)
             logger.info("WALGREENS STOCK CHECK")
             logger.info("Time: %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            logger.info("Location: ZIP %s (%s mile radius)", zip_code, SEARCH_RADIUS_MILES)
+            logger.info("Location: ZIP %s (%s mile radius)", zip_code, self._effective_search_radius_miles())
             logger.info("=" * 60)
 
             stores = self._fetch_stores_near_zip(zip_code)

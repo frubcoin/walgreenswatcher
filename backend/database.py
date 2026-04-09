@@ -10,7 +10,13 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional
 
-from config import APP_DATABASE_FILE, DATA_DIR, DEFAULT_CHECK_INTERVAL_MINUTES, TARGET_ZIP_CODE
+from config import (
+    APP_DATABASE_FILE,
+    DATA_DIR,
+    DEFAULT_CHECK_INTERVAL_MINUTES,
+    SEARCH_RADIUS_MILES,
+    TARGET_ZIP_CODE,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,6 +27,7 @@ DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645
 DEFAULT_ADMIN_ALERT_NEW_USERS = True
 DEFAULT_ADMIN_ALERT_USER_ACTIONS = True
 TRENDING_PRODUCTS_RETENTION_HOURS = 24
+DEFAULT_MAX_NOTIFICATION_DISTANCE_MILES = int(SEARCH_RADIUS_MILES or 20)
 
 
 def _normalize_email(email: Any) -> str:
@@ -71,6 +78,7 @@ class StockDatabase:
                     user_id INTEGER PRIMARY KEY,
                     current_zipcode TEXT NOT NULL DEFAULT '',
                     check_interval_minutes INTEGER NOT NULL DEFAULT 60,
+                    max_notification_distance_miles INTEGER NOT NULL DEFAULT 20,
                     discord_destinations TEXT NOT NULL DEFAULT '[]',
                     pokemon_background_enabled INTEGER NOT NULL DEFAULT 0,
                     pokemon_background_theme TEXT NOT NULL DEFAULT 'gyra',
@@ -190,6 +198,12 @@ class StockDatabase:
                 "tracked_products",
                 "retailer",
                 "TEXT NOT NULL DEFAULT 'walgreens'",
+            )
+            self._ensure_column(
+                conn,
+                "user_settings",
+                "max_notification_distance_miles",
+                f"INTEGER NOT NULL DEFAULT {DEFAULT_MAX_NOTIFICATION_DISTANCE_MILES}",
             )
             self._backfill_recent_trending_products(conn)
             self._prune_expired_trending_products(conn)
@@ -437,19 +451,21 @@ class StockDatabase:
                 user_id,
                 current_zipcode,
                 check_interval_minutes,
+                max_notification_distance_miles,
                 discord_destinations,
                 pokemon_background_enabled,
                 pokemon_background_theme,
                 pokemon_background_tile_size,
                 scheduler_enabled
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
             ON CONFLICT(user_id) DO NOTHING
             """,
             (
                 user_id,
                 TARGET_ZIP_CODE,
                 DEFAULT_CHECK_INTERVAL_MINUTES,
+                DEFAULT_MAX_NOTIFICATION_DISTANCE_MILES,
                 "[]",
                 int(DEFAULT_POKEMON_BACKGROUND_ENABLED),
                 DEFAULT_POKEMON_BACKGROUND_THEME,
@@ -526,6 +542,7 @@ class StockDatabase:
             return {
                 "current_zipcode": TARGET_ZIP_CODE,
                 "check_interval_minutes": DEFAULT_CHECK_INTERVAL_MINUTES,
+                "max_notification_distance_miles": DEFAULT_MAX_NOTIFICATION_DISTANCE_MILES,
                 "discord_destinations": [],
                 "pokemon_background_enabled": DEFAULT_POKEMON_BACKGROUND_ENABLED,
                 "pokemon_background_theme": DEFAULT_POKEMON_BACKGROUND_THEME,
@@ -537,6 +554,9 @@ class StockDatabase:
         return {
             "current_zipcode": data["current_zipcode"] or TARGET_ZIP_CODE,
             "check_interval_minutes": int(data["check_interval_minutes"] or DEFAULT_CHECK_INTERVAL_MINUTES),
+            "max_notification_distance_miles": int(
+                data.get("max_notification_distance_miles") or DEFAULT_MAX_NOTIFICATION_DISTANCE_MILES
+            ),
             "discord_destinations": self._decode_json(data["discord_destinations"], []),
             "pokemon_background_enabled": bool(data["pokemon_background_enabled"]),
             "pokemon_background_theme": data["pokemon_background_theme"] or DEFAULT_POKEMON_BACKGROUND_THEME,
@@ -558,6 +578,7 @@ class StockDatabase:
                 UPDATE user_settings
                 SET current_zipcode = ?,
                     check_interval_minutes = ?,
+                    max_notification_distance_miles = ?,
                     discord_destinations = ?,
                     pokemon_background_enabled = ?,
                     pokemon_background_theme = ?,
@@ -568,6 +589,7 @@ class StockDatabase:
                 (
                     merged["current_zipcode"],
                     int(merged["check_interval_minutes"]),
+                    int(merged["max_notification_distance_miles"]),
                     json.dumps(merged.get("discord_destinations") or []),
                     int(bool(merged.get("pokemon_background_enabled"))),
                     merged["pokemon_background_theme"],

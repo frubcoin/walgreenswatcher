@@ -1229,6 +1229,7 @@ def configure(user: Dict[str, Any]):
     webhook_value = data.get("discord_destinations")
     zipcode = data.get("zipcode")
     interval_minutes = data.get("check_interval_minutes")
+    max_notification_distance_miles = data.get("max_notification_distance_miles")
     pokemon_background_enabled = data.get("pokemon_background_enabled")
     pokemon_background_theme = data.get("pokemon_background_theme")
     pokemon_background_tile_size = data.get("pokemon_background_tile_size")
@@ -1240,6 +1241,8 @@ def configure(user: Dict[str, Any]):
             scheduler.set_zipcode(zipcode)
         if interval_minutes is not None:
             scheduler.set_check_interval_minutes(interval_minutes)
+        if max_notification_distance_miles is not None:
+            scheduler.set_max_notification_distance_miles(max_notification_distance_miles)
         if pokemon_background_enabled is not None:
             scheduler.set_pokemon_background_enabled(pokemon_background_enabled)
         if pokemon_background_theme is not None:
@@ -1256,6 +1259,7 @@ def configure(user: Dict[str, Any]):
         metadata={
             "zipcode": scheduler.current_zipcode,
             "check_interval_minutes": scheduler.check_interval_minutes,
+            "max_notification_distance_miles": scheduler.max_notification_distance_miles,
             "discord_webhook_count": len(scheduler.discord_destinations),
         },
         alert_category="user_action",
@@ -1269,6 +1273,7 @@ def configure(user: Dict[str, Any]):
             "discord_destinations": scheduler.discord_destinations,
             "zipcode": scheduler.current_zipcode,
             "check_interval_minutes": scheduler.check_interval_minutes,
+            "max_notification_distance_miles": scheduler.max_notification_distance_miles,
             "pokemon_background_enabled": scheduler.pokemon_background_enabled,
             "pokemon_background_theme": scheduler.pokemon_background_theme,
             "pokemon_background_tile_size": scheduler.pokemon_background_tile_size,

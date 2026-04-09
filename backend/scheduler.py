@@ -9,7 +9,12 @@ from typing import Any, Dict, List, Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from config import DEFAULT_CHECK_INTERVAL_MINUTES, DEFAULT_TRACKED_PRODUCTS, TARGET_ZIP_CODE
+from config import (
+    DEFAULT_CHECK_INTERVAL_MINUTES,
+    DEFAULT_TRACKED_PRODUCTS,
+    SEARCH_RADIUS_MILES,
+    TARGET_ZIP_CODE,
+)
 
 from cvs_scraper import CvsBlockedError, CvsDisabledError, CvsStockChecker
 from database import StockDatabase
@@ -24,6 +29,8 @@ DEFAULT_POKEMON_BACKGROUND_THEME = "gyra"
 DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645
 MIN_POKEMON_BACKGROUND_TILE_SIZE = 200
 MAX_POKEMON_BACKGROUND_TILE_SIZE = 1200
+MIN_NOTIFICATION_DISTANCE_MILES = 1
+MAX_NOTIFICATION_DISTANCE_MILES = 100
 ALLOWED_POKEMON_BACKGROUND_THEMES = {
     "ancient",
     "bee",
@@ -67,6 +74,7 @@ class StockCheckScheduler:
 
         self.current_zipcode = TARGET_ZIP_CODE
         self.check_interval_minutes = DEFAULT_CHECK_INTERVAL_MINUTES
+        self.max_notification_distance_miles = int(SEARCH_RADIUS_MILES)
         self.discord_destinations: List[Dict[str, str]] = []
         self.pokemon_background_enabled = DEFAULT_POKEMON_BACKGROUND_ENABLED
         self.pokemon_background_theme = DEFAULT_POKEMON_BACKGROUND_THEME
@@ -128,6 +136,7 @@ class StockCheckScheduler:
 
         self.current_zipcode = settings["current_zipcode"]
         self.check_interval_minutes = settings["check_interval_minutes"]
+        self.max_notification_distance_miles = settings["max_notification_distance_miles"]
         self.discord_destinations = list(settings["discord_destinations"])
         self.pokemon_background_enabled = settings["pokemon_background_enabled"]
         self.pokemon_background_theme = settings["pokemon_background_theme"]
@@ -148,8 +157,8 @@ class StockCheckScheduler:
             for product in products
         }
         self.walgreens_checker.current_zip_code = self.current_zipcode
+        self.walgreens_checker.search_radius_miles = self.max_notification_distance_miles
         self.cvs_checker.current_zip_code = self.current_zipcode
-
 
     @staticmethod
     def _validate_interval_minutes(interval_minutes: Any) -> int:
@@ -202,6 +211,23 @@ class StockCheckScheduler:
         if value > MAX_POKEMON_BACKGROUND_TILE_SIZE:
             raise ValueError(
                 f"Pokemon background tile size must be {MAX_POKEMON_BACKGROUND_TILE_SIZE}px or less"
+            )
+        return value
+
+    @staticmethod
+    def _validate_notification_distance_miles(distance_miles: Any) -> int:
+        try:
+            value = int(distance_miles)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Max notification range must be a whole number of miles") from exc
+
+        if value < MIN_NOTIFICATION_DISTANCE_MILES:
+            raise ValueError(
+                f"Max notification range must be at least {MIN_NOTIFICATION_DISTANCE_MILES} mile"
+            )
+        if value > MAX_NOTIFICATION_DISTANCE_MILES:
+            raise ValueError(
+                f"Max notification range must be {MAX_NOTIFICATION_DISTANCE_MILES} miles or less"
             )
         return value
 
@@ -269,6 +295,11 @@ class StockCheckScheduler:
                 minutes=self.check_interval_minutes,
             )
         return self.check_interval_minutes
+
+    def set_max_notification_distance_miles(self, distance_miles: Any) -> int:
+        validated = self._validate_notification_distance_miles(distance_miles)
+        self._update_setting(max_notification_distance_miles=validated)
+        return self.max_notification_distance_miles
 
     def set_discord_destinations(self, destinations: Optional[List[Dict[str, Any]]]) -> List[Dict[str, str]]:
         normalized = DiscordNotifier._normalize_destinations(destinations)
@@ -358,6 +389,55 @@ class StockCheckScheduler:
 
         return products_with_stock
 
+    @staticmethod
+    def _store_distance_miles(store: Dict[str, Any]) -> Optional[float]:
+        try:
+            value = store.get("distance")
+            return float(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def _store_within_notification_range(self, store: Dict[str, Any]) -> bool:
+        distance = self._store_distance_miles(store)
+        if distance is None:
+            return False
+        return distance <= float(self.max_notification_distance_miles)
+
+    def _filter_product_result_by_notification_range(
+        self,
+        product_result: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        stores = dict(product_result.get("stores") or {})
+        availability = dict(product_result.get("availability") or {})
+        location_ids = [str(store_id) for store_id in (product_result.get("location_ids") or []) if store_id]
+
+        allowed_store_ids = {
+            store_id
+            for store_id, store in stores.items()
+            if self._store_within_notification_range(store)
+        }
+
+        filtered_availability = {
+            store_id: in_stock
+            for store_id, in_stock in availability.items()
+            if store_id in allowed_store_ids
+        }
+        filtered_stores = {
+            store_id: store
+            for store_id, store in stores.items()
+            if store_id in allowed_store_ids
+        }
+        filtered_location_ids = [
+            store_id for store_id in location_ids if store_id in allowed_store_ids
+        ]
+
+        return {
+            **product_result,
+            "availability": filtered_availability,
+            "stores": filtered_stores,
+            "location_ids": filtered_location_ids,
+        }
+
     def _check_stock(self) -> None:
         try:
             with self.state_lock:
@@ -443,9 +523,9 @@ class StockCheckScheduler:
 
             self.walgreens_checker.progress_callback = update_progress
             self.walgreens_checker.current_zip_code = self.current_zipcode
+            self.walgreens_checker.search_radius_miles = self.max_notification_distance_miles
             self.cvs_checker.progress_callback = update_progress
             self.cvs_checker.current_zip_code = self.current_zipcode
-
 
             walgreens_products = [
                 product for product in product_specs if product.get("retailer", "walgreens") == "walgreens"
@@ -540,6 +620,8 @@ class StockCheckScheduler:
                         }
                 else:
                     raise ValueError(f"Unsupported retailer: {retailer}")
+
+                product_result = self._filter_product_result_by_notification_range(product_result)
 
                 scanned_store_keys.update(
                     f"{retailer}:{store_id}"
@@ -725,6 +807,7 @@ class StockCheckScheduler:
             "discord_webhook_count": len(self.notifier.webhook_urls),
             "discord_destinations": self.discord_destinations,
             "current_zipcode": self.current_zipcode,
+            "max_notification_distance_miles": self.max_notification_distance_miles,
             "pokemon_background_enabled": self.pokemon_background_enabled,
             "pokemon_background_theme": self.pokemon_background_theme,
             "pokemon_background_tile_size": self.pokemon_background_tile_size,

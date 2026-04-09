@@ -6381,6 +6381,11 @@
             <span class="form-hint">Minutes between automatic checks</span>
           </div>
           <div class="form-group">
+            <label class="form-label">Max Alert Range</label>
+            <input type="number" class="form-input" id="cfg-max-range" min="1" max="100" step="1" placeholder="20">
+            <span class="form-hint">Miles from your ZIP. Stores outside this range are excluded from results and Discord alerts.</span>
+          </div>
+          <div class="form-group">
             <label class="form-label">Install App</label>
             <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
               <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
@@ -11518,6 +11523,7 @@
       const status = data.status || {};
       document.getElementById('cfg-zip').value = status.current_zipcode || '';
       document.getElementById('cfg-interval').value = status.check_interval_minutes || 60;
+      document.getElementById('cfg-max-range').value = status.max_notification_distance_miles || 20;
       applyPokemonBackgroundSettings({
         enabled: status.pokemon_background_enabled ?? DEFAULT_POKEMON_BACKGROUND_ENABLED,
         theme: status.pokemon_background_theme || DEFAULT_POKEMON_BACKGROUND_THEME,
@@ -11533,6 +11539,7 @@
     async function saveSettings() {
       const zip = document.getElementById('cfg-zip').value.trim();
       const interval = document.getElementById('cfg-interval').value.trim();
+      const maxRange = document.getElementById('cfg-max-range').value.trim();
       const mapAddress = storeMapAddress(document.getElementById('cfg-map-address').value.trim());
       const webhookDestinations = collectDiscordDestinations();
       const pokemonBackgroundEnabled = document.getElementById('cfg-pokemon-bg-enabled').checked;
@@ -11552,6 +11559,7 @@
       const data = {};
       if (zip) data.zipcode = zip;
       if (interval) data.check_interval_minutes = Number(interval);
+      if (maxRange) data.max_notification_distance_miles = Number(maxRange);
       data.discord_destinations = webhookDestinations;
       data.pokemon_background_enabled = pokemonBackgroundEnabled;
       data.pokemon_background_theme = pokemonBackgroundTheme;
