@@ -8687,8 +8687,8 @@
             const safeImageUrl = sanitizeProductImageUrl(product.image_url || '');
             const trackedByCount = Math.max(0, Number(product.tracked_by_count || 0));
             const watcherLabel = `${trackedByCount} watcher${trackedByCount === 1 ? '' : 's'}`;
-            const lastTrackedDate = parseApiTimestamp(product.last_tracked_at);
-            const lastTrackedLabel = lastTrackedDate ? formatRelativeDuration(lastTrackedDate) : 'Recently tracked';
+            const firstTrackedDate = parseApiTimestamp(product.first_tracked_at || product.last_tracked_at);
+            const firstTrackedLabel = firstTrackedDate ? formatRelativeDuration(firstTrackedDate) : 'Recently tracked';
             const isTracked = Boolean(product.is_tracked_by_user);
             const isSelected = draft.productUrl.trim() === safeSourceUrl;
 
@@ -8707,7 +8707,7 @@
                       <span>${safeRetailerLabel}</span>
                     </span>
                     <span class="trending-product-chip">${escapeHtml(watcherLabel)}</span>
-                    <span>${escapeHtml(lastTrackedLabel)}</span>
+                    <span>${escapeHtml(firstTrackedLabel)}</span>
                   </div>
                   <div class="onboarding-trending-name">${safeName}</div>
                   <div class="onboarding-trending-actions">
@@ -8745,8 +8745,8 @@
         const safeRetailerIcon = escapeHtml(retailerIconPath(product.retailer));
         const trackedByCount = Math.max(0, Number(product.tracked_by_count || 0));
         const watcherLabel = `${trackedByCount} watcher${trackedByCount === 1 ? '' : 's'}`;
-        const lastTrackedDate = parseApiTimestamp(product.last_tracked_at);
-        const lastTrackedLabel = lastTrackedDate ? formatRelativeDuration(lastTrackedDate) : 'Recently tracked';
+        const firstTrackedDate = parseApiTimestamp(product.first_tracked_at || product.last_tracked_at);
+        const firstTrackedLabel = firstTrackedDate ? formatRelativeDuration(firstTrackedDate) : 'Recently tracked';
         const isTracked = Boolean(product.is_tracked_by_user);
         const addLabel = isTracked ? 'Already Tracking' : '+ Add To Monitor';
 
@@ -8765,7 +8765,7 @@
                   <span>${safeRetailerLabel}</span>
                 </span>
                 <span class="trending-product-chip">${escapeHtml(watcherLabel)}</span>
-                <span>${escapeHtml(lastTrackedLabel)}</span>
+                <span>${escapeHtml(firstTrackedLabel)}</span>
               </div>
               <div class="trending-product-name">${safeName}</div>
               <div class="trending-product-footer">

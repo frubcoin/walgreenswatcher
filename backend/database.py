@@ -662,6 +662,7 @@ class StockDatabase:
                         article_id,
                         retailer,
                         COUNT(DISTINCT user_id) AS tracked_by_count,
+                        MIN(last_tracked_at) AS first_tracked_at,
                         MAX(last_tracked_at) AS last_tracked_at
                     FROM trending_products
                     WHERE COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
@@ -671,6 +672,7 @@ class StockDatabase:
                     g.article_id,
                     g.retailer,
                     g.tracked_by_count,
+                    g.first_tracked_at,
                     g.last_tracked_at,
                     EXISTS(
                         SELECT 1
@@ -737,6 +739,7 @@ class StockDatabase:
                 "source_url": row["source_url"] or "",
                 "product_id": row["product_id"] or "",
                 "tracked_by_count": int(row["tracked_by_count"] or 0),
+                "first_tracked_at": row["first_tracked_at"] or "",
                 "last_tracked_at": row["last_tracked_at"] or "",
                 "is_tracked_by_user": bool(row["is_tracked_by_user"]),
             }
@@ -755,6 +758,7 @@ class StockDatabase:
                         article_id,
                         retailer,
                         COUNT(DISTINCT user_id) AS tracked_by_count,
+                        MIN(last_tracked_at) AS first_tracked_at,
                         MAX(last_tracked_at) AS last_tracked_at
                     FROM trending_products
                     WHERE COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
@@ -764,6 +768,7 @@ class StockDatabase:
                     g.article_id,
                     g.retailer,
                     g.tracked_by_count,
+                    g.first_tracked_at,
                     g.last_tracked_at,
                     (
                         SELECT COALESCE(NULLIF(TRIM(tp.name), ''), tp.article_id)
@@ -823,6 +828,7 @@ class StockDatabase:
                 "source_url": row["source_url"] or "",
                 "product_id": row["product_id"] or "",
                 "tracked_by_count": int(row["tracked_by_count"] or 0),
+                "first_tracked_at": row["first_tracked_at"] or "",
                 "last_tracked_at": row["last_tracked_at"] or "",
             }
             for row in rows
