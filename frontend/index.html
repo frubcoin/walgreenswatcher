@@ -2903,6 +2903,11 @@
       gap: 8px;
     }
 
+    .results-map-filter-group {
+      display: grid;
+      gap: 8px;
+    }
+
     .results-map-filter-label {
       font-size: 11px;
       font-family: 'Space Mono', monospace;
@@ -3030,6 +3035,19 @@
       box-shadow: inset 0 0 0 1px var(--accent-soft-border);
     }
 
+    .results-map-filter-option-with-icon {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .results-map-filter-option-icon {
+      width: 14px;
+      height: 14px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
     .results-map-filter-summary {
       font-size: 11px;
       color: var(--text-muted);
@@ -3083,6 +3101,35 @@
       font-size: 14px;
       font-weight: 700;
       color: var(--text-primary);
+    }
+
+    .results-map-item-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .results-map-item-title-block {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .results-map-item-retailer-icon {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .results-map-item-retailer {
+      font-size: 10px;
+      line-height: 1.2;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
     }
 
     .results-map-item-address {
@@ -3179,6 +3226,33 @@
       color: var(--text-secondary);
     }
 
+    .map-popup-product {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .map-popup-product-retailer {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .map-popup-product-icon {
+      width: 14px;
+      height: 14px;
+      object-fit: contain;
+    }
+
+    .map-popup-product-copy {
+      min-width: 0;
+      flex: 1;
+    }
+
     .map-popup-address a,
     .map-popup-products a {
       color: var(--green);
@@ -3230,22 +3304,42 @@
 
     .results-store-marker__core {
       position: absolute;
-      inset: 7px;
+      inset: 5px;
       display: flex;
       align-items: center;
       justify-content: center;
       border-radius: 999px;
       background: radial-gradient(circle at 35% 30%, var(--map-marker-core-start), var(--map-marker-core-mid) 55%, var(--map-marker-core-end) 100%);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      overflow: visible;
     }
 
-    .results-store-marker__core::after {
-      content: '';
-      width: 5px;
-      height: 5px;
+    .results-store-marker__icon-stack {
+      position: relative;
+      width: 11px;
+      height: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .results-store-marker__icon {
+      width: 11px;
+      height: 11px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.18));
+    }
+
+    .results-store-marker__icon--secondary {
+      position: absolute;
+      right: -4px;
+      bottom: -4px;
+      width: 8px;
+      height: 8px;
+      padding: 1px;
       border-radius: 999px;
-      background: rgba(244, 247, 249, 0.94);
-      box-shadow: 0 0 8px rgba(255, 255, 255, 0.38);
+      background: rgba(250, 252, 253, 0.94);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
     }
 
     .results-store-marker.is-multi::before {
@@ -6792,9 +6886,11 @@
     let resultsMapResizeObserver = null;
     let activeResultsMapKey = null;
     let currentResultsMapTheme = loadStoredResultsMapTheme();
+    let currentResultsMapRetailerFilter = '';
     let currentResultsMapProductFilter = '';
     let resultsMapProductFilterOpen = false;
     let resultsMapProductMenuOpen = false;
+    let resultsMapRetailerMenuOpen = false;
     let manualLocationFallbackVisible = false;
     let mapDistanceReference = loadStoredMapAddressReference();
     let manualLocationQuery = loadStoredMapAddress();
@@ -8960,6 +9056,13 @@
       }
     }
 
+    function renderRetailerIconHtml(retailer, className = 'product-retailer-icon') {
+      const retailerKeyValue = retailerKey(retailer);
+      const iconPath = retailerIconPath(retailerKeyValue);
+      const label = retailerLabel(retailerKeyValue);
+      return `<img class="${escapeHtml(className)}" src="${escapeHtml(iconPath)}" alt="${escapeHtml(label)}" title="${escapeHtml(label)}" loading="lazy" decoding="async">`;
+    }
+
     function productIdentityKey(productId, retailer = 'walgreens') {
       return `${retailerKey(retailer)}:${String(productId || '').trim()}`;
     }
@@ -9310,6 +9413,7 @@
       Object.values(products || {}).forEach(product => {
         const productName = String(product.product_name || 'Tracked product').trim();
         const productSourceUrl = sanitizeProductSourceUrl(product.source_url || '');
+        const productRetailer = retailerKey(product.retailer || 'walgreens');
         const stores = Array.isArray(product.stores) ? product.stores : [];
 
         stores.forEach(store => {
@@ -9321,12 +9425,16 @@
             return;
           }
 
-          const storeKey = String(store.store_id || `${latitude},${longitude}`);
+          const rawStoreId = String(store.store_id || '').trim();
+          const storeKey = rawStoreId
+            ? `${productRetailer}:${rawStoreId}`
+            : `${productRetailer}:${latitude},${longitude}`;
           if (!storeMap.has(storeKey)) {
             storeMap.set(storeKey, {
               location_key: storeKey,
-              store_id: store.store_id || '',
-              name: store.name || 'Walgreens',
+              store_id: rawStoreId,
+              retailer: productRetailer,
+              name: store.name || retailerLabel(productRetailer),
               address: store.address || 'Address unavailable',
               distance: getStoreDistance(store, referenceLocation),
               latitude,
@@ -9341,6 +9449,7 @@
           location.total_inventory += Number.isFinite(inventoryCount) ? inventoryCount : 0;
           location.products.push({
             name: productName,
+            retailer: productRetailer,
             source_url: productSourceUrl,
             inventory_count: Number.isFinite(inventoryCount) ? inventoryCount : 0
           });
@@ -9348,12 +9457,20 @@
       });
 
       const locations = Array.from(storeMap.values())
-        .map(location => ({
-          ...location,
-          product_count: location.products.length,
-          distance: Number.isFinite(location.distance) ? location.distance : null,
-          products_label: location.products.map(product => product.name).join(', ')
-        }))
+        .map(location => {
+          const retailerKeys = Array.from(new Set(
+            (location.products || []).map(product => retailerKey(product?.retailer || location.retailer || 'walgreens'))
+          ));
+          return {
+            ...location,
+            retailer: retailerKeys[0] || retailerKey(location.retailer || 'walgreens'),
+            retailer_keys: retailerKeys,
+            retailer_label: retailerLabel(retailerKeys[0] || location.retailer || 'walgreens'),
+            product_count: location.products.length,
+            distance: Number.isFinite(location.distance) ? location.distance : null,
+            products_label: location.products.map(product => product.name).join(', ')
+          };
+        })
         .sort((a, b) => {
           if (a.distance === null && b.distance === null) return b.total_inventory - a.total_inventory;
           if (a.distance === null) return 1;
@@ -9481,16 +9598,19 @@
 
     function renderMapPopup(location) {
       const productsHtml = location.products.map(product => `
-          <div>${product.source_url
-          ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
-          : escapeHtml(product.name)
-        } <strong>${Number(product.inventory_count || 0)}</strong></div>
+          <div class="map-popup-product">
+            <span class="map-popup-product-retailer">${renderRetailerIconHtml(product.retailer || location.retailer, 'map-popup-product-icon')}</span>
+            <span class="map-popup-product-copy">${product.source_url
+              ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
+              : escapeHtml(product.name)
+            } <strong>${Number(product.inventory_count || 0)}</strong></span>
+          </div>
         `).join('');
 
       return `
           <div class="map-popup-title">${escapeHtml(location.name)}</div>
           <div class="map-popup-address">${renderAddressLink(location.address)}</div>
-          <div class="map-popup-meta">${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
+          <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
           <div class="map-popup-products">${productsHtml}</div>
         `;
     }
@@ -9672,9 +9792,16 @@
     }
 
     function createResultsMapMarkerIcon(location) {
+      const retailerKeys = Array.isArray(location?.retailer_keys) && location.retailer_keys.length
+        ? location.retailer_keys.map(retailerKey)
+        : [retailerKey(location?.retailer || 'walgreens')];
+      const uniqueRetailers = Array.from(new Set(retailerKeys)).filter(Boolean);
+      const primaryRetailer = uniqueRetailers[0] || 'walgreens';
+      const secondaryRetailer = uniqueRetailers[1] || '';
       const markerClasses = [
         'results-store-marker',
-        Number(location?.product_count || 0) > 1 ? 'is-multi' : ''
+        Number(location?.product_count || 0) > 1 ? 'is-multi' : '',
+        uniqueRetailers.length > 1 ? 'has-multiple-retailers' : ''
       ].filter(Boolean).join(' ');
 
       return L.divIcon({
@@ -9682,7 +9809,12 @@
         html: `
           <div class="${markerClasses}">
             <span class="results-store-marker__halo"></span>
-            <span class="results-store-marker__core"></span>
+            <span class="results-store-marker__core">
+              <span class="results-store-marker__icon-stack">
+                ${renderRetailerIconHtml(primaryRetailer, 'results-store-marker__icon')}
+                ${secondaryRetailer ? renderRetailerIconHtml(secondaryRetailer, 'results-store-marker__icon results-store-marker__icon--secondary') : ''}
+              </span>
+            </span>
           </div>
         `,
         iconSize: [24, 24],
@@ -10506,7 +10638,16 @@
           resultsMapProductFilterOpen = !resultsMapProductFilterOpen;
           if (!resultsMapProductFilterOpen) {
             resultsMapProductMenuOpen = false;
+            resultsMapRetailerMenuOpen = false;
           }
+          if (latestRenderedResults && currentTab === 'results' && currentResultsView === 'map') {
+            const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
+            syncResultsMapSidebar(mapData);
+          }
+          return;
+        case 'toggle-results-map-retailer-menu':
+          resultsMapRetailerMenuOpen = !resultsMapRetailerMenuOpen;
+          resultsMapProductMenuOpen = false;
           if (latestRenderedResults && currentTab === 'results' && currentResultsView === 'map') {
             const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
             syncResultsMapSidebar(mapData);
@@ -10514,9 +10655,23 @@
           return;
         case 'toggle-results-map-product-menu':
           resultsMapProductMenuOpen = !resultsMapProductMenuOpen;
+          resultsMapRetailerMenuOpen = false;
           if (latestRenderedResults && currentTab === 'results' && currentResultsView === 'map') {
             const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
             syncResultsMapSidebar(mapData);
+          }
+          return;
+        case 'set-results-map-retailer-filter':
+          currentResultsMapRetailerFilter = String(actionElement.dataset.retailerFilterValue || '').trim().toLowerCase();
+          resultsMapRetailerMenuOpen = false;
+          if (latestRenderedResults && currentTab === 'results') {
+            const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
+            const filteredLocations = getFilteredResultsMapLocations(mapData.locations);
+            syncResultsMapSidebar(mapData);
+
+            if (currentResultsView === 'map') {
+              rerenderResultsMapForFilteredLocations(filteredLocations);
+            }
           }
           return;
         case 'set-results-map-product-filter':
@@ -10832,27 +10987,83 @@
       return options.sort((a, b) => a.localeCompare(b));
     }
 
+    function getResultsMapRetailerOptions(locations = []) {
+      const seen = new Set();
+      const options = [];
+
+      locations.forEach(location => {
+        const retailerKeys = Array.isArray(location?.retailer_keys) && location.retailer_keys.length
+          ? location.retailer_keys
+          : [retailerKey(location?.retailer || 'walgreens')];
+
+        retailerKeys.forEach(retailer => {
+          const key = retailerKey(retailer);
+          if (!key || seen.has(key)) return;
+          seen.add(key);
+          options.push({
+            key,
+            label: retailerLabel(key),
+            icon: retailerIconPath(key)
+          });
+        });
+      });
+
+      return options.sort((a, b) => a.label.localeCompare(b.label));
+    }
+
+    function getRetailerFilteredResultsMapLocations(locations = []) {
+      const options = getResultsMapRetailerOptions(locations);
+      if (currentResultsMapRetailerFilter && !options.some(option => option.key === currentResultsMapRetailerFilter)) {
+        currentResultsMapRetailerFilter = '';
+      }
+
+      if (!currentResultsMapRetailerFilter) {
+        return locations;
+      }
+
+      return locations.filter(location => {
+        const retailerKeys = Array.isArray(location?.retailer_keys) && location.retailer_keys.length
+          ? location.retailer_keys.map(retailerKey)
+          : [retailerKey(location?.retailer || 'walgreens')];
+        return retailerKeys.includes(currentResultsMapRetailerFilter);
+      });
+    }
+
     function getFilteredResultsMapLocations(locations = []) {
-      const options = getResultsMapProductOptions(locations);
+      const retailerFilteredLocations = getRetailerFilteredResultsMapLocations(locations);
+      const options = getResultsMapProductOptions(retailerFilteredLocations);
       if (currentResultsMapProductFilter && !options.includes(currentResultsMapProductFilter)) {
         currentResultsMapProductFilter = '';
       }
 
       if (!currentResultsMapProductFilter) {
-        return locations;
+        return retailerFilteredLocations;
       }
 
-      return locations.filter(location =>
+      return retailerFilteredLocations.filter(location =>
         (location.products || []).some(product => String(product?.name || '').trim() === currentResultsMapProductFilter)
       );
     }
 
     function renderResultsMapSidebarHead(locations = [], missingCoordinates = 0) {
-      const productOptions = getResultsMapProductOptions(locations);
+      const retailerOptions = getResultsMapRetailerOptions(locations);
+      const retailerFilteredLocations = getRetailerFilteredResultsMapLocations(locations);
+      const productOptions = getResultsMapProductOptions(retailerFilteredLocations);
       const filteredLocations = getFilteredResultsMapLocations(locations);
-      const hasFilterControl = productOptions.length > 1;
+      const hasFilterControl = retailerOptions.length > 1 || productOptions.length > 1;
+
+      if (retailerOptions.length <= 1) {
+        currentResultsMapRetailerFilter = '';
+        resultsMapRetailerMenuOpen = false;
+      }
+
+      if (productOptions.length <= 1) {
+        resultsMapProductMenuOpen = false;
+      }
 
       if (!hasFilterControl) {
+        currentResultsMapRetailerFilter = '';
+        resultsMapRetailerMenuOpen = false;
         resultsMapProductFilterOpen = false;
       }
 
@@ -10861,8 +11072,8 @@
           class="results-map-filter-btn ${resultsMapProductFilterOpen ? 'is-active' : ''}"
           type="button"
           data-action="toggle-results-map-product-filter"
-          aria-label="Filter pinned stores by product"
-          title="Filter pinned stores by product"
+          aria-label="Filter pinned stores"
+          title="Filter pinned stores"
           aria-expanded="${resultsMapProductFilterOpen ? 'true' : 'false'}">
           <span class="results-map-filter-btn-icon" aria-hidden="true"></span>
         </button>
@@ -10870,24 +11081,50 @@
 
       const filterPanelHtml = hasFilterControl && resultsMapProductFilterOpen ? `
         <div class="results-map-filter-row">
-          <div class="results-map-filter-label">Filter by product</div>
-          <button
-            class="results-map-filter-select-trigger ${resultsMapProductMenuOpen ? 'is-open' : ''}"
-            type="button"
-            data-action="toggle-results-map-product-menu"
-            aria-haspopup="listbox"
-            aria-expanded="${resultsMapProductMenuOpen ? 'true' : 'false'}">
-            <span class="results-map-filter-select-value">${escapeHtml(currentResultsMapProductFilter || 'All products')}</span>
-            <span class="results-map-filter-select-chevron" aria-hidden="true"></span>
-          </button>
-          <div class="results-map-filter-menu" role="listbox" ${resultsMapProductMenuOpen ? '' : 'hidden'}>
-            <button class="results-map-filter-option ${!currentResultsMapProductFilter ? 'is-selected' : ''}" type="button" data-action="set-results-map-product-filter" data-product-filter-value="" role="option" aria-selected="${!currentResultsMapProductFilter ? 'true' : 'false'}">All products</button>
-            ${productOptions.map(productName => `
-              <button class="results-map-filter-option ${productName === currentResultsMapProductFilter ? 'is-selected' : ''}" type="button" data-action="set-results-map-product-filter" data-product-filter-value="${escapeHtml(productName)}" role="option" aria-selected="${productName === currentResultsMapProductFilter ? 'true' : 'false'}">${escapeHtml(productName)}</button>
-            `).join('')}
-          </div>
+          ${retailerOptions.length > 1 ? `
+            <div class="results-map-filter-group">
+              <div class="results-map-filter-label">Filter by retailer</div>
+              <button
+                class="results-map-filter-select-trigger ${resultsMapRetailerMenuOpen ? 'is-open' : ''}"
+                type="button"
+                data-action="toggle-results-map-retailer-menu"
+                aria-haspopup="listbox"
+                aria-expanded="${resultsMapRetailerMenuOpen ? 'true' : 'false'}">
+                <span class="results-map-filter-select-value">${escapeHtml((retailerOptions.find(option => option.key === currentResultsMapRetailerFilter) || {}).label || 'All retailers')}</span>
+                <span class="results-map-filter-select-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="results-map-filter-menu" role="listbox" ${resultsMapRetailerMenuOpen ? '' : 'hidden'}>
+                <button class="results-map-filter-option ${!currentResultsMapRetailerFilter ? 'is-selected' : ''}" type="button" data-action="set-results-map-retailer-filter" data-retailer-filter-value="" role="option" aria-selected="${!currentResultsMapRetailerFilter ? 'true' : 'false'}">All retailers</button>
+                ${retailerOptions.map(option => `
+                  <button class="results-map-filter-option ${option.key === currentResultsMapRetailerFilter ? 'is-selected' : ''}" type="button" data-action="set-results-map-retailer-filter" data-retailer-filter-value="${escapeHtml(option.key)}" role="option" aria-selected="${option.key === currentResultsMapRetailerFilter ? 'true' : 'false'}">
+                    <span class="results-map-filter-option-with-icon">${renderRetailerIconHtml(option.key, 'results-map-filter-option-icon')}<span>${escapeHtml(option.label)}</span></span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          ${productOptions.length > 1 ? `
+            <div class="results-map-filter-group">
+              <div class="results-map-filter-label">Filter by product</div>
+              <button
+                class="results-map-filter-select-trigger ${resultsMapProductMenuOpen ? 'is-open' : ''}"
+                type="button"
+                data-action="toggle-results-map-product-menu"
+                aria-haspopup="listbox"
+                aria-expanded="${resultsMapProductMenuOpen ? 'true' : 'false'}">
+                <span class="results-map-filter-select-value">${escapeHtml(currentResultsMapProductFilter || 'All products')}</span>
+                <span class="results-map-filter-select-chevron" aria-hidden="true"></span>
+              </button>
+              <div class="results-map-filter-menu" role="listbox" ${resultsMapProductMenuOpen ? '' : 'hidden'}>
+                <button class="results-map-filter-option ${!currentResultsMapProductFilter ? 'is-selected' : ''}" type="button" data-action="set-results-map-product-filter" data-product-filter-value="" role="option" aria-selected="${!currentResultsMapProductFilter ? 'true' : 'false'}">All products</button>
+                ${productOptions.map(productName => `
+                  <button class="results-map-filter-option ${productName === currentResultsMapProductFilter ? 'is-selected' : ''}" type="button" data-action="set-results-map-product-filter" data-product-filter-value="${escapeHtml(productName)}" role="option" aria-selected="${productName === currentResultsMapProductFilter ? 'true' : 'false'}">${escapeHtml(productName)}</button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
           <div class="results-map-filter-summary">
-            Showing ${filteredLocations.length} of ${locations.length} pinned store${locations.length === 1 ? '' : 's'}${currentResultsMapProductFilter ? ` for ${escapeHtml(currentResultsMapProductFilter)}` : ''}.
+            Showing ${filteredLocations.length} of ${locations.length} pinned store${locations.length === 1 ? '' : 's'}${currentResultsMapRetailerFilter ? ` for ${escapeHtml(retailerLabel(currentResultsMapRetailerFilter))}` : ''}${currentResultsMapProductFilter ? `${currentResultsMapRetailerFilter ? ' / ' : ' for '}${escapeHtml(currentResultsMapProductFilter)}` : ''}.
           </div>
         </div>
       ` : '';
@@ -10923,6 +11160,9 @@
 
     function renderResultsMapList(locations = []) {
       const filteredLocations = getFilteredResultsMapLocations(locations);
+      const activeFilterLabel = currentResultsMapProductFilter && currentResultsMapRetailerFilter
+        ? `${retailerLabel(currentResultsMapRetailerFilter)} / ${currentResultsMapProductFilter}`
+        : (currentResultsMapProductFilter || (currentResultsMapRetailerFilter ? retailerLabel(currentResultsMapRetailerFilter) : 'the current filter'));
 
       if (!locations.length) {
         return `
@@ -10937,7 +11177,7 @@
         return `
             <div class="empty-state">
               <div class="empty-title">No matching stores</div>
-              <div class="empty-text">No pinned stores in this scan currently show ${escapeHtml(currentResultsMapProductFilter)}.</div>
+              <div class="empty-text">No pinned stores in this scan currently match ${escapeHtml(activeFilterLabel)}.</div>
             </div>
           `;
       }
@@ -10946,7 +11186,13 @@
           <div class="results-map-list">
             ${filteredLocations.map((location, index) => `
               <button class="results-map-item ${activeResultsMapKey === location.location_key ? 'is-active' : ''}" type="button" data-action="focus-results-marker" data-location-key="${escapeHtml(location.location_key)}">
-                <div class="results-map-item-title">${escapeHtml(location.name)}</div>
+                <div class="results-map-item-title-wrap">
+                  ${renderRetailerIconHtml(location.retailer, 'results-map-item-retailer-icon')}
+                  <div class="results-map-item-title-block">
+                    <div class="results-map-item-title">${escapeHtml(location.name)}</div>
+                    <div class="results-map-item-retailer">${escapeHtml(retailerLabel(location.retailer))}</div>
+                  </div>
+                </div>
                 <div class="results-map-item-address">${escapeHtml(location.address)}</div>
                 <div class="results-map-item-meta">${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
                 <div class="results-map-item-products">${escapeHtml(location.products_label)}</div>
@@ -11678,12 +11924,13 @@
       }
 
       if (
-        resultsMapProductMenuOpen &&
+        (resultsMapProductMenuOpen || resultsMapRetailerMenuOpen) &&
         event.target instanceof Element &&
         !event.target.closest('.results-map-filter-row') &&
         !event.target.closest('.results-map-filter-btn')
       ) {
         resultsMapProductMenuOpen = false;
+        resultsMapRetailerMenuOpen = false;
         if (latestRenderedResults && currentTab === 'results' && currentResultsView === 'map') {
           const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
           syncResultsMapSidebar(mapData);
