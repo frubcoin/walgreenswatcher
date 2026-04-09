@@ -6403,7 +6403,8 @@
           <div class="form-group">
             <label class="form-label" for="cfg-interval">Check Interval</label>
             <input type="range" class="form-input" id="cfg-interval" min="30" max="1440" step="30" value="60">
-            <span class="form-hint">Time between automatic checks. <span id="cfg-interval-value">60 min (1 hr)</span></span>
+            <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;" id="cfg-interval-value">60 min (1 hr)</div>
+            <span class="form-hint">Time between automatic checks.</span>
           </div>
           <div class="form-group">
             <label class="form-label" for="cfg-max-range">Max Search Range</label>
@@ -8457,6 +8458,16 @@
             void saveSettings();
           }
         }, true);
+      }
+
+      // Live update slider value labels while sliding
+      const intervalSlider = document.getElementById('cfg-interval');
+      if (intervalSlider) {
+        intervalSlider.addEventListener('input', () => updateIntervalValueLabel(intervalSlider.value));
+      }
+      const rangeSlider = document.getElementById('cfg-max-range');
+      if (rangeSlider) {
+        rangeSlider.addEventListener('input', () => updateMaxRangeValueLabel(rangeSlider.value));
       }
     }
 
