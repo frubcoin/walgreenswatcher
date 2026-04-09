@@ -445,6 +445,20 @@ class StockDatabase:
             "alert_user_actions": DEFAULT_ADMIN_ALERT_USER_ACTIONS,
         }
 
+    @staticmethod
+    def _add_column_if_not_exists(
+        conn: sqlite3.Connection, table_name: str, column_name: str, definition_sql: str
+    ) -> None:
+        existing_columns = {
+            row["name"]
+            for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name in existing_columns:
+            return
+        conn.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition_sql}"
+        )
+
     def _ensure_user_settings(self, conn: sqlite3.Connection, user_id: int) -> None:
         StockDatabase._add_column_if_not_exists(
             conn, "user_settings", "map_provider", "TEXT NOT NULL DEFAULT 'google'"
