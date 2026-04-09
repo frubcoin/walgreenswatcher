@@ -9599,7 +9599,6 @@
     function renderMapPopup(location) {
       const productsHtml = location.products.map(product => `
           <div class="map-popup-product">
-            <span class="map-popup-product-retailer">${renderRetailerIconHtml(product.retailer || location.retailer, 'map-popup-product-icon')}</span>
             <span class="map-popup-product-copy">${product.source_url
               ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
               : escapeHtml(product.name)
@@ -9610,7 +9609,7 @@
       return `
           <div class="map-popup-title">${escapeHtml(location.name)}</div>
           <div class="map-popup-address">${renderAddressLink(location.address)}</div>
-          <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
+          <div class="map-popup-meta">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(retailerLabel(location.retailer))} | ${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
           <div class="map-popup-products">${productsHtml}</div>
         `;
     }
