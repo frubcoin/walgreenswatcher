@@ -5899,7 +5899,7 @@
     function updateMaxRangeValueLabel(value = 20) {
       const rangeValueLabel = document.getElementById('cfg-max-range-value');
       if (rangeValueLabel) {
-        rangeValueLabel.textContent = `${Math.max(1, Math.min(50, Number(value) || 20))} mi`;
+        rangeValueLabel.textContent = `${Math.max(1, Math.min(20, Number(value) || 20))} mi`;
       }
     }
 
@@ -6408,7 +6408,7 @@
           </div>
           <div class="form-group">
             <label class="form-label" for="cfg-max-range">Max Search Range</label>
-            <input type="range" class="form-input" id="cfg-max-range" min="1" max="50" step="1" value="20">
+            <input type="range" class="form-input" id="cfg-max-range" min="1" max="20" step="1" value="20">
             <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;"><span id="cfg-max-range-value">20</span> miles</div>
             <span class="form-hint">Stores outside this range are excluded from results and Discord alerts.</span>
           </div>
@@ -7589,7 +7589,7 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="onboarding-range">Max Search Range</label>
-                  <input type="range" class="form-input" id="onboarding-range" min="1" max="50" step="1" value="${escapeHtml(draft.range || 20)}">
+                  <input type="range" class="form-input" id="onboarding-range" min="1" max="20" step="1" value="${escapeHtml(draft.range || 20)}">
                   <span class="form-hint">Miles from ZIP to search. <span id="onboarding-range-value">${escapeHtml(draft.range || 20)} mi</span></span>
                 </div>
               </div>
@@ -7771,7 +7771,7 @@
           rangeInput.addEventListener('input', (e) => {
             const valueLabel = document.getElementById('onboarding-range-value');
             if (valueLabel) {
-              valueLabel.textContent = `${Math.max(1, Math.min(50, Number(e.target.value) || 20))} mi`;
+              valueLabel.textContent = `${Math.max(1, Math.min(20, Number(e.target.value) || 20))} mi`;
             }
           });
         }
@@ -7967,8 +7967,8 @@
         return false;
       }
 
-      if (!Number.isFinite(range) || range < 1 || range > 50) {
-        setOnboardingFeedback('Choose a search range between 1 and 50 miles.', 'error');
+      if (!Number.isFinite(range) || range < 1 || range > 20) {
+        setOnboardingFeedback('Choose a search range between 1 and 20 miles.', 'error');
         return false;
       }
 
