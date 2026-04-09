@@ -1,7 +1,7 @@
 {
-  "name": "Frub's Walwatch",
-  "short_name": "Walwatch",
-  "description": "Hosted Walgreens pickup inventory monitoring with per-user settings, Google sign-in, and Discord alerts.",
+  "name": "Local Pick-up Monitor by frub",
+  "short_name": "Pick-up Monitor",
+  "description": "Hosted local pickup inventory monitoring for multiple retailers with per-user settings, Google sign-in, and Discord alerts.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

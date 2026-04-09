@@ -1,4 +1,4 @@
-"""SQLite persistence for the hosted Walgreens watcher."""
+"""SQLite persistence for the hosted local pick-up monitor."""
 
 from __future__ import annotations
 

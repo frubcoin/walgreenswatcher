@@ -1,4 +1,4 @@
-"""Per-user scheduler management for the hosted Walgreens watcher."""
+"""Per-user scheduler management for the hosted local pick-up monitor."""
 
 from __future__ import annotations
 

@@ -127,7 +127,7 @@ class DiscordNotifier:
 
     def _brand_author(self) -> Dict[str, str]:
         """Build the standard branded embed author."""
-        author = {"name": "Frub's Walwatch"}
+        author = {"name": "Local Pick-up Monitor by frub"}
         if os.path.exists(self.brand_logo_path):
             author["icon_url"] = f"attachment://{self.brand_logo_filename}"
         return author

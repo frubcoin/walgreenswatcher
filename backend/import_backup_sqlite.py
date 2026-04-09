@@ -420,7 +420,7 @@ def _import_audit_events(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Import users and related data from an old Walgreens Watcher SQLite backup.",
+        description="Import users and related data from an old Local Pick-up Monitor SQLite backup.",
     )
     parser.add_argument("source_db", help="Path to the old backup watcher.sqlite3")
     parser.add_argument(
