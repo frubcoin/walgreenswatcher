@@ -4773,14 +4773,16 @@
     }
 
     body.cookie-banner-active:not(.auth-gate-active) .site-footer {
+      bottom: calc(68px + env(safe-area-inset-bottom, 0px));
       top: auto;
       transform: translateX(-50%);
     }
 
     body:not(.auth-gate-active) .site-footer {
-      top: calc(100dvh - (var(--shell-footer-gap) / 2));
-      bottom: auto;
-      transform: translate(-50%, -50%);
+      position: sticky;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      top: auto;
+      transform: translateX(-50%);
     }
 
     .site-footer-copy {
