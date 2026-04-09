@@ -513,6 +513,14 @@
       flex-direction: column;
     }
 
+    body.auth-gate-active #app-shell {
+      display: none !important;
+    }
+
+    body:not(.auth-gate-active) .auth-gate {
+      display: none !important;
+    }
+
     body.auth-gate-active .auth-gate {
       min-height: 0;
       max-height: calc(100dvh - 110px);
