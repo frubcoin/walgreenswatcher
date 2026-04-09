@@ -664,22 +664,89 @@ function renderAuthorizedEmails(entries) {
   `).join('');
 }
 
+function sortTrendingProductsByWatchers(products = []) {
+  return (Array.isArray(products) ? products.slice() : []).sort((left, right) => {
+    const leftWatchers = Math.max(0, Number(left?.tracked_by_count || 0));
+    const rightWatchers = Math.max(0, Number(right?.tracked_by_count || 0));
+    if (rightWatchers !== leftWatchers) {
+      return rightWatchers - leftWatchers;
+    }
+
+    const leftTrackedAt = Date.parse(String(left?.last_tracked_at || '')) || 0;
+    const rightTrackedAt = Date.parse(String(right?.last_tracked_at || '')) || 0;
+    if (rightTrackedAt !== leftTrackedAt) {
+      return rightTrackedAt - leftTrackedAt;
+    }
+
+    const leftName = String(left?.name || left?.id || '').trim().toLowerCase();
+    const rightName = String(right?.name || right?.id || '').trim().toLowerCase();
+    return leftName.localeCompare(rightName) || String(left?.id || '').localeCompare(String(right?.id || ''));
+  });
+}
+
 function renderTrendingProductsAdmin(trendingPayload) {
   const container = document.getElementById('trending-admin-list');
   const countBadge = document.getElementById('trending-admin-count');
-  const products = Array.isArray(trendingPayload?.products) ? trendingPayload.products : [];
+  const hiddenContainer = document.getElementById('trending-hidden-list');
+  const hiddenCountBadge = document.getElementById('trending-hidden-count');
+  const products = sortTrendingProductsByWatchers(trendingPayload?.products);
+  const hiddenProducts = sortTrendingProductsByWatchers(trendingPayload?.hidden_products);
   const retentionHours = Math.max(1, Number(trendingPayload?.retention_hours || 24));
 
   if (countBadge) {
     countBadge.textContent = `${products.length} product${products.length === 1 ? '' : 's'}`;
   }
+  if (hiddenCountBadge) {
+    hiddenCountBadge.textContent = `${hiddenProducts.length} hidden`;
+  }
 
   if (!products.length) {
     container.innerHTML = `<div class="empty-state">No trending products are currently visible in the last ${retentionHours} hours.</div>`;
+  } else {
+    container.innerHTML = products.map(product => `
+      <article class="trending-admin-item">
+        <div class="trending-admin-item-head">
+          <div class="trending-admin-copy">
+            <strong>${escapeHtml(product.name || product.id || 'Product')}</strong>
+            <div class="trending-admin-meta">
+              ${escapeHtml(retailerLabel(product.retailer))}
+              <span class="meta-divider">|</span>
+              ${escapeHtml(String(product.id || 'Unknown ID'))}
+              ${product.product_id ? `<span class="meta-divider">|</span>${escapeHtml(product.product_id)}` : ''}
+            </div>
+          </div>
+          <div class="tag-row">
+            <span class="chip chip-warning">${escapeHtml(`${Number(product.tracked_by_count || 0)} watcher${Number(product.tracked_by_count || 0) === 1 ? '' : 's'}`)}</span>
+          </div>
+        </div>
+        <div class="trending-admin-item-body">
+          <div class="trending-admin-note">Last tracked ${escapeHtml(formatDateTime(product.last_tracked_at))}</div>
+          ${product.source_url ? `<a class="button button-muted button-compact" href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">Open link</a>` : ''}
+        </div>
+        <div class="action-row">
+          <button
+            class="button button-danger button-compact"
+            type="button"
+            data-action="delete-trending-product"
+            data-product-id="${escapeHtml(product.id || '')}"
+            data-retailer="${escapeHtml(product.retailer || 'walgreens')}"
+            data-name="${escapeHtml(product.name || product.id || 'Product')}"
+          >Delete from trending</button>
+        </div>
+      </article>
+    `).join('');
+  }
+
+  if (!hiddenContainer) {
     return;
   }
 
-  container.innerHTML = products.map(product => `
+  if (!hiddenProducts.length) {
+    hiddenContainer.innerHTML = '<div class="empty-state">No products are currently hidden from Community Radar.</div>';
+    return;
+  }
+
+  hiddenContainer.innerHTML = hiddenProducts.map(product => `
     <article class="trending-admin-item">
       <div class="trending-admin-item-head">
         <div class="trending-admin-copy">
@@ -692,22 +759,26 @@ function renderTrendingProductsAdmin(trendingPayload) {
           </div>
         </div>
         <div class="tag-row">
-          <span class="chip chip-warning">${escapeHtml(`${Number(product.tracked_by_count || 0)} watcher${Number(product.tracked_by_count || 0) === 1 ? '' : 's'}`)}</span>
+          <span class="chip">${escapeHtml(`${Number(product.tracked_by_count || 0)} recent watcher${Number(product.tracked_by_count || 0) === 1 ? '' : 's'}`)}</span>
         </div>
       </div>
       <div class="trending-admin-item-body">
-        <div class="trending-admin-note">Last tracked ${escapeHtml(formatDateTime(product.last_tracked_at))}</div>
+        <div class="trending-admin-note">
+          Hidden ${escapeHtml(formatDateTime(product.hidden_at))}
+          ${product.hidden_by_email ? ` by ${escapeHtml(product.hidden_by_email)}` : ''}
+          ${product.last_tracked_at ? ` | Last tracked ${escapeHtml(formatDateTime(product.last_tracked_at))}` : ''}
+        </div>
         ${product.source_url ? `<a class="button button-muted button-compact" href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">Open link</a>` : ''}
       </div>
       <div class="action-row">
         <button
-          class="button button-danger button-compact"
+          class="button button-success button-compact"
           type="button"
-          data-action="delete-trending-product"
+          data-action="restore-trending-product"
           data-product-id="${escapeHtml(product.id || '')}"
           data-retailer="${escapeHtml(product.retailer || 'walgreens')}"
           data-name="${escapeHtml(product.name || product.id || 'Product')}"
-        >Delete from trending</button>
+        >Restore to trending</button>
       </div>
     </article>
   `).join('');
@@ -1196,6 +1267,36 @@ async function deleteTrendingProduct(actionElement) {
   }
 }
 
+async function restoreTrendingProduct(actionElement) {
+  const productId = String(actionElement?.dataset.productId || '').trim();
+  const retailer = String(actionElement?.dataset.retailer || 'walgreens').trim();
+  const productName = String(actionElement?.dataset.name || productId).trim() || productId;
+
+  if (!productId) {
+    showBanner('Hidden trending product ID missing', 'error');
+    return;
+  }
+
+  const originalLabel = actionElement.textContent;
+  actionElement.disabled = true;
+  actionElement.textContent = 'Restoring...';
+
+  try {
+    await apiRequest('/api/admin/trending-products/restore', 'POST', {
+      id: productId,
+      retailer,
+      name: productName
+    });
+    await loadAdminOverview();
+    showBanner('Trending product restored', 'success');
+  } catch (error) {
+    showBanner(error.message, 'error');
+  } finally {
+    actionElement.disabled = false;
+    actionElement.textContent = originalLabel;
+  }
+}
+
 async function banUser(userId) {
   const reason = document.getElementById(`ban-reason-${userId}`)?.value.trim() || '';
   try {
@@ -1273,6 +1374,8 @@ document.addEventListener('click', event => {
     unbanUser(Number(actionElement.dataset.userId || 0));
   } else if (action === 'delete-trending-product') {
     deleteTrendingProduct(actionElement);
+  } else if (action === 'restore-trending-product') {
+    restoreTrendingProduct(actionElement);
   }
 });
 

@@ -828,6 +828,105 @@ class StockDatabase:
             for row in rows
         ]
 
+    def list_hidden_trending_products_for_admin(self, limit: int = 48) -> List[Dict[str, Any]]:
+        capped_limit = max(1, min(int(limit or 48), 200))
+        cutoff = self._trending_retention_cutoff()
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    h.article_id,
+                    h.retailer,
+                    h.hidden_at,
+                    h.hidden_by_user_id,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.name), ''), tp.article_id)
+                        FROM tracked_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS name,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.planogram), ''), '')
+                        FROM tracked_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS planogram,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.image_url), ''), '')
+                        FROM tracked_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS image_url,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.source_url), ''), '')
+                        FROM tracked_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS source_url,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.product_id), ''), '')
+                        FROM tracked_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS product_id,
+                    (
+                        SELECT COUNT(DISTINCT tp.user_id)
+                        FROM tracked_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                          AND COALESCE(NULLIF(TRIM(tp.source_url), ''), '') <> ''
+                          AND tp.created_at >= ?
+                    ) AS tracked_by_count,
+                    (
+                        SELECT MAX(tp.created_at)
+                        FROM tracked_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                          AND COALESCE(NULLIF(TRIM(tp.source_url), ''), '') <> ''
+                          AND tp.created_at >= ?
+                    ) AS last_tracked_at,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(u.email), ''), '')
+                        FROM users u
+                        WHERE u.id = h.hidden_by_user_id
+                        LIMIT 1
+                    ) AS hidden_by_email
+                FROM hidden_trending_products h
+                ORDER BY h.hidden_at DESC, lower(COALESCE(name, h.article_id)) ASC, h.article_id ASC
+                LIMIT ?
+                """,
+                (cutoff, cutoff, capped_limit),
+            ).fetchall()
+
+        return [
+            {
+                "key": self._product_key(row["article_id"], row["retailer"]),
+                "id": row["article_id"],
+                "retailer": row["retailer"] or "walgreens",
+                "name": row["name"] or row["article_id"],
+                "planogram": row["planogram"] or "",
+                "image_url": row["image_url"] or "",
+                "source_url": row["source_url"] or "",
+                "product_id": row["product_id"] or "",
+                "tracked_by_count": int(row["tracked_by_count"] or 0),
+                "last_tracked_at": row["last_tracked_at"] or "",
+                "hidden_at": row["hidden_at"] or "",
+                "hidden_by_email": row["hidden_by_email"] or "",
+            }
+            for row in rows
+        ]
+
     def hide_trending_product(
         self,
         article_id: str,
@@ -912,6 +1011,90 @@ class StockDatabase:
             "tracked_by_count": int(row["tracked_by_count"] or 0),
             "last_tracked_at": row["last_tracked_at"] or "",
             "hidden_at": hidden_at,
+        }
+
+    def restore_hidden_trending_product(self, article_id: str, retailer: str = "") -> Optional[Dict[str, Any]]:
+        normalized_article_id = str(article_id or "").strip()
+        normalized_retailer = str(retailer or "walgreens").strip().lower() or "walgreens"
+        if not normalized_article_id:
+            return None
+
+        with self._connect() as conn:
+            hidden_row = conn.execute(
+                """
+                SELECT
+                    h.article_id,
+                    h.retailer,
+                    h.hidden_at,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.name), ''), tp.article_id)
+                        FROM tracked_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS name
+                FROM hidden_trending_products h
+                WHERE h.article_id = ? AND h.retailer = ?
+                LIMIT 1
+                """,
+                (normalized_article_id, normalized_retailer),
+            ).fetchone()
+            if hidden_row is None:
+                return None
+
+            conn.execute(
+                """
+                DELETE FROM hidden_trending_products
+                WHERE article_id = ? AND retailer = ?
+                """,
+                (normalized_article_id, normalized_retailer),
+            )
+
+            cutoff = self._trending_retention_cutoff()
+            tracked_rows = conn.execute(
+                """
+                SELECT
+                    user_id,
+                    article_id,
+                    retailer,
+                    COALESCE(NULLIF(TRIM(name), ''), article_id) AS name,
+                    COALESCE(NULLIF(TRIM(planogram), ''), '') AS planogram,
+                    COALESCE(NULLIF(TRIM(image_url), ''), '') AS image_url,
+                    COALESCE(NULLIF(TRIM(source_url), ''), '') AS source_url,
+                    COALESCE(NULLIF(TRIM(product_id), ''), '') AS product_id,
+                    created_at
+                FROM tracked_products
+                WHERE article_id = ?
+                  AND retailer = ?
+                  AND COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
+                  AND created_at >= ?
+                ORDER BY created_at ASC, user_id ASC
+                """,
+                (normalized_article_id, normalized_retailer, cutoff),
+            ).fetchall()
+
+            for row in tracked_rows:
+                self._upsert_trending_product(
+                    conn,
+                    int(row["user_id"]),
+                    str(row["article_id"] or "").strip(),
+                    str(row["retailer"] or "walgreens").strip() or "walgreens",
+                    str(row["name"] or "").strip() or normalized_article_id,
+                    str(row["planogram"] or "").strip(),
+                    image_url=str(row["image_url"] or "").strip(),
+                    source_url=str(row["source_url"] or "").strip(),
+                    product_id=str(row["product_id"] or "").strip(),
+                    tracked_at=str(row["created_at"] or "").strip(),
+                )
+
+        return {
+            "key": self._product_key(normalized_article_id, normalized_retailer),
+            "id": normalized_article_id,
+            "retailer": normalized_retailer,
+            "name": hidden_row["name"] or normalized_article_id,
+            "hidden_at": hidden_row["hidden_at"] or "",
+            "restored_recent_count": len(tracked_rows),
         }
 
     def add_tracked_product(

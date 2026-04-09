@@ -859,6 +859,12 @@ textarea {
   padding: 24px;
 }
 
+.trending-hidden-head {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
 .section-copy {
   margin: 10px 0 0;
   max-width: 760px;

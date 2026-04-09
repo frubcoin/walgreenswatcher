@@ -8644,9 +8644,29 @@
     }
 
     function getOnboardingTrendingSuggestions(limit = 4) {
-      return trendingProductsCache
+      return sortTrendingProductsByWatchers(trendingProductsCache)
         .filter(product => Boolean(sanitizeProductSourceUrl(product?.source_url || '')))
         .slice(0, Math.max(1, Number(limit) || 4));
+    }
+
+    function sortTrendingProductsByWatchers(products = []) {
+      return (Array.isArray(products) ? products.slice() : []).sort((left, right) => {
+        const leftWatchers = Math.max(0, Number(left?.tracked_by_count || 0));
+        const rightWatchers = Math.max(0, Number(right?.tracked_by_count || 0));
+        if (rightWatchers !== leftWatchers) {
+          return rightWatchers - leftWatchers;
+        }
+
+        const leftTrackedAt = Date.parse(String(left?.last_tracked_at || '')) || 0;
+        const rightTrackedAt = Date.parse(String(right?.last_tracked_at || '')) || 0;
+        if (rightTrackedAt !== leftTrackedAt) {
+          return rightTrackedAt - leftTrackedAt;
+        }
+
+        const leftName = String(left?.name || left?.id || '').trim().toLowerCase();
+        const rightName = String(right?.name || right?.id || '').trim().toLowerCase();
+        return leftName.localeCompare(rightName) || String(left?.id || '').localeCompare(String(right?.id || ''));
+      });
     }
 
     function renderOnboardingTrendingSuggestions(draft = ensureOnboardingDraft(), limit = 4) {
@@ -8703,7 +8723,7 @@
     }
 
     function renderTrendingProducts(products = trendingProductsCache, retentionHours = trendingRetentionHours) {
-      trendingProductsCache = Array.isArray(products) ? products : [];
+      trendingProductsCache = sortTrendingProductsByWatchers(products);
       const list = document.getElementById('trending-products-list');
       if (!list) return;
 

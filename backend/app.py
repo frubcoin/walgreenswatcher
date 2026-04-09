@@ -883,6 +883,7 @@ def _admin_overview_payload(admin_user: Optional[Dict[str, Any]] = None) -> Dict
     service_uptime = db.get_service_uptime_stats()
     system_stats = _get_system_stats()
     trending_products = db.list_trending_products_for_admin(limit=48)
+    hidden_trending_products = db.list_hidden_trending_products_for_admin(limit=48)
     return {
         "settings": settings,
         "authorized_google_emails": db.list_authorized_google_emails(),
@@ -891,6 +892,8 @@ def _admin_overview_payload(admin_user: Optional[Dict[str, Any]] = None) -> Dict
         "trending_products": {
             "products": trending_products,
             "count": len(trending_products),
+            "hidden_products": hidden_trending_products,
+            "hidden_count": len(hidden_trending_products),
             "retention_hours": TRENDING_PRODUCTS_RETENTION_HOURS,
             "viewer_user_id": int(admin_user["id"]) if admin_user else None,
         },
@@ -1507,6 +1510,39 @@ def remove_trending_product_admin():
         alert_category="user_action",
     )
     return jsonify({"product": removed_product})
+
+
+@app.route("/api/admin/trending-products/restore", methods=["POST"])
+@require_admin
+def restore_trending_product_admin():
+    admin_user = _session_user()
+    data = request.json or {}
+    product_id = str(data.get("id") or "").strip()
+    retailer = str(data.get("retailer") or "").strip()
+    product_name = str(data.get("name") or "").strip()
+
+    if not product_id:
+        return jsonify({"error": "Product ID required"}), 400
+
+    restored_product = db.restore_hidden_trending_product(product_id, retailer)
+    if restored_product is None:
+        return jsonify({"error": "Hidden trending product not found"}), 404
+
+    _record_audit_event(
+        "admin.trending_product_restored",
+        f"Trending product restored to admin radar: {product_name or restored_product['name']}",
+        actor_user=admin_user,
+        metadata={
+            "product_id": restored_product["id"],
+            "retailer": restored_product["retailer"],
+            "name": product_name or restored_product["name"],
+            "hidden_at": restored_product["hidden_at"],
+            "restored_recent_count": restored_product["restored_recent_count"],
+            "trending_only": True,
+        },
+        alert_category="user_action",
+    )
+    return jsonify({"product": restored_product})
 
 
 @app.route("/api/admin/settings", methods=["POST"])
