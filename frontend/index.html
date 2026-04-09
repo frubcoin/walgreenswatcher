@@ -8780,12 +8780,12 @@
     function formatIntervalLabel(minutes) {
       const totalMinutes = Number(minutes) || 0;
       if (!totalMinutes) return 'Not configured';
-      if (totalMinutes === 60) return 'Every 1 hour';
+      if (totalMinutes === 60) return 'Checks every 1 hour';
       if (totalMinutes % 60 === 0) {
         const hours = totalMinutes / 60;
-        return `Every ${hours} hour${hours === 1 ? '' : 's'}`;
+        return `Checks every ${hours} hour${hours === 1 ? '' : 's'}`;
       }
-      return `Every ${totalMinutes} minute${totalMinutes === 1 ? '' : 's'}`;
+      return `Checks every ${totalMinutes} minute${totalMinutes === 1 ? '' : 's'}`;
     }
 
     function discordDestinationRowHtml(destination = {}) {
