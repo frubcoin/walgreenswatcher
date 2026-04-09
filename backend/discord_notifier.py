@@ -44,6 +44,20 @@ class DiscordNotifier:
         )
 
     @staticmethod
+    def _mask_webhook_url(url: str) -> str:
+        """Mask the sensitive token portion of a Discord webhook URL for logging."""
+        normalized = str(url or "").strip()
+        if not normalized:
+            return ""
+        try:
+            parts = normalized.rsplit("/", 1)
+            if len(parts) == 2 and len(parts[1]) > 8:
+                return f"{parts[0]}/{'*' * (len(parts[1]) - 4)}{parts[1][-4:]}"
+            return normalized
+        except Exception:
+            return normalized
+
+    @staticmethod
     def _extract_role_id(value: Any) -> str:
         """Normalize a role mention or raw role id into Discord's numeric role id."""
         text = str(value or "").strip()
@@ -172,7 +186,7 @@ class DiscordNotifier:
                     logger.error(
                         "Discord API returned status %s for %s (batch %s/%s, embed lengths=%s, total=%s): %s",
                         response.status_code,
-                        webhook_url,
+                        self._mask_webhook_url(webhook_url),
                         batch_index,
                         len(payload_batches),
                         embed_lengths,
@@ -309,7 +323,6 @@ class DiscordNotifier:
             description_prefix = (
                 f"Near ZIP {configured_zip}\n"
                 f"{store_count} stores in stock | {total_units} total units\n\n"
-                f"🗺️ [Open map view](https://walgreens.frub.dev/map)\n\n"
             )
 
             base_fields = [
@@ -324,7 +337,7 @@ class DiscordNotifier:
                     0,
                     {
                         "name": "Check Summary",
-                        "value": f"{total_inventory} total units across {total_store_hits} store hits",
+                        "value": f"{total_inventory} total units across {total_store_hits} store hits\n🗺️ [Open map view](https://walgreens.frub.dev/map)",
                         "inline": False,
                     },
                 )
@@ -370,7 +383,7 @@ class DiscordNotifier:
                             0,
                             {
                                 "name": "Check Summary",
-                                "value": f"{total_inventory} total units across {total_store_hits} store hits",
+                                "value": f"{total_inventory} total units across {total_store_hits} store hits\n🗺️ [Open map view](https://walgreens.frub.dev/map)",
                                 "inline": False,
                             },
                         )
