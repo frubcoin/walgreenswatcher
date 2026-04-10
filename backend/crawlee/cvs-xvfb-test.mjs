@@ -11,6 +11,11 @@ const DEFAULT_HEADLESS = false;
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_INVENTORY_WAIT_MS = 12000;
 const OUTPUT_DIR = path.resolve(process.cwd(), 'output');
+const WINDOWS_USER_AGENT =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
+const WINDOWS_SEC_CH_UA = '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"';
+const WINDOWS_SEC_CH_UA_PLATFORM = '"Windows"';
+const WINDOWS_SEC_CH_UA_MOBILE = '?0';
 
 const targetUrl = String(process.argv[2] || process.env.CVS_TEST_URL || DEFAULT_URL).trim();
 const targetZip = String(process.argv[3] || process.env.CVS_TEST_ZIP || DEFAULT_ZIP).trim();
@@ -218,12 +223,16 @@ async function runAttempt(proxyConfig) {
     const context = await browser.newContext({
         ...(proxyConfig ? { proxy: proxyConfig } : {}),
         viewport: { width: 1920, height: 1080 },
-        userAgent:
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        userAgent: WINDOWS_USER_AGENT,
         locale: 'en-US',
         timezoneId: process.env.CVS_XVFB_TIMEZONE || 'America/New_York',
         permissions: ['geolocation'],
-        extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
+        extraHTTPHeaders: {
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Sec-CH-UA': WINDOWS_SEC_CH_UA,
+            'Sec-CH-UA-Mobile': WINDOWS_SEC_CH_UA_MOBILE,
+            'Sec-CH-UA-Platform': WINDOWS_SEC_CH_UA_PLATFORM,
+        },
     });
 
     await context.addInitScript(() => {
@@ -241,6 +250,40 @@ async function runAttempt(proxyConfig) {
         });
         Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
         Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+        Object.defineProperty(navigator, 'userAgent', {
+            get: () =>
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        });
+        if ('userAgentData' in navigator) {
+            Object.defineProperty(navigator, 'userAgentData', {
+                get: () => ({
+                    brands: [
+                        { brand: 'Chromium', version: '134' },
+                        { brand: 'Not:A-Brand', version: '24' },
+                        { brand: 'Google Chrome', version: '134' },
+                    ],
+                    mobile: false,
+                    platform: 'Windows',
+                    getHighEntropyValues: async (hints) => {
+                        const values = {
+                            architecture: 'x86',
+                            bitness: '64',
+                            mobile: false,
+                            model: '',
+                            platform: 'Windows',
+                            platformVersion: '10.0.0',
+                            uaFullVersion: '134.0.0.0',
+                            wow64: false,
+                        };
+                        if (!Array.isArray(hints)) return values;
+                        return hints.reduce((accumulator, hint) => {
+                            if (hint in values) accumulator[hint] = values[hint];
+                            return accumulator;
+                        }, {});
+                    },
+                }),
+            });
+        }
         Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
         Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
         window.chrome = {
