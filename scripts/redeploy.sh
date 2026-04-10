@@ -263,6 +263,11 @@ main() {
     log "Browser not auto-detected. Set CVS_ZENDRIVER_BROWSER_EXECUTABLE_PATH if needed."
   fi
 
+  if [[ "${SKIP_SYSTEMD:-}" == "1" ]]; then
+    log "SKIP_SYSTEMD=1 set, skipping systemd reload/restart"
+    return
+  fi
+
   if command -v systemctl >/dev/null 2>&1; then
     log "Reloading systemd units"
     systemctl daemon-reload
