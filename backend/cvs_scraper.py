@@ -54,11 +54,12 @@ CVS_BROWSER_SEC_CH_UA = '"Chromium";v="141", "Not?A_Brand";v="8"'
 CVS_BROWSER_SEC_CH_UA_MOBILE = "?0"
 CVS_BROWSER_SEC_CH_UA_PLATFORM = '"Windows"'
 
-# Nominatim (OpenStreetMap) geocoding for CVS store addresses
-NOMINATIM_GEOCODE_URL = "https://nominatim.openstreetmap.org/search"
-NOMINATIM_USER_AGENT = "WalgreensWatcher/1.0 (contact@example.com)"
+# Positionstack geocoding for CVS store addresses (free tier: 10k requests/month)
+# Get API key from: https://positionstack.com/
+POSITIONSTACK_API_KEY = os.getenv("POSITIONSTACK_API_KEY", "").strip()
+POSITIONSTACK_GEOCODE_URL = "http://api.positionstack.com/v1/forward"
 GEOCODE_CACHE_TTL_DAYS = 30
-GEOCODE_RATE_LIMIT_SECONDS = 1.0  # Nominatim requires 1 second between requests
+GEOCODE_RATE_LIMIT_SECONDS = 0.1  # 100ms between requests to be safe
 
 # Geocoding cache and rate limiting
 _geocode_cache_lock = threading.RLock()
@@ -1515,12 +1516,14 @@ class CvsStockChecker:
                     if cached:
                         lat = cached.get("latitude")
                         lng = cached.get("longitude")
-                        if lat is not None and lng is not None:
+                        if lat and lng and lat != 0 and lng != 0:
                             logger.debug(
                                 "CVS store %s coordinates from cache: %s, %s",
                                 store_id, lat, lng
                             )
                             return float(lat), float(lng)
+                        else:
+                            logger.warning("CVS store %s has invalid cached coordinates: %s, %s", store_id, lat, lng)
 
                 # Try by address components
                 cached = self._db.get_cvs_store_location_by_address(
@@ -1529,11 +1532,13 @@ class CvsStockChecker:
                 if cached:
                     lat = cached.get("latitude")
                     lng = cached.get("longitude")
-                    if lat is not None and lng is not None:
+                    if lat and lng and lat != 0 and lng != 0:
                         logger.debug(
                             "CVS address coordinates from cache: %s, %s", lat, lng
                         )
                         return float(lat), float(lng)
+                    else:
+                        logger.warning("CVS address has invalid cached coordinates: %s, %s", lat, lng)
             except Exception as exc:
                 logger.warning("CVS geocoding cache lookup failed: %s", exc)
 
@@ -1546,44 +1551,42 @@ class CvsStockChecker:
                 time.sleep(sleep_time)
             _last_geocode_time = time.monotonic()
 
-        # Build the query string
-        query_parts = [
-            str(address).strip(),
-            str(city).strip(),
-            str(state).strip(),
-        ]
-        if zipcode:
-            query_parts.append(str(zipcode).strip())
-        query = ", ".join(query_parts)
+        # Try positionstack if API key available, otherwise skip geocoding
+        if not POSITIONSTACK_API_KEY:
+            logger.warning("CVS geocoding skipped: No POSITIONSTACK_API_KEY set in environment")
+            return None, None
 
         try:
+            full_address = f"{address}, {city}, {state} {zipcode}".strip()
+            logger.info("CVS geocoding requesting: %s", full_address)
+            
             response = requests.get(
-                NOMINATIM_GEOCODE_URL,
+                POSITIONSTACK_GEOCODE_URL,
                 params={
-                    "q": query,
-                    "format": "json",
+                    "access_key": POSITIONSTACK_API_KEY,
+                    "query": full_address,
+                    "country": "US",
                     "limit": "1",
-                    "countrycodes": "us",
-                },
-                headers={
-                    "User-Agent": NOMINATIM_USER_AGENT,
-                    "Accept": "application/json",
                 },
                 timeout=10,
             )
+            logger.info("CVS geocoding response status: %s", response.status_code)
             response.raise_for_status()
             data = response.json()
+            logger.debug("CVS geocoding response data: %s", data)
 
-            if not data or not isinstance(data, list) or len(data) == 0:
-                logger.warning("CVS geocoding no results for: %s", query)
+            # positionstack returns { "data": [ {...} ] }
+            results = data.get("data") if isinstance(data, dict) else None
+            if not results or not isinstance(results, list) or len(results) == 0:
+                logger.warning("CVS geocoding no results for: %s", full_address)
                 return None, None
 
-            result = data[0]
-            lat = self._safe_float(result.get("lat"))
-            lng = self._safe_float(result.get("lon"))
+            result = results[0]
+            lat = self._safe_float(result.get("latitude"))
+            lng = self._safe_float(result.get("longitude"))
 
             if lat is None or lng is None:
-                logger.warning("CVS geocoding invalid coordinates for: %s", query)
+                logger.warning("CVS geocoding invalid coordinates for: %s, result=%s", full_address, result)
                 return None, None
 
             logger.info(
@@ -1610,10 +1613,10 @@ class CvsStockChecker:
             return lat, lng
 
         except requests.RequestException as exc:
-            logger.warning("CVS geocoding request failed: %s", exc)
+            logger.warning("CVS geocoding request failed: %s: %s", type(exc).__name__, exc)
             return None, None
         except Exception as exc:
-            logger.warning("CVS geocoding unexpected error: %s", exc)
+            logger.warning("CVS geocoding unexpected error: %s: %s", type(exc).__name__, exc)
             return None, None
 
     @staticmethod
@@ -1655,24 +1658,8 @@ class CvsStockChecker:
         # Try to extract coordinates from store data first
         latitude, longitude = self._extract_coordinate(store, "latitude", "longitude")
 
-        # If not found, geocode from address
-        if latitude is None or longitude is None:
-            address = str(store.get("storeAddress", "")).strip()
-            city = str(store.get("City", "")).strip()
-            state = str(store.get("State", "")).strip()
-            zipcode = str(store.get("Zipcode", "")).strip()
-            if address and city and state:
-                logger.info(
-                    "CVS store %s missing coordinates, geocoding address: %s, %s, %s %s",
-                    store_id, address, city, state, zipcode
-                )
-                latitude, longitude = self._geocode_address(
-                    address,
-                    city,
-                    state,
-                    zipcode,
-                    store_id,
-                )
+        # Note: Geocoding is done on the frontend to avoid server-side rate limits
+        # Frontend will geocode using Nominatim when stores are rendered on the map
 
         return {
             "store_id": store_id,

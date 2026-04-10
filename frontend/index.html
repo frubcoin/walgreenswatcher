@@ -6999,6 +6999,7 @@
     let resultsMapProductFilterOpen = false;
     let resultsMapProductMenuOpen = false;
     let resultsMapRetailerMenuOpen = false;
+    let cvsGeocodingInProgress = false;
     let manualLocationFallbackVisible = false;
     let mapDistanceReference = loadStoredMapAddressReference();
     let manualLocationQuery = loadStoredMapAddress();
@@ -10375,6 +10376,90 @@
       }
     }
 
+    // Geocode a CVS store address using Nominatim (client-side to avoid server blocking)
+    async function geocodeStoreAddress(address, city, state, zipcode) {
+      const query = [address, city, state, zipcode].filter(Boolean).join(', ');
+      if (!query) return null;
+
+      try {
+        const params = new URLSearchParams({
+          format: 'json',
+          limit: '1',
+          countrycodes: 'us',
+          q: query
+        });
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+          headers: { Accept: 'application/json' }
+        });
+
+        if (!response.ok) {
+          console.warn('Geocoding failed:', response.status);
+          return null;
+        }
+
+        const data = await response.json();
+        if (!Array.isArray(data) || data.length === 0) return null;
+
+        const result = data[0];
+        const lat = Number(result?.lat);
+        const lng = Number(result?.lon);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          return { latitude: lat, longitude: lng };
+        }
+        return null;
+      } catch (err) {
+        console.warn('Geocoding error:', err);
+        return null;
+      }
+    }
+
+    // Geocode CVS stores that are missing coordinates
+    async function geocodeMissingCVSStores(locations) {
+      const cvsStoresNeedingGeocode = locations.filter(loc =>
+        loc.retailer === 'cvs' &&
+        (loc.latitude === null || loc.longitude === null) &&
+        loc.address && loc.address !== 'Address unavailable'
+      );
+
+      if (cvsStoresNeedingGeocode.length === 0) return locations;
+
+      // Set flag to show geocoding in progress
+      cvsGeocodingInProgress = true;
+      // Refresh sidebar to show status
+      if (latestRenderedResults && currentTab === 'results') {
+        const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
+        syncResultsMapSidebar({ locations: mapData.locations, missingCoordinates: mapData.missingCoordinates });
+      }
+
+      // Rate limit: process one at a time with 1 second delay (Nominatim requirement)
+      for (const store of cvsStoresNeedingGeocode) {
+        // Parse address like "6015 E. BROWN ROAD, MESA, AZ 85205"
+        const addressParts = store.address.split(',').map(p => p.trim());
+        if (addressParts.length >= 2) {
+          const streetAddress = addressParts[0];
+          const cityStateZip = addressParts[addressParts.length - 1];
+          const cityStateParts = cityStateZip.split(' ').filter(p => p.length === 2); // State
+          const state = cityStateParts[cityStateParts.length - 1] || '';
+          const zipMatch = cityStateZip.match(/\d{5}(-\d{4})?/);
+          const zipcode = zipMatch ? zipMatch[0] : '';
+          const city = addressParts.slice(1, -1).join(', ') || cityStateZip.replace(state, '').replace(zipcode, '').trim();
+
+          const coords = await geocodeStoreAddress(streetAddress, city, state, zipcode);
+          if (coords) {
+            store.latitude = coords.latitude;
+            store.longitude = coords.longitude;
+            store.distance = getStoreDistance(store, mapDistanceReference);
+            console.log(`Geocoded CVS ${store.store_id}: ${store.latitude}, ${store.longitude}`);
+          }
+          // Wait 1 second between requests (Nominatim rate limit)
+          await new Promise(r => setTimeout(r, 1100));
+        }
+      }
+
+      cvsGeocodingInProgress = false;
+      return locations;
+    }
+
     async function loadManualLocationSuggestions(query) {
       const normalizedQuery = String(query || '').trim();
 
@@ -11383,7 +11468,8 @@
             ${filterControlsHtml}
           </div>
           ${filterPanelHtml}
-          ${missingCoordinates ? `<div class="results-map-note">${missingCoordinates} stocked store result${missingCoordinates === 1 ? '' : 's'} from older cache data could not be pinned yet.</div>` : ''}
+          ${missingCoordinates ? `<div class="results-map-note">${missingCoordinates} stocked store result${missingCoordinates === 1 ? '' : 's'} from older cache data could not be pinned yet.${cvsGeocodingInProgress ? ' (Geocoding CVS locations...)' : ''}</div>` : ''}
+          ${cvsGeocodingInProgress && !missingCoordinates ? `<div class="results-map-note">Geocoding CVS store locations...</div>` : ''}
         </div>
       `;
     }
@@ -11556,7 +11642,11 @@
             });
         } else {
           setResultsMapLoadingState('');
-          rerenderResultsMapForFilteredLocations(filteredMapLocations);
+          // Geocode missing CVS stores before rendering, then render
+          void geocodeMissingCVSStores(filteredMapLocations).then(geocodedLocations => {
+            if (!latestRenderedResults || currentResultsView !== 'map') return;
+            rerenderResultsMapForFilteredLocations(geocodedLocations);
+          });
         }
       } else {
         destroyResultsMap();

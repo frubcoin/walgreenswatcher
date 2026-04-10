@@ -18,3 +18,4 @@ backend/decodo_cvs_inventory_sweep.py
 backend/cvs_inventory_spider.py
 package.json
 /backend/__pycache__
+data/watcher.sqlite3
