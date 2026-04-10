@@ -11,10 +11,8 @@ import re
 import secrets
 import shutil
 import subprocess
-import threading
 import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List
 from urllib.parse import unquote, urlsplit
 
 import requests
@@ -22,6 +20,12 @@ try:
     from curl_cffi import requests as curl_requests
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
+try:
+    import zendriver as zd
+    from zendriver import cdp as zendriver_cdp
+except ImportError:  # pragma: no cover - optional runtime dependency
+    zd = None
+    zendriver_cdp = None
 try:
     from playwright.async_api import async_playwright
 except ImportError:  # pragma: no cover - optional runtime dependency
@@ -48,17 +52,6 @@ CVS_BROWSER_SEC_CH_UA = '"Chromium";v="141", "Not?A_Brand";v="8"'
 CVS_BROWSER_SEC_CH_UA_MOBILE = "?0"
 CVS_BROWSER_SEC_CH_UA_PLATFORM = '"Windows"'
 
-# Positionstack geocoding for CVS store addresses (free tier: 10k requests/month)
-# Get API key from: https://positionstack.com/
-POSITIONSTACK_API_KEY = os.getenv("POSITIONSTACK_API_KEY", "").strip()
-POSITIONSTACK_GEOCODE_URL = "http://api.positionstack.com/v1/forward"
-GEOCODE_CACHE_TTL_DAYS = 30
-GEOCODE_RATE_LIMIT_SECONDS = 0.1  # 100ms between requests to be safe
-
-# Geocoding cache and rate limiting
-_geocode_cache_lock = threading.RLock()
-_last_geocode_time = 0.0
-
 
 class CvsBlockedError(ValueError):
     """Raised when CVS edge blocks every configured route."""
@@ -76,12 +69,11 @@ class CvsStockChecker:
     )
     _proxy_urls_override: List[str] = []
 
-    def __init__(self, db: Any = None) -> None:
+    def __init__(self) -> None:
         self.progress_callback = None
         self.current_zip_code = TARGET_ZIP_CODE
         self.search_radius_miles = int(SEARCH_RADIUS_MILES or 20)
         self._blocked_until_by_product: Dict[str, float] = {}
-        self._db = db  # Database instance for geocoding cache
 
     def _emit_progress(self, progress_info: Dict[str, Any]) -> None:
         if self.progress_callback:
@@ -134,19 +126,16 @@ class CvsStockChecker:
 
     @staticmethod
     def _convert_proxy_format(proxy_url: str) -> str:
-        """Convert proxy from host:port:username:password to http://user:pass@host:port format."""
         if not proxy_url:
             return proxy_url
-        # If already a proper URL (has ://), return as-is
         if "://" in proxy_url:
             return proxy_url
-        # Try to parse host:port:username:password format
         parts = proxy_url.split(":")
         if len(parts) >= 4:
             host = parts[0]
             port = parts[1]
             username = parts[2]
-            password = ":".join(parts[3:])  # Password might contain colons
+            password = ":".join(parts[3:])
             return f"http://{username}:{password}@{host}:{port}"
         return proxy_url
 
@@ -224,11 +213,57 @@ class CvsStockChecker:
         return ""
 
     @staticmethod
+    def _zendriver_browser_executable_path() -> str | None:
+        for env_var in (
+            "CVS_ZENDRIVER_BROWSER_EXECUTABLE_PATH",
+            "ZENDRIVER_BROWSER_EXECUTABLE_PATH",
+            "BROWSER_EXECUTABLE_PATH",
+            "CHROME_BINARY",
+            "CHROMIUM_BINARY",
+        ):
+            configured_path = os.getenv(env_var, "").strip()
+            if configured_path:
+                if os.path.exists(configured_path):
+                    logger.info("CVS zendriver browser path resolved from %s: %s", env_var, configured_path)
+                    return configured_path
+                logger.warning(
+                    "CVS zendriver browser path set via %s but file does not exist: %s",
+                    env_var,
+                    configured_path,
+                )
+
+        for candidate in (
+            shutil.which("google-chrome"),
+            shutil.which("google-chrome-stable"),
+            shutil.which("chromium"),
+            shutil.which("chromium-browser"),
+            shutil.which("chrome"),
+            shutil.which("msedge"),
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        ):
+            if candidate and os.path.exists(candidate):
+                logger.info("CVS zendriver browser auto-detected at %s", candidate)
+                return candidate
+        logger.warning("CVS zendriver could not find a browser executable on PATH or known locations")
+        return None
+
+    @staticmethod
     def _env_bool(name: str, default: bool = False) -> bool:
         value = os.getenv(name)
         if value is None:
             return default
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _zendriver_user_data_dir() -> str | None:
+        configured = os.getenv("CVS_ZENDRIVER_USER_DATA_DIR", "").strip()
+        if not configured:
+            return None
+        os.makedirs(configured, exist_ok=True)
+        return configured
 
     @staticmethod
     def _blocked_cooldown_seconds() -> int:
@@ -240,6 +275,14 @@ class CvsStockChecker:
         except ValueError:
             return 30 * 60
         return max(0, minutes) * 60
+
+    @classmethod
+    def _zendriver_proxy_url(cls) -> str:
+        explicit_proxy = os.getenv("CVS_ZENDRIVER_PROXY_URL", "").strip()
+        if explicit_proxy:
+            return cls._convert_proxy_format(explicit_proxy)
+        candidates = cls._proxy_candidates()
+        return cls._convert_proxy_format(str(candidates[0] if candidates else "").strip())
 
     @staticmethod
     def _playwright_enabled() -> bool:
@@ -288,6 +331,7 @@ class CvsStockChecker:
         for env_var in (
             "CVS_PLAYWRIGHT_BROWSER_EXECUTABLE_PATH",
             "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH",
+            "CVS_ZENDRIVER_BROWSER_EXECUTABLE_PATH",
             "CHROME_BINARY",
             "CHROMIUM_BINARY",
         ):
@@ -295,7 +339,7 @@ class CvsStockChecker:
             if configured_path and os.path.exists(configured_path):
                 logger.info("CVS Playwright browser path resolved from %s: %s", env_var, configured_path)
                 return configured_path
-        return None
+        return CvsStockChecker._zendriver_browser_executable_path()
 
     @staticmethod
     def _playwright_proxy_candidates() -> List[str]:
@@ -432,6 +476,141 @@ class CvsStockChecker:
             first = result[0]
             return getattr(first, "value", None)
         return getattr(result, "value", None)
+
+    @classmethod
+    def _zendriver_payload(cls, product_id: str, zip_code: str, api_key: str) -> Dict[str, Any]:
+        return {
+            "getStoreDetailsAndInventoryRequest": {
+                "header": cls._request_body_header(api_key, secrets.token_hex(8)),
+                "productId": product_id,
+                "addressLine": zip_code,
+            }
+        }
+
+    @classmethod
+    async def _fetch_inventory_payload_via_zendriver_async(
+        cls,
+        *,
+        product_id: str,
+        zip_code: str,
+        referer: str,
+        api_key: str,
+    ) -> Dict[str, Any]:
+        if zd is None or zendriver_cdp is None:
+            raise RuntimeError("zendriver is not installed")
+
+        browser_kwargs: Dict[str, Any] = {
+            "headless": True,
+            "sandbox": True,
+        }
+        browser_executable_path = cls._zendriver_browser_executable_path()
+        if browser_executable_path:
+            browser_kwargs["browser_executable_path"] = browser_executable_path
+        user_data_dir = cls._zendriver_user_data_dir()
+        if user_data_dir:
+            browser_kwargs["user_data_dir"] = user_data_dir
+            logger.info("CVS zendriver using persistent user data dir: %s", user_data_dir)
+        if cls._env_bool("CVS_ZENDRIVER_USE_PROXY", False):
+            proxy_url = cls._zendriver_proxy_url()
+            if proxy_url:
+                proxy_label = cls._proxy_label(proxy_url)
+                proxy_arg = f"--proxy-server={proxy_url}"
+                browser_kwargs["browser_args"] = [proxy_arg]
+                logger.info("CVS zendriver browser-context using proxy routing via %s", proxy_label)
+
+        try:
+            browser = await zd.start(**browser_kwargs)
+        except TypeError as exc:
+            browser_args = browser_kwargs.pop("browser_args", None)
+            if browser_args:
+                logger.warning("CVS zendriver rejected browser_args, retrying with args: %s", exc)
+                browser_kwargs["args"] = browser_args
+                browser = await zd.start(**browser_kwargs)
+            else:
+                raise
+        try:
+            page = await browser.get(referer)
+            await page.sleep(8)
+            payload = cls._zendriver_payload(product_id, zip_code, api_key)
+            request_args = json.dumps(
+                {
+                    "url": cls.INVENTORY_URLS[0],
+                    "headers": {
+                        "accept": "application/json",
+                        "content-type": "application/json",
+                        "x-api-key": api_key,
+                    },
+                    "payload": payload,
+                }
+            )
+            script = """
+            (async () => {
+              const requestArgs = %s;
+              try {
+                const response = await fetch(requestArgs.url, {
+                  method: 'POST',
+                  headers: requestArgs.headers,
+                  body: JSON.stringify(requestArgs.payload),
+                  credentials: 'include'
+                });
+                const text = await response.text();
+                let jsonBody = null;
+                try {
+                  jsonBody = JSON.parse(text);
+                } catch (parseError) {
+                  jsonBody = null;
+                }
+                return {
+                  status: response.status,
+                  text,
+                  jsonBody,
+                };
+              } catch (error) {
+                return {
+                  status: 0,
+                  text: String(error || 'unknown browser fetch error'),
+                  jsonBody: null,
+                };
+              }
+            })()
+            """ % request_args
+            result = await page.send(
+                zendriver_cdp.runtime.evaluate(
+                    expression=script,
+                    await_promise=True,
+                    return_by_value=True,
+                )
+            )
+            response_value = cls._remote_value(result) or {}
+            data = response_value.get("jsonBody")
+            if cls._looks_like_inventory_response(data):
+                logger.info("CVS inventory response accepted from browser page context via zendriver")
+                return data
+
+            snippet = str(response_value.get("text") or "")[:200].replace("\n", " ")
+            raise ValueError(
+                "zendriver browser-context inventory request failed with "
+                f"HTTP {response_value.get('status') or 'unknown'}: {snippet}"
+            )
+        finally:
+            await browser.stop()
+
+    def _fetch_inventory_payload_via_zendriver(
+        self,
+        *,
+        product_id: str,
+        zip_code: str,
+        referer: str,
+        api_key: str,
+    ) -> Dict[str, Any]:
+        return self._run_async(
+            self._fetch_inventory_payload_via_zendriver_async(
+                product_id=product_id,
+                zip_code=zip_code,
+                referer=referer,
+                api_key=api_key,
+            )
+        )
 
     @staticmethod
     async def _playwright_click_check_more_stores(page: Any) -> bool:
@@ -655,43 +834,6 @@ class CvsStockChecker:
                         blocked_routes.append(proxy_label)
                         raise ValueError(f"CVS browser page challenge ({challenge})")
 
-                    # Extract product image URL from the page
-                    extracted_image_url = await page.evaluate("""
-                        () => {
-                            const ogImage = document.querySelector('meta[property="og:image"]');
-                            if (ogImage && ogImage.content && ogImage.content.includes('cvs.com')) {
-                                return ogImage.content;
-                            }
-                            const scripts = document.querySelectorAll('script[type="application/ld+json"]');
-                            for (const script of scripts) {
-                                try {
-                                    const data = JSON.parse(script.textContent);
-                                    const products = Array.isArray(data) ? data : [data];
-                                    for (const p of products) {
-                                        if (p.image) {
-                                            const img = Array.isArray(p.image) ? p.image[0] : p.image;
-                                            if (img && img.includes('cvs.com')) return img;
-                                        }
-                                    }
-                                } catch (e) {}
-                            }
-                            const images = document.querySelectorAll('img');
-                            for (const img of images) {
-                                const src = img.src || img.dataset.src || img.dataset.lazySrc;
-                                if (src && src.includes('/bizcontent/merchandising/productimages/high_res/')) {
-                                    return src;
-                                }
-                            }
-                            for (const img of images) {
-                                const src = img.src || img.dataset.src || img.dataset.lazySrc;
-                                if (src && src.includes('/bizcontent/merchandising/productimages/')) {
-                                    return src;
-                                }
-                            }
-                            return null;
-                        }
-                    """)
-
                     await page.evaluate("window.scrollTo(0, 600)")
                     await page.wait_for_timeout(1500)
 
@@ -720,9 +862,6 @@ class CvsStockChecker:
 
                     if cls._looks_like_inventory_response(inventory_payload.get("data")):
                         logger.info("CVS inventory response accepted from browser page context via Playwright")
-                        # Include extracted product image URL
-                        if extracted_image_url:
-                            inventory_payload["data"]["_extracted_image_url"] = extracted_image_url
                         return inventory_payload["data"]
                     raise ValueError("CVS Playwright flow did not return a valid inventory payload")
                 except Exception as exc:
@@ -1002,6 +1141,26 @@ class CvsStockChecker:
                             self._blocked_until_by_product[product_id] = time.time() + cooldown_seconds
                     raise
 
+        if api_key_candidates:
+            try:
+                logger.info("CVS inventory attempting zendriver browser-context fetch")
+                return self._fetch_inventory_payload_via_zendriver(
+                    product_id=product_id,
+                    zip_code=zip_code,
+                    referer=referer,
+                    api_key=api_key_candidates[0],
+                )
+            except Exception as exc:
+                failures.append(f"zendriver browser context {type(exc).__name__}: {exc}")
+                logger.warning("CVS zendriver inventory attempt failed: %s", exc)
+                if browser_only_mode:
+                    if "HTTP 403" in str(exc):
+                        cooldown_seconds = self._blocked_cooldown_seconds()
+                        if cooldown_seconds > 0:
+                            self._blocked_until_by_product[product_id] = time.time() + cooldown_seconds
+                    raise CvsBlockedError(
+                        "CVS browser-context inventory fetch failed while CVS_BROWSER_ONLY_MODE is enabled"
+                    ) from exc
 
         if playwright_enabled and not playwright_first and api_key_candidates:
             try:
@@ -1209,177 +1368,6 @@ class CvsStockChecker:
         except (TypeError, ValueError):
             return None
 
-    @staticmethod
-    def _extract_coordinate(store: Dict[str, Any], lat_key: str, lng_key: str) -> tuple[float | None, float | None]:
-        """Extract latitude/longitude from store data with multiple fallback keys."""
-        lat_fields = [lat_key, "latitude", "Latitude", "lat", "Lat", "storeLatitude", "geoLatitude", "geolatitude"]
-        lng_fields = [lng_key, "longitude", "Longitude", "lng", "Lng", "long", "Long", "storeLongitude", "geoLongitude", "geolongitude"]
-
-        latitude = None
-        longitude = None
-
-        for field in lat_fields:
-            val = store.get(field)
-            if val is not None:
-                try:
-                    latitude = float(val)
-                    if -90 <= latitude <= 90:
-                        break
-                except (TypeError, ValueError):
-                    continue
-
-        for field in lng_fields:
-            val = store.get(field)
-            if val is not None:
-                try:
-                    longitude = float(val)
-                    if -180 <= longitude <= 180:
-                        break
-                except (TypeError, ValueError):
-                    continue
-
-        return (latitude, longitude)
-
-    def _geocode_address(
-        self,
-        address: str,
-        city: str,
-        state: str,
-        zipcode: str,
-        store_id: str = "",
-    ) -> tuple[float | None, float | None]:
-        """Geocode a CVS store address using Nominatim (OpenStreetMap).
-        
-        Returns (latitude, longitude) or (None, None) if geocoding fails.
-        """
-        global _last_geocode_time
-
-        if not address or not city or not state:
-            return None, None
-
-        # Check database cache first if available
-        if self._db and hasattr(self._db, "get_cvs_store_location"):
-            try:
-                # Try by store_id first
-                if store_id:
-                    cached = self._db.get_cvs_store_location(store_id)
-                    if cached:
-                        lat = cached.get("latitude")
-                        lng = cached.get("longitude")
-                        if lat and lng and lat != 0 and lng != 0:
-                            logger.debug(
-                                "CVS store %s coordinates from cache: %s, %s",
-                                store_id, lat, lng
-                            )
-                            return float(lat), float(lng)
-                        else:
-                            logger.warning("CVS store %s has invalid cached coordinates: %s, %s", store_id, lat, lng)
-
-                # Try by address components
-                cached = self._db.get_cvs_store_location_by_address(
-                    address, city, state, zipcode
-                )
-                if cached:
-                    lat = cached.get("latitude")
-                    lng = cached.get("longitude")
-                    if lat and lng and lat != 0 and lng != 0:
-                        logger.debug(
-                            "CVS address coordinates from cache: %s, %s", lat, lng
-                        )
-                        return float(lat), float(lng)
-                    else:
-                        logger.warning("CVS address has invalid cached coordinates: %s, %s", lat, lng)
-            except Exception as exc:
-                logger.warning("CVS geocoding cache lookup failed: %s", exc)
-
-        # Rate limiting - Nominatim requires 1 second between requests
-        with _geocode_cache_lock:
-            time_since_last = time.monotonic() - _last_geocode_time
-            if time_since_last < GEOCODE_RATE_LIMIT_SECONDS:
-                sleep_time = GEOCODE_RATE_LIMIT_SECONDS - time_since_last
-                logger.debug("CVS geocoding rate limit: sleeping %.2fs", sleep_time)
-                time.sleep(sleep_time)
-            _last_geocode_time = time.monotonic()
-
-        # Try positionstack if API key available, otherwise skip geocoding
-        if not POSITIONSTACK_API_KEY:
-            logger.warning("CVS geocoding skipped: No POSITIONSTACK_API_KEY set in environment")
-            return None, None
-
-        try:
-            full_address = f"{address}, {city}, {state} {zipcode}".strip()
-            logger.info("CVS geocoding requesting: %s", full_address)
-            
-            logger.info("CVS geocoding requesting: %s", query)
-            response = requests.get(
-                POSITIONSTACK_GEOCODE_URL,
-                params={
-                    "access_key": POSITIONSTACK_API_KEY,
-                    "query": full_address,
-                    "country": "US",
-                    "limit": "1",
-                },
-                timeout=10,
-            )
-            logger.info("CVS geocoding response status: %s", response.status_code)
-            logger.info("CVS geocoding response status: %s", response.status_code)
-            response.raise_for_status()
-            data = response.json()
-            logger.debug("CVS geocoding response data: %s", data)
-            logger.debug("CVS geocoding response data: %s", data)
-
-            # positionstack returns { "data": [ {...} ] }
-            results = data.get("data") if isinstance(data, dict) else None
-            if not results or not isinstance(results, list) or len(results) == 0:
-                logger.warning("CVS geocoding no results for: %s", full_address)
-                return None, None
-
-            result = results[0]
-            lat = self._safe_float(result.get("latitude"))
-            lng = self._safe_float(result.get("longitude"))
-
-            if lat is None or lng is None:
-                logger.warning("CVS geocoding invalid coordinates for: %s, result=%s", query, result)
-                return None, None
-
-            logger.info(
-                "CVS geocoding success for store %s: %s, %s", store_id or "unknown", lat, lng
-            )
-
-            # Cache the result in database if available
-            if self._db and hasattr(self._db, "store_cvs_store_location"):
-                try:
-                    cache_store_id = str(store_id) if store_id else f"{lat},{lng}"
-                    self._db.store_cvs_store_location(
-                        store_id=cache_store_id,
-                        address=address,
-                        city=city,
-                        state=state,
-                        zipcode=zipcode or "",
-                        latitude=lat,
-                        longitude=lng,
-                    )
-                    logger.debug("CVS store location cached: %s", cache_store_id)
-                except Exception as cache_exc:
-                    logger.warning("CVS geocoding cache storage failed: %s", cache_exc)
-
-            return lat, lng
-
-        except requests.RequestException as exc:
-            logger.warning("CVS geocoding request failed: %s: %s", type(exc).__name__, exc)
-            return None, None
-        except Exception as exc:
-            logger.warning("CVS geocoding unexpected error: %s: %s", type(exc).__name__, exc)
-            return None, None
-
-    @staticmethod
-    def _safe_float(value: Any) -> float | None:
-        """Safely convert a value to float, returning None on failure."""
-        try:
-            return float(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
-
     def _filter_locations_by_search_radius(self, locations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         radius = self._normalize_distance(self.search_radius_miles)
         if radius is None or radius <= 0:
@@ -1407,46 +1395,14 @@ class CvsStockChecker:
             or (store.get("SDD") or {}).get("storeId")
             or ""
         ).strip()
-
-        # Try to extract coordinates from store data first
-        latitude, longitude = self._extract_coordinate(store, "latitude", "longitude")
-
-        # If not found, geocode from address
-        if latitude is None or longitude is None:
-            address = str(store.get("storeAddress", "")).strip()
-            city = str(store.get("City", "")).strip()
-            state = str(store.get("State", "")).strip()
-            zipcode = str(store.get("Zipcode", "")).strip()
-            logger.info(
-                "CVS store %s coordinate extraction failed, attempting geocoding. Address: '%s', City: '%s', State: '%s', Zip: '%s'",
-                store_id, address, city, state, zipcode
-            )
-            if address and city and state:
-                latitude, longitude = self._geocode_address(
-                    address,
-                    city,
-                    state,
-                    zipcode,
-                    store_id,
-                )
-                logger.info(
-                    "CVS store %s geocoding result: lat=%s, lng=%s",
-                    store_id, latitude, longitude
-                )
-            else:
-                logger.warning(
-                    "CVS store %s cannot geocode - missing address/city/state: '%s', '%s', '%s'",
-                    store_id, address, city, state
-                )
-
         return {
             "store_id": store_id,
             "name": f"CVS #{store_id}" if store_id else "CVS",
             "address": self._normalize_address(store),
             "distance": self._normalize_distance(store.get("dt")),
             "inventory_count": self._inventory_count(store),
-            "latitude": latitude,
-            "longitude": longitude,
+            "latitude": None,
+            "longitude": None,
         }
 
     def check_product_availability(
@@ -1544,5 +1500,4 @@ class CvsStockChecker:
             "availability": availability,
             "stores": store_details,
             "location_ids": location_ids,
-            "_extracted_image_url": payload.get("_extracted_image_url", ""),
         }

@@ -66,7 +66,7 @@ class StockCheckScheduler:
         self.state_lock = threading.RLock()
 
         self.walgreens_checker = WalgreensStockChecker()
-        self.cvs_checker = CvsStockChecker(db=db)
+        self.cvs_checker = CvsStockChecker()
         self.fivebelow_checker = FiveBelowStockChecker()
 
         self.notifier = DiscordNotifier([])
