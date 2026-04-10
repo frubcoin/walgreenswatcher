@@ -4455,6 +4455,12 @@
       gap: 12px;
     }
 
+    .trending-products-expand {
+      display: flex;
+      justify-content: center;
+      padding: 8px 0;
+    }
+
     .trending-product-item {
       position: relative;
       display: grid;
@@ -4815,6 +4821,8 @@
       left: auto;
       bottom: auto;
       flex-wrap: wrap;
+      color: var(--footer-text);
+      text-shadow: var(--footer-text-shadow);
     }
 
     .site-footer-copy {
@@ -7076,6 +7084,7 @@
     let trackedProductsCache = [];
     let trendingProductsCache = [];
     let trendingRetentionHours = 24;
+    let trendingDisplayLimit = 8;
     let editingProductId = null;
     let currentUser = null;
     let authState = null;
@@ -9255,7 +9264,7 @@
       `;
     }
 
-    function renderTrendingProducts(products = trendingProductsCache, retentionHours = trendingRetentionHours) {
+    function renderTrendingProducts(products = trendingProductsCache, retentionHours = trendingRetentionHours, limit = trendingDisplayLimit) {
       trendingProductsCache = sortTrendingProductsByWatchers(products);
       const list = document.getElementById('trending-products-list');
       if (!list) return;
@@ -9268,7 +9277,10 @@
         return;
       }
 
-      list.innerHTML = trendingProductsCache.map(product => {
+      const displayProducts = trendingProductsCache.slice(0, limit);
+      const hasMore = trendingProductsCache.length > displayProducts.length;
+
+      const itemsHtml = displayProducts.map(product => {
         const safeId = escapeHtml(product.id || '');
         const safeRetailer = escapeHtml(retailerKey(product.retailer));
         const safeRetailerLabel = escapeHtml(retailerLabel(product.retailer));
@@ -9311,6 +9323,12 @@
             </div>
           </div>`;
       }).join('');
+
+      const expandButtonHtml = hasMore
+        ? `<div class="trending-products-expand"><button class="btn btn-secondary" type="button" data-action="expand-trending">+ Show more (${trendingProductsCache.length - displayProducts.length} more)</button></div>`
+        : '';
+
+      list.innerHTML = itemsHtml + expandButtonHtml;
     }
 
     function renderTrackedProducts(products = trackedProductsCache) {
@@ -9514,14 +9532,15 @@
       renderTrackedProducts();
     }
 
-    async function loadTrendingProducts(limit = 8) {
-      const result = await apiCall(`/api/products/trending?limit=${Math.max(1, Number(limit) || 8)}`);
+    async function loadTrendingProducts(limit = 64) {
+      const result = await apiCall(`/api/products/trending?limit=${Math.max(1, Number(limit) || 64)}`);
       if (!result) {
         renderTrendingProducts([], trendingRetentionHours);
         return null;
       }
 
       trendingRetentionHours = Math.max(1, Number(result.retention_hours) || trendingRetentionHours || 24);
+      trendingDisplayLimit = 8;
       updateTrendingProductsSummary(trendingRetentionHours);
       renderTrendingProducts(result.products || [], trendingRetentionHours);
       return result;
@@ -10823,6 +10842,10 @@
           return;
         case 'add-trending-product':
           await addTrendingProduct(actionElement);
+          return;
+        case 'expand-trending':
+          trendingDisplayLimit += 8;
+          renderTrendingProducts();
           return;
         case 'cancel-product-name-edit':
           cancelProductNameEdit();
