@@ -11,8 +11,10 @@ import re
 import secrets
 import shutil
 import subprocess
+import threading
 import time
-from typing import Any, Dict, Iterable, List
+from datetime import datetime, timedelta
+from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import unquote, urlsplit
 
 import requests
@@ -52,6 +54,16 @@ CVS_BROWSER_SEC_CH_UA = '"Chromium";v="141", "Not?A_Brand";v="8"'
 CVS_BROWSER_SEC_CH_UA_MOBILE = "?0"
 CVS_BROWSER_SEC_CH_UA_PLATFORM = '"Windows"'
 
+# Nominatim (OpenStreetMap) geocoding for CVS store addresses
+NOMINATIM_GEOCODE_URL = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_USER_AGENT = "WalgreensWatcher/1.0 (contact@example.com)"
+GEOCODE_CACHE_TTL_DAYS = 30
+GEOCODE_RATE_LIMIT_SECONDS = 1.0  # Nominatim requires 1 second between requests
+
+# Geocoding cache and rate limiting
+_geocode_cache_lock = threading.RLock()
+_last_geocode_time = 0.0
+
 
 class CvsBlockedError(ValueError):
     """Raised when CVS edge blocks every configured route."""
@@ -69,11 +81,12 @@ class CvsStockChecker:
     )
     _proxy_urls_override: List[str] = []
 
-    def __init__(self) -> None:
+    def __init__(self, db: Any = None) -> None:
         self.progress_callback = None
         self.current_zip_code = TARGET_ZIP_CODE
         self.search_radius_miles = int(SEARCH_RADIUS_MILES or 20)
         self._blocked_until_by_product: Dict[str, float] = {}
+        self._db = db  # Database instance for geocoding cache
 
     def _emit_progress(self, progress_info: Dict[str, Any]) -> None:
         if self.progress_callback:
