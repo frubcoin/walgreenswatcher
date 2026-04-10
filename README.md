@@ -120,6 +120,27 @@ Useful notes:
 - `CVS_PLAYWRIGHT_ONLY_MODE=1` forces the app to use the Playwright browser flow and skip the older CVS browser fallback.
 - `CVS_PROXY_URLS` accepts normal authenticated proxy URLs such as `http://user:pass@host:port`.
 
+### Standalone Linux/Xvfb CVS Script
+If you want to run the known-good Playwright CVS browser flow by itself on a Linux VPS, use:
+
+```bash
+cd backend/crawlee
+npm install
+playwright install chromium
+```
+
+Then run it headed inside Xvfb:
+
+```bash
+CVS_PROXY_URLS="http://user:pass@host:port,http://user:pass@host2:port" \
+../../scripts/run_cvs_xvfb.sh "https://www.cvs.com/shop/pok-mon-poke-ball-tin-with-3-trading-card-packs-coin-blind-capsule-prodid-444357" "85208"
+```
+
+Notes:
+- The script lives at `backend/crawlee/cvs-xvfb-test.mjs`.
+- It intentionally defaults to `headless=false` because this CVS flow only worked in headed mode during testing.
+- Artifacts such as screenshots are written under `backend/crawlee/output/`.
+
 ### Decodo Web Scraping API Local Test
 To test CVS inventory via Decodo Web Scraping API (instead of raw proxy requests):
 
