@@ -367,6 +367,7 @@ async function runAttempt(proxyConfig) {
     let responseCount = 0;
     let capturedInventory = null;
     let buttonClicked = false;
+    let pageChallenge = '';
 
     const inventoryPromise = new Promise((resolve) => {
         page.on('response', async (res) => {
@@ -429,9 +430,9 @@ async function runAttempt(proxyConfig) {
         console.log('[page] loaded');
 
         const html = await page.content();
-        const challengeType = detectChallenge(html);
-        if (challengeType) {
-            throw new Error(`page challenge detected: ${challengeType}`);
+        pageChallenge = detectChallenge(html);
+        if (pageChallenge) {
+            console.log(`[page] challenge marker detected: ${pageChallenge}`);
         }
 
         await page.evaluate(() => window.scrollTo(0, 600));
@@ -440,8 +441,9 @@ async function runAttempt(proxyConfig) {
         buttonClicked = await clickCheckMoreStores(page);
         if (!buttonClicked) {
             const screenshotPath = path.join(OUTPUT_DIR, `debug_nobutton_${Date.now()}.png`);
-            await page.screenshot({ path: screenshotPath, fullPage: true });
-            throw new Error(`'Check more stores' button not found; screenshot=${screenshotPath}`);
+            await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
+            const reason = pageChallenge ? `; page challenge detected: ${pageChallenge}` : '';
+            throw new Error(`'Check more stores' button not found; screenshot=${screenshotPath}${reason}`);
         }
 
         console.log('[page] clicked "Check more stores"');
@@ -488,7 +490,9 @@ async function runAttempt(proxyConfig) {
             ok: false,
             proxy: proxyLabel(proxyConfig),
             buttonClicked,
-            error: error.message,
+            error: pageChallenge && !String(error?.message || '').includes('page challenge detected:')
+                ? `${error.message}; page challenge detected: ${pageChallenge}`
+                : error.message,
             screenshotPath,
         };
     } finally {
