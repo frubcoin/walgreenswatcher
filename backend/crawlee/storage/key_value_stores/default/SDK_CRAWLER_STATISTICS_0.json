@@ -1,0 +1,37 @@
+{
+  "requestsFinished": 0,
+  "requestsFailed": 1,
+  "requestsRetries": 0,
+  "requestsFailedPerMinute": 5,
+  "requestsFinishedPerMinute": 0,
+  "requestMinDurationMillis": null,
+  "requestMaxDurationMillis": 0,
+  "requestTotalFailedDurationMillis": 9465,
+  "requestTotalFinishedDurationMillis": 0,
+  "crawlerStartedAt": "2026-04-08T19:53:05.025Z",
+  "crawlerFinishedAt": "2026-04-08T19:53:15.600Z",
+  "statsPersistedAt": "2026-04-08T19:53:15.600Z",
+  "crawlerRuntimeMillis": 10715,
+  "crawlerLastStartTimestamp": 1775677984885,
+  "requestRetryHistogram": [
+    1
+  ],
+  "statsId": 0,
+  "requestAvgFailedDurationMillis": 9465,
+  "requestAvgFinishedDurationMillis": null,
+  "requestTotalDurationMillis": 9465,
+  "requestsTotal": 1,
+  "requestsWithStatusCode": {},
+  "errors": {
+    "C:\\Users\\metro\\Documents\\GitHub\\walgreenswatcher\\backend\\crawlee\\node_modules\\@crawlee\\playwright\\internals\\utils\\playwright-utils.js:165:17": {
+      "missing error code": {
+        "Error": {
+          "page.goto: NS_ERROR_PROXY_CONNECTION_REFUSED": {
+            "count": 1
+          }
+        }
+      }
+    }
+  },
+  "retryErrors": {}
+}
