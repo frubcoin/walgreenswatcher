@@ -355,25 +355,23 @@ class DiscordNotifier:
                     },
                 )
 
+            # Always include retailer name in the title
+            title_prefix = f"[{retailer_info['name']}] " if retailer_info["name"] else ""
             base_embed: Dict[str, Any] = {
-                "title": f"{product_name}",
+                "title": f"{title_prefix}{product_name}",
                 "color": 3066993,
                 "timestamp": datetime.utcnow().isoformat(),
                 "author": self._brand_author(),
             }
 
-            # Add retailer info as thumbnail if no product image, or as field
-            if retailer_info["icon"]:
-                if not image_url:
-                    base_embed["thumbnail"] = {"url": retailer_info["icon"]}
-                else:
-                    # Add retailer name as a tag in the title or field
-                    base_embed["title"] = f"[{retailer_info['name']}] {product_name}"
+            # Use product image as thumbnail if available, otherwise use retailer icon
+            if image_url:
+                base_embed["thumbnail"] = {"url": image_url}
+            elif retailer_info["icon"]:
+                base_embed["thumbnail"] = {"url": retailer_info["icon"]}
 
             if source_url:
                 base_embed["url"] = source_url
-            if image_url:
-                base_embed["thumbnail"] = {"url": image_url}
 
             budget_embed = dict(base_embed)
             budget_embed["fields"] = reserved_fields
