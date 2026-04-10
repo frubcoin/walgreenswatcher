@@ -304,6 +304,18 @@ class DiscordNotifier:
         total_room = cls.EMBED_TOTAL_LIMIT - cls._embed_text_length(base_embed) - len(description_prefix) - footer_reserve
         return max(250, min(description_room, total_room))
 
+    # Map retailer codes to display names and icon URLs
+    RETAILER_INFO: Dict[str, Dict[str, str]] = {
+        "walgreens": {"name": "Walgreens", "icon": "https://www.walgreens.com/favicon.ico"},
+        "cvs": {"name": "CVS", "icon": f"{FRONTEND_BASE_URL}/icons/cvs.svg"},
+        "fivebelow": {"name": "Five Below", "icon": f"{FRONTEND_BASE_URL}/icons/fivebelow.svg"},
+        "bestbuy": {"name": "Best Buy", "icon": f"{FRONTEND_BASE_URL}/icons/bestbuy.png"},
+    }
+
+    def _get_retailer_info(self, retailer_code: str) -> Dict[str, str]:
+        """Get display name and icon for a retailer code."""
+        return self.RETAILER_INFO.get(retailer_code.lower(), {"name": retailer_code.title(), "icon": ""})
+
     def _build_stock_embeds(self, products_with_stock: Dict, configured_zip: str) -> List[Dict[str, Any]]:
         """Build stock embeds while staying under Discord's embed size limits."""
         total_store_hits = sum(product.get("count", 0) for product in products_with_stock.values())
@@ -313,6 +325,8 @@ class DiscordNotifier:
 
         for product_index, product_info in enumerate(products_with_stock.values(), start=1):
             product_name = str(product_info["product_name"])[: self.EMBED_TITLE_LIMIT]
+            retailer = product_info.get("retailer", "walgreens")
+            retailer_info = self._get_retailer_info(retailer)
             image_url = str(product_info.get("image_url", "")).strip()
             source_url = str(product_info.get("source_url", "")).strip()
             store_count = product_info.get("count", 0)
@@ -342,11 +356,19 @@ class DiscordNotifier:
                 )
 
             base_embed: Dict[str, Any] = {
-                "title": product_name,
+                "title": f"{product_name}",
                 "color": 3066993,
                 "timestamp": datetime.utcnow().isoformat(),
                 "author": self._brand_author(),
             }
+
+            # Add retailer info as thumbnail if no product image, or as field
+            if retailer_info["icon"]:
+                if not image_url:
+                    base_embed["thumbnail"] = {"url": retailer_info["icon"]}
+                else:
+                    # Add retailer name as a tag in the title or field
+                    base_embed["title"] = f"[{retailer_info['name']}] {product_name}"
 
             if source_url:
                 base_embed["url"] = source_url

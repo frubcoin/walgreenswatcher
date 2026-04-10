@@ -10911,7 +10911,7 @@
           if (latestRenderedResults && currentTab === 'results') {
             const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
             const filteredLocations = getFilteredResultsMapLocations(mapData.locations);
-            syncResultsMapSidebar(mapData);
+            syncResultsMapSidebar({ locations: filteredLocations, missingCoordinates: mapData.missingCoordinates });
 
             if (currentResultsView === 'map') {
               rerenderResultsMapForFilteredLocations(filteredLocations);
@@ -10924,7 +10924,7 @@
           if (latestRenderedResults && currentTab === 'results') {
             const mapData = buildResultsMapLocations(latestRenderedResults.data?.products_found || {}, mapDistanceReference);
             const filteredLocations = getFilteredResultsMapLocations(mapData.locations);
-            syncResultsMapSidebar(mapData);
+            syncResultsMapSidebar({ locations: filteredLocations, missingCoordinates: mapData.missingCoordinates });
 
             if (currentResultsView === 'map') {
               rerenderResultsMapForFilteredLocations(filteredLocations);
