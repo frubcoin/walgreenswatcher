@@ -5853,10 +5853,6 @@
         padding: 14px;
       }
 
-      body:not(.auth-gate-active) .site-footer {
-        display: none !important;
-      }
-
       body:not(.auth-gate-active) .wrapper {
         min-height: auto !important;
         padding-bottom: 0 !important;
@@ -11070,7 +11066,7 @@
 
       resultsMap = L.map(mapElement, {
         zoomControl: true,
-        scrollWheelZoom: false
+        scrollWheelZoom: true
       });
 
       createResultsMapThemeControl().addTo(resultsMap);
