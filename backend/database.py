@@ -173,6 +173,20 @@ class StockDatabase:
 
                 CREATE INDEX IF NOT EXISTS idx_audit_events_created_at
                     ON audit_events(created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS cvs_store_locations (
+                    store_id TEXT PRIMARY KEY,
+                    address TEXT NOT NULL,
+                    city TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    zipcode TEXT NOT NULL,
+                    latitude REAL NOT NULL,
+                    longitude REAL NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_cvs_store_locations_address
+                    ON cvs_store_locations(address, city, state, zipcode);
                 """
             )
             self._migrate_tracked_products_primary_key(conn)
@@ -1913,3 +1927,105 @@ class StockDatabase:
             ).fetchall()
 
         return [dict(row) for row in rows if self.is_google_email_authorized(str(row["email"] or ""))]
+
+    def get_cvs_store_location(self, store_id: str) -> Optional[Dict[str, Any]]:
+        """Get cached CVS store location by store_id."""
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT store_id, address, city, state, zipcode, latitude, longitude, updated_at
+                FROM cvs_store_locations
+                WHERE store_id = ?
+                """,
+                (str(store_id or "").strip(),),
+            ).fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "store_id": row["store_id"],
+            "address": row["address"],
+            "city": row["city"],
+            "state": row["state"],
+            "zipcode": row["zipcode"],
+            "latitude": float(row["latitude"]) if row["latitude"] is not None else None,
+            "longitude": float(row["longitude"]) if row["longitude"] is not None else None,
+            "updated_at": row["updated_at"],
+        }
+
+    def get_cvs_store_location_by_address(
+        self, address: str, city: str, state: str, zipcode: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get cached CVS store location by address components."""
+        normalized_address = str(address or "").strip().lower()
+        normalized_city = str(city or "").strip().lower()
+        normalized_state = str(state or "").strip().lower()
+        normalized_zipcode = str(zipcode or "").strip()
+
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT store_id, address, city, state, zipcode, latitude, longitude, updated_at
+                FROM cvs_store_locations
+                WHERE LOWER(address) = ?
+                  AND LOWER(city) = ?
+                  AND LOWER(state) = ?
+                  AND zipcode = ?
+                """,
+                (normalized_address, normalized_city, normalized_state, normalized_zipcode),
+            ).fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "store_id": row["store_id"],
+            "address": row["address"],
+            "city": row["city"],
+            "state": row["state"],
+            "zipcode": row["zipcode"],
+            "latitude": float(row["latitude"]) if row["latitude"] is not None else None,
+            "longitude": float(row["longitude"]) if row["longitude"] is not None else None,
+            "updated_at": row["updated_at"],
+        }
+
+    def store_cvs_store_location(
+        self,
+        store_id: str,
+        address: str,
+        city: str,
+        state: str,
+        zipcode: str,
+        latitude: float,
+        longitude: float,
+    ) -> None:
+        """Store or update CVS store location in cache."""
+        from datetime import datetime
+
+        timestamp = datetime.utcnow().isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO cvs_store_locations (store_id, address, city, state, zipcode, latitude, longitude, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(store_id) DO UPDATE SET
+                    address = excluded.address,
+                    city = excluded.city,
+                    state = excluded.state,
+                    zipcode = excluded.zipcode,
+                    latitude = excluded.latitude,
+                    longitude = excluded.longitude,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    str(store_id or "").strip(),
+                    str(address or "").strip(),
+                    str(city or "").strip(),
+                    str(state or "").strip(),
+                    str(zipcode or "").strip(),
+                    float(latitude),
+                    float(longitude),
+                    timestamp,
+                ),
+            )
