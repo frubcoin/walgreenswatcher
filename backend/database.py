@@ -441,6 +441,7 @@ class StockDatabase:
         return {
             "google_allowlist_enabled": True,
             "admin_webhook_destinations": [],
+            "cvs_proxy_urls": [],
             "alert_new_users": DEFAULT_ADMIN_ALERT_NEW_USERS,
             "alert_user_actions": DEFAULT_ADMIN_ALERT_USER_ACTIONS,
         }
@@ -1496,6 +1497,10 @@ class StockDatabase:
                 stored.get("admin_webhook_destinations"),
                 defaults["admin_webhook_destinations"],
             ),
+            "cvs_proxy_urls": self._decode_json(
+                stored.get("cvs_proxy_urls"),
+                defaults["cvs_proxy_urls"],
+            ),
             "alert_new_users": bool(
                 self._decode_json(stored.get("alert_new_users"), defaults["alert_new_users"])
             ),
@@ -1514,6 +1519,7 @@ class StockDatabase:
         serializable = {
             "google_allowlist_enabled": True,
             "admin_webhook_destinations": list(merged.get("admin_webhook_destinations") or []),
+            "cvs_proxy_urls": list(merged.get("cvs_proxy_urls") or []),
             "alert_new_users": bool(merged.get("alert_new_users", DEFAULT_ADMIN_ALERT_NEW_USERS)),
             "alert_user_actions": bool(merged.get("alert_user_actions", DEFAULT_ADMIN_ALERT_USER_ACTIONS)),
         }

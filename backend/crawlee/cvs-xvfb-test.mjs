@@ -16,9 +16,18 @@ const WINDOWS_USER_AGENT =
 const WINDOWS_SEC_CH_UA = '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"';
 const WINDOWS_SEC_CH_UA_PLATFORM = '"Windows"';
 const WINDOWS_SEC_CH_UA_MOBILE = '?0';
+const RESULT_MARKER = '__CVS_XVFB_RESULT__=';
 
 const targetUrl = String(process.argv[2] || process.env.CVS_TEST_URL || DEFAULT_URL).trim();
 const targetZip = String(process.argv[3] || process.env.CVS_TEST_ZIP || DEFAULT_ZIP).trim();
+const targetRangeMiles = (() => {
+    const rawValue = String(
+        process.argv[4] || process.env.CVS_TEST_RANGE_MILES || process.env.CVS_XVFB_RANGE_MILES || '',
+    ).trim();
+    if (!rawValue) return null;
+    const parsed = Number.parseFloat(rawValue);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+})();
 const headless = !['0', 'false', 'no', 'off'].includes(
     String(process.env.CVS_XVFB_HEADLESS ?? DEFAULT_HEADLESS).toLowerCase(),
 );
@@ -50,6 +59,47 @@ function detectChallenge(text) {
     if (normalized.includes('captcha')) return 'captcha';
     if (normalized.includes('access denied')) return 'access_denied';
     return '';
+}
+
+function normalizeDistance(value) {
+    const parsed = Number.parseFloat(String(value ?? '').trim());
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function inventoryLocations(payload) {
+    if (Array.isArray(payload?.atgResponse)) return payload.atgResponse;
+    if (Array.isArray(payload?.response?.atgResponse)) return payload.response.atgResponse;
+    return [];
+}
+
+function filterInventoryPayloadByRange(payload) {
+    if (!payload || typeof payload !== 'object' || !targetRangeMiles) return payload;
+
+    const locations = inventoryLocations(payload);
+    if (!locations.length) return payload;
+
+    const filteredLocations = locations.filter((store) => {
+        const distance = normalizeDistance(store?.dt);
+        return distance !== null && distance <= targetRangeMiles;
+    });
+
+    console.log(
+        `[response] applying range=${targetRangeMiles} miles kept ${filteredLocations.length}/${locations.length} stores`,
+    );
+
+    if (Array.isArray(payload.atgResponse)) {
+        return { ...payload, atgResponse: filteredLocations };
+    }
+    if (Array.isArray(payload?.response?.atgResponse)) {
+        return {
+            ...payload,
+            response: {
+                ...payload.response,
+                atgResponse: filteredLocations,
+            },
+        };
+    }
+    return payload;
 }
 
 function proxyLabel(proxyConfig) {
@@ -326,10 +376,11 @@ async function runAttempt(proxyConfig) {
             if (res.status() !== 200) return;
             const data = await res.json().catch(() => null);
             if (data) {
+                const filteredData = filterInventoryPayloadByRange(data);
                 console.log('[response] inventory payload captured');
-                console.dir(data, { depth: 6 });
-                capturedInventory = data;
-                resolve(data);
+                console.dir(filteredData, { depth: 6 });
+                capturedInventory = filteredData;
+                resolve(filteredData);
             }
         });
     });
@@ -450,6 +501,7 @@ async function run() {
     const proxyConfigs = getProxyConfigs();
     console.log(`[config] url=${targetUrl}`);
     console.log(`[config] zip=${targetZip}`);
+    console.log(`[config] rangeMiles=${targetRangeMiles ?? 'none'}`);
     console.log(`[config] headless=${headless}`);
     console.log(`[config] proxyCount=${proxyConfigs.length}`);
     console.log(`[config] platform=${os.platform()}`);
@@ -461,6 +513,7 @@ async function run() {
         if (result.ok) {
             console.log('\n[success] inventory flow succeeded');
             console.log(JSON.stringify(result, null, 2));
+            console.log(`${RESULT_MARKER}${JSON.stringify(result)}`);
             return;
         }
         console.log('\n[failure] attempt failed');
@@ -469,10 +522,12 @@ async function run() {
 
     console.error('\n[error] all proxy attempts failed');
     console.error(JSON.stringify(results, null, 2));
+    console.error(`${RESULT_MARKER}${JSON.stringify({ ok: false, attempts: results })}`);
     process.exitCode = 1;
 }
 
 run().catch((error) => {
     console.error('[fatal]', error);
+    console.error(`${RESULT_MARKER}${JSON.stringify({ ok: false, fatal: String(error?.message || error || 'unknown error') })}`);
     process.exitCode = 1;
 });

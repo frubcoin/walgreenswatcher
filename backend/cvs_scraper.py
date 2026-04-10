@@ -6,9 +6,11 @@ import asyncio
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import secrets
 import shutil
+import subprocess
 import time
 from typing import Any, Dict, Iterable, List
 from urllib.parse import unquote, urlsplit
@@ -29,7 +31,7 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     async_playwright = None
 
-from config import CVS_PROXY_URLS, TARGET_ZIP_CODE
+from config import CVS_PROXY_URLS, SEARCH_RADIUS_MILES, TARGET_ZIP_CODE
 
 PROGRESS_UI_YIELD_SECONDS = 0.02
 
@@ -65,10 +67,12 @@ class CvsStockChecker:
     INVENTORY_URLS = (
         "https://www.cvs.com/RETAGPV3/Inventory/V1/getStoreDetailsAndInventory",
     )
+    _proxy_urls_override: List[str] = []
 
     def __init__(self) -> None:
         self.progress_callback = None
         self.current_zip_code = TARGET_ZIP_CODE
+        self.search_radius_miles = int(SEARCH_RADIUS_MILES or 20)
         self._blocked_until_by_product: Dict[str, float] = {}
 
     def _emit_progress(self, progress_info: Dict[str, Any]) -> None:
@@ -76,8 +80,36 @@ class CvsStockChecker:
             self.progress_callback(progress_info)
 
     @staticmethod
-    def _proxy_candidates() -> List[str]:
-        proxies = list(CVS_PROXY_URLS)
+    def normalize_proxy_urls(raw_value: Any) -> List[str]:
+        if isinstance(raw_value, (list, tuple, set)):
+            candidates = [str(item or "").strip() for item in raw_value]
+        else:
+            candidates = re.split(r"[\r\n,;]+", str(raw_value or ""))
+
+        normalized: List[str] = []
+        seen = set()
+        for candidate in candidates:
+            value = str(candidate or "").strip().strip("'\"")
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            normalized.append(value)
+        return normalized
+
+    @classmethod
+    def set_proxy_urls_override(cls, raw_value: Any) -> List[str]:
+        cls._proxy_urls_override = cls.normalize_proxy_urls(raw_value)
+        return list(cls._proxy_urls_override)
+
+    @classmethod
+    def _configured_proxy_urls(cls) -> List[str]:
+        if cls._proxy_urls_override:
+            return list(cls._proxy_urls_override)
+        return cls.normalize_proxy_urls(CVS_PROXY_URLS)
+
+    @classmethod
+    def _proxy_candidates(cls) -> List[str]:
+        proxies = cls._configured_proxy_urls()
         if len(proxies) <= 1:
             return proxies
         start = secrets.randbelow(len(proxies))
@@ -367,6 +399,47 @@ class CvsStockChecker:
         if "access denied" in normalized:
             return "access_denied"
         return ""
+
+    @staticmethod
+    def _playwright_use_node_script() -> bool:
+        return CvsStockChecker._env_bool("CVS_PLAYWRIGHT_USE_NODE_SCRIPT", True)
+
+    @staticmethod
+    def _playwright_node_bin() -> str:
+        return os.getenv("CVS_PLAYWRIGHT_NODE_BIN", "node").strip() or "node"
+
+    @staticmethod
+    def _playwright_node_timeout_seconds() -> int:
+        raw = os.getenv("CVS_PLAYWRIGHT_NODE_TIMEOUT_SECONDS", "").strip()
+        if not raw:
+            return 90
+        try:
+            timeout_seconds = int(raw)
+        except ValueError:
+            return 90
+        return max(20, min(timeout_seconds, 300))
+
+    @staticmethod
+    def _playwright_node_script_path() -> Path:
+        configured = os.getenv("CVS_PLAYWRIGHT_NODE_SCRIPT_PATH", "").strip()
+        if configured:
+            return Path(configured).expanduser().resolve()
+        return (Path(__file__).resolve().parent / "crawlee" / "cvs-xvfb-test.mjs").resolve()
+
+    @staticmethod
+    def _extract_node_script_result(output_text: str) -> Dict[str, Any]:
+        marker = "__CVS_XVFB_RESULT__="
+        for line in reversed(str(output_text or "").splitlines()):
+            if not line.startswith(marker):
+                continue
+            payload_text = line[len(marker):].strip()
+            try:
+                payload = json.loads(payload_text)
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise ValueError(f"Could not parse CVS node-script result JSON: {payload_text[:200]}") from exc
+            if isinstance(payload, dict):
+                return payload
+        raise ValueError("CVS node-script output did not include a machine-readable result marker")
 
     @staticmethod
     def _run_async(coro: Any) -> Any:
@@ -807,13 +880,97 @@ class CvsStockChecker:
         zip_code: str,
         api_key: str,
     ) -> Dict[str, Any]:
-        return self._run_async(
-            self._fetch_inventory_payload_via_playwright_async(
-                product=product,
-                product_id=product_id,
-                zip_code=zip_code,
-                api_key=api_key,
+        if not self._playwright_use_node_script():
+            return self._run_async(
+                self._fetch_inventory_payload_via_playwright_async(
+                    product=product,
+                    product_id=product_id,
+                    zip_code=zip_code,
+                    api_key=api_key,
+                )
             )
+
+        script_path = self._playwright_node_script_path()
+        if not script_path.exists():
+            raise ValueError(f"CVS Playwright node script not found: {script_path}")
+
+        product_url = str(product.get("source_url", "")).strip()
+        if not product_url:
+            raise ValueError("CVS Playwright node-script flow requires a source_url product page")
+
+        command = [
+            self._playwright_node_bin(),
+            str(script_path.name),
+            product_url,
+            zip_code,
+            str(self.search_radius_miles),
+        ]
+        env = os.environ.copy()
+        env["CVS_XVFB_API_KEY"] = api_key
+        env["CVS_XVFB_HEADLESS"] = "1" if self._playwright_headless() else "0"
+        env["CVS_XVFB_TIMEOUT_MS"] = str(self._playwright_timeout_ms())
+        env["CVS_XVFB_INVENTORY_WAIT_MS"] = str(self._playwright_inventory_wait_ms())
+        env["CVS_XVFB_RANGE_MILES"] = str(self.search_radius_miles)
+        configured_proxy_urls = self._configured_proxy_urls()
+        if configured_proxy_urls:
+            env["CVS_PROXY_URLS"] = ",".join(configured_proxy_urls)
+            env["CVS_XVFB_PROXY_URLS"] = ",".join(configured_proxy_urls)
+
+        logger.info("CVS inventory attempting Node/Playwright browser-context fetch via %s", script_path)
+        completed = subprocess.run(
+            command,
+            cwd=str(script_path.parent),
+            capture_output=True,
+            text=True,
+            timeout=self._playwright_node_timeout_seconds(),
+            env=env,
+        )
+        combined_output = "\n".join(
+            part for part in (
+                str(completed.stdout or "").strip(),
+                str(completed.stderr or "").strip(),
+            ) if part
+        )
+
+        try:
+            result = self._extract_node_script_result(combined_output)
+        except Exception as exc:
+            snippet = combined_output[-1500:] if combined_output else ""
+            raise ValueError(
+                "CVS Playwright node-script run did not produce a parseable result"
+                + (f": {snippet}" if snippet else "")
+            ) from exc
+
+        if result.get("ok") and self._looks_like_inventory_response(result.get("payload")):
+            logger.info("CVS inventory response accepted from Node/Playwright browser-context flow")
+            return result["payload"]
+
+        attempts = result.get("attempts")
+        if isinstance(attempts, list) and attempts:
+            errors = [str((attempt or {}).get("error") or "").strip() for attempt in attempts]
+            blocked_errors = [error for error in errors if "page challenge" in error.lower() or "access denied" in error.lower()]
+            if blocked_errors and len(blocked_errors) == len(errors):
+                route_labels = [
+                    str((attempt or {}).get("proxy") or "").strip()
+                    for attempt in attempts
+                    if str((attempt or {}).get("proxy") or "").strip()
+                ]
+                raise CvsBlockedError(
+                    "CVS Playwright node-script flow hit blocking on every configured route: "
+                    + ", ".join(route_labels or blocked_errors)
+                )
+            failure_detail = "; ".join(error for error in errors if error)[:1000].strip()
+            if failure_detail:
+                raise ValueError(f"CVS Playwright node-script flow failed: {failure_detail}")
+
+        fatal_message = str(result.get("fatal") or "").strip()
+        if fatal_message:
+            raise ValueError(f"CVS Playwright node-script fatal error: {fatal_message}")
+
+        snippet = combined_output[-1000:] if combined_output else ""
+        raise ValueError(
+            "CVS Playwright node-script flow did not return store inventory"
+            + (f": {snippet}" if snippet else "")
         )
 
     def _bootstrap_session(self, session: requests.Session, product: Dict[str, Any]) -> tuple[str, str]:
@@ -1195,6 +1352,24 @@ class CvsStockChecker:
         except (TypeError, ValueError):
             return None
 
+    def _filter_locations_by_search_radius(self, locations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        radius = self._normalize_distance(self.search_radius_miles)
+        if radius is None or radius <= 0:
+            return list(locations)
+
+        filtered_locations = [
+            store
+            for store in locations
+            if (distance := self._normalize_distance((store or {}).get("dt"))) is not None and distance <= radius
+        ]
+        logger.info(
+            "CVS inventory applying search radius %.1f miles: kept %s of %s stores",
+            radius,
+            len(filtered_locations),
+            len(locations),
+        )
+        return filtered_locations
+
     def _store_detail(self, store: Dict[str, Any]) -> Dict[str, Any]:
         store_id = str(
             store.get("storeId")
@@ -1250,7 +1425,9 @@ class CvsStockChecker:
                 f"CVS inventory API returned {header.get('statusCode')}: {header.get('statusDesc') or 'Unknown error'}"
             )
 
-        locations = payload.get("atgResponse") or response.get("atgResponse") or []
+        locations = self._filter_locations_by_search_radius(
+            list(payload.get("atgResponse") or response.get("atgResponse") or [])
+        )
         total_stores = len(locations)
         availability: Dict[str, bool] = {}
         store_details: Dict[str, Dict[str, Any]] = {}

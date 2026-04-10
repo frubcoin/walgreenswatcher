@@ -121,7 +121,10 @@ class StockCheckScheduler:
 
     def refresh_from_db(self) -> None:
         settings = self.db.get_user_settings(self.user_id)
+        admin_settings = self.db.get_admin_settings()
         products = self.db.list_tracked_products(self.user_id)
+
+        CvsStockChecker.set_proxy_urls_override(admin_settings.get("cvs_proxy_urls"))
 
         if not products:
             for article_id, product in DEFAULT_TRACKED_PRODUCTS.items():
@@ -164,6 +167,7 @@ class StockCheckScheduler:
         self.walgreens_checker.current_zip_code = self.current_zipcode
         self.walgreens_checker.search_radius_miles = self.max_notification_distance_miles
         self.cvs_checker.current_zip_code = self.current_zipcode
+        self.cvs_checker.search_radius_miles = self.max_notification_distance_miles
         self.fivebelow_checker.current_zip_code = self.current_zipcode
 
     @staticmethod
@@ -554,6 +558,7 @@ class StockCheckScheduler:
             self.walgreens_checker.search_radius_miles = self.max_notification_distance_miles
             self.cvs_checker.progress_callback = update_progress
             self.cvs_checker.current_zip_code = self.current_zipcode
+            self.cvs_checker.search_radius_miles = self.max_notification_distance_miles
             self.fivebelow_checker.progress_callback = update_progress
             self.fivebelow_checker.current_zip_code = self.current_zipcode
 
@@ -922,3 +927,8 @@ class SchedulerManager:
             scheduler = self.get_or_create(int(user["id"]))
             if not scheduler.is_running:
                 scheduler.start(run_immediately=False)
+
+    def refresh_all_from_db(self) -> None:
+        with self.lock:
+            for scheduler in self.schedulers.values():
+                scheduler.refresh_from_db()

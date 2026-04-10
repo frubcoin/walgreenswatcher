@@ -672,6 +672,10 @@ function renderSettings(settings) {
     .map(destination => destination.url || '')
     .filter(Boolean)
     .join('\n');
+  document.getElementById('cvs-proxy-urls').value = (settings.cvs_proxy_urls || [])
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .join('\n');
 }
 
 function renderAuthorizedEmails(entries) {
@@ -1203,7 +1207,8 @@ async function handleSettingsSave(event) {
     const response = await apiRequest('/api/admin/settings', 'POST', {
       alert_new_users: document.getElementById('alert-new-users').checked,
       alert_user_actions: document.getElementById('alert-user-actions').checked,
-      admin_webhook_destinations: webhookTextareaToDestinations()
+      admin_webhook_destinations: webhookTextareaToDestinations(),
+      cvs_proxy_urls: document.getElementById('cvs-proxy-urls').value
     });
     renderSettings(response.settings || {});
     await loadAdminOverview();

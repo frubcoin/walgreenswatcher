@@ -41,6 +41,7 @@ from config import (  # noqa: E402
     SESSION_COOKIE_SECURE,
 )
 from admin_notifications import AdminAlertService  # noqa: E402
+from cvs_scraper import CvsStockChecker  # noqa: E402
 from database import StockDatabase, TRENDING_PRODUCTS_RETENTION_HOURS  # noqa: E402
 from product_resolver import resolve_product_link  # noqa: E402
 from scheduler import SchedulerManager  # noqa: E402
@@ -103,6 +104,7 @@ CORS(
 
 db = StockDatabase()
 admin_alerts = AdminAlertService(db)
+CvsStockChecker.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
 scheduler_manager = SchedulerManager(db)
 scheduler_manager.start_enabled_schedulers()
 SERVICE_UPTIME_HEARTBEAT_SECONDS = 30
@@ -944,6 +946,7 @@ def _admin_overview_payload(admin_user: Optional[Dict[str, Any]] = None) -> Dict
     settings["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
         settings.get("admin_webhook_destinations")
     )
+    settings["cvs_proxy_urls"] = CvsStockChecker.normalize_proxy_urls(settings.get("cvs_proxy_urls"))
     users = db.list_users_for_admin()
     events = db.list_audit_events(limit=200)
     global_statistics = db.get_global_statistics()
@@ -1661,11 +1664,16 @@ def update_admin_settings():
         updates["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
             data.get("admin_webhook_destinations")
         )
+    if "cvs_proxy_urls" in data:
+        updates["cvs_proxy_urls"] = CvsStockChecker.normalize_proxy_urls(data.get("cvs_proxy_urls"))
 
     settings = db.update_admin_settings(updates)
     settings["admin_webhook_destinations"] = admin_alerts.normalize_destinations(
         settings.get("admin_webhook_destinations")
     )
+    settings["cvs_proxy_urls"] = CvsStockChecker.normalize_proxy_urls(settings.get("cvs_proxy_urls"))
+    CvsStockChecker.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
+    scheduler_manager.refresh_all_from_db()
     for user in db.list_users_for_admin():
         if not user.get("is_authorized_email"):
             db.update_user_settings(int(user["id"]), {"scheduler_enabled": False})
@@ -1677,6 +1685,7 @@ def update_admin_settings():
         metadata={
             "google_allowlist_enabled": True,
             "webhook_count": len(settings.get("admin_webhook_destinations") or []),
+            "cvs_proxy_count": len(settings.get("cvs_proxy_urls") or []),
             "alert_new_users": settings.get("alert_new_users"),
             "alert_user_actions": settings.get("alert_user_actions"),
         },
