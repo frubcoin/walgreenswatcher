@@ -1125,12 +1125,19 @@ class StockDatabase:
         timestamp = datetime.utcnow().isoformat()
         try:
             with self._connect() as conn:
+                # Get max sort_order and add 1 so new products appear at the bottom
+                row = conn.execute(
+                    "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tracked_products WHERE user_id = ?",
+                    (user_id,)
+                ).fetchone()
+                next_sort_order = int(row[0]) if row else 1
+
                 conn.execute(
                     """
                     INSERT INTO tracked_products (
-                        user_id, article_id, retailer, name, planogram, image_url, source_url, product_id, created_at
+                        user_id, article_id, retailer, name, planogram, image_url, source_url, product_id, created_at, sort_order
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
@@ -1142,6 +1149,7 @@ class StockDatabase:
                         source_url,
                         product_id,
                         timestamp,
+                        next_sort_order,
                     ),
                 )
                 self._upsert_trending_product(
