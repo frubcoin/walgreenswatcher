@@ -1,0 +1,661 @@
+{
+    "response": {
+        "header": {
+            "statusCode": "0000",
+            "statusDesc": "Success",
+            "refId": "rrt-933381943649922394-a-gwo1-49778-64560770-3"
+        }
+    },
+    "atgResponse": [
+        {
+            "Areacode": "",
+            "City": "MESA",
+            "Phonenumber": "4808332986",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85201",
+            "spuEligible": "Y",
+            "storeAddress": "305 E. BROWN RD.",
+            "storeId": "9213",
+            "dt": "1.33",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "9213"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "9213"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "9213"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "MESA",
+            "Phonenumber": "4809641411",
+            "State": "AZ",
+            "StoreSPUInd": "N",
+            "Zipcode": "85202",
+            "spuEligible": "Y",
+            "storeAddress": "1137 S. DOBSON RD #10",
+            "storeId": "9218",
+            "dt": "2.79",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "9218"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "9218"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "9218"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "TEMPE",
+            "Phonenumber": "4805570970",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85282",
+            "spuEligible": "Y",
+            "storeAddress": "1750 E BROADWAY RD",
+            "storeId": "33",
+            "dt": "3.95",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "33"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "33"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "33"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "TEMPE",
+            "Phonenumber": "4809670799",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85281",
+            "spuEligible": "Y",
+            "storeAddress": "909 EAST APACHE BLVD",
+            "storeId": "10928",
+            "dt": "4.74",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "10928"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "10928"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "10928"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "MESA",
+            "Phonenumber": "4808070251",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85213",
+            "spuEligible": "Y",
+            "storeAddress": "360 N. VAL VISTA DR.",
+            "storeId": "5779",
+            "dt": "5.24",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "5779"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "5779"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "5779"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "SCOTTSDALE",
+            "Phonenumber": "4809450396",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85251",
+            "spuEligible": "Y",
+            "storeAddress": "7901 E THOMAS ROAD",
+            "storeId": "9328",
+            "dt": "5.28",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "9328"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "9328"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "9328"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "TEMPE",
+            "Phonenumber": "4809666271",
+            "State": "AZ",
+            "StoreSPUInd": "N",
+            "Zipcode": "85281",
+            "spuEligible": "Y",
+            "storeAddress": "802 S. MILL AVE.",
+            "storeId": "9205",
+            "dt": "5.51",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "9205"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "9205"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "9205"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "SCOTTSDALE",
+            "Phonenumber": "4809456660",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85251",
+            "spuEligible": "Y",
+            "storeAddress": "7552 E. INDIAN SCHOOL RD.",
+            "storeId": "7845",
+            "dt": "6.34",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "7845"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "7845"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "7845"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "CHANDLER",
+            "Phonenumber": "4808993260",
+            "State": "AZ",
+            "StoreSPUInd": "N",
+            "Zipcode": "85225",
+            "spuEligible": "Y",
+            "storeAddress": "990 E. WARNER RD.",
+            "storeId": "3143",
+            "dt": "6.38",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "3143"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "3143"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "3143"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "CHANDLER",
+            "Phonenumber": "4808120063",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85224",
+            "spuEligible": "Y",
+            "storeAddress": "2005 N. DOBSON RD.",
+            "storeId": "5315",
+            "dt": "6.52",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "5315"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "5315"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "5315"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "MESA",
+            "Phonenumber": "4806548920",
+            "State": "AZ",
+            "StoreSPUInd": "N",
+            "Zipcode": "85206",
+            "spuEligible": "Y",
+            "storeAddress": "1212 S. GREENFIELD RD.",
+            "storeId": "5026",
+            "dt": "6.64",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "5026"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "5026"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "5026"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "TEMPE",
+            "Phonenumber": "4804563602",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85284",
+            "spuEligible": "Y",
+            "storeAddress": "855 E. ELLIOT ROAD",
+            "storeId": "5950",
+            "dt": "7.25",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "5950"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "5950"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "5950"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "GILBERT",
+            "Phonenumber": "4805075399",
+            "State": "AZ",
+            "StoreSPUInd": "N",
+            "Zipcode": "85234",
+            "spuEligible": "Y",
+            "storeAddress": "2371 E. GUADALUPE RD.",
+            "storeId": "3272",
+            "dt": "7.46",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "3272"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "3272"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "3272"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "GILBERT",
+            "Phonenumber": "4806350118",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85296",
+            "spuEligible": "Y",
+            "storeAddress": "765 S. LINDSAY RD.",
+            "storeId": "3268",
+            "dt": "7.52",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "3268"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "3268"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "3268"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "SCOTTSDALE",
+            "Phonenumber": "4809981670",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85250",
+            "spuEligible": "Y",
+            "storeAddress": "6045 NORTH SCOTTSDALE ROAD",
+            "storeId": "10007",
+            "dt": "8.22",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "10007"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "10007"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "10007"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "CHANDLER",
+            "Phonenumber": "4807863478",
+            "State": "AZ",
+            "StoreSPUInd": "N",
+            "Zipcode": "85226",
+            "spuEligible": "Y",
+            "storeAddress": "3990 W. RAY ROAD",
+            "storeId": "3967",
+            "dt": "8.23",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "3967"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "3967"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "3967"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "MESA",
+            "Phonenumber": "4803255869",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85205",
+            "spuEligible": "Y",
+            "storeAddress": "6015 E. BROWN ROAD",
+            "storeId": "4795",
+            "dt": "8.34",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "4795"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "4795"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "4795"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "PHOENIX",
+            "Phonenumber": "6022750120",
+            "State": "AZ",
+            "StoreSPUInd": "N",
+            "Zipcode": "85008",
+            "spuEligible": "Y",
+            "storeAddress": "1625 N. 44TH ST.",
+            "storeId": "3500",
+            "dt": "8.6",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "3500"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "3500"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "3500"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "MESA",
+            "Phonenumber": "4808304518",
+            "State": "AZ",
+            "StoreSPUInd": "N",
+            "Zipcode": "85215",
+            "spuEligible": "Y",
+            "storeAddress": "5954 E. MCDOWELL RD.",
+            "storeId": "5812",
+            "dt": "8.68",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "5812"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "5812"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "5812"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "PHOENIX",
+            "Phonenumber": "6028406500",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85018",
+            "spuEligible": "Y",
+            "storeAddress": "4742 E. INDIAN SCHOOL",
+            "storeId": "9202",
+            "dt": "9.06",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "9202"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "9202"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "9202"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "CHANDLER",
+            "Phonenumber": "4808572508",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85225",
+            "spuEligible": "Y",
+            "storeAddress": "990 E. PECOS RD.",
+            "storeId": "5849",
+            "dt": "9.35",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "5849"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "5849"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "5849"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "GILBERT",
+            "Phonenumber": "4809177467",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85295",
+            "spuEligible": "Y",
+            "storeAddress": "2428 S VAL VISTA DR",
+            "storeId": "8365",
+            "dt": "9.78",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "8365"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "8365"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "8365"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "PHOENIX",
+            "Phonenumber": "6029562494",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85018",
+            "spuEligible": "Y",
+            "storeAddress": "3933 E. CAMELBACK RD.",
+            "storeId": "10920",
+            "dt": "10.41",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "10920"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "10920"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "10920"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "MESA",
+            "Phonenumber": "4808309249",
+            "State": "AZ",
+            "StoreSPUInd": "N",
+            "Zipcode": "85209",
+            "spuEligible": "Y",
+            "storeAddress": "7547 E. SOUTHERN AVE.",
+            "storeId": "10616",
+            "dt": "10.45",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "10616"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "10616"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "10616"
+            }
+        },
+        {
+            "Areacode": "",
+            "City": "CHANDLER",
+            "Phonenumber": "4808992183",
+            "State": "AZ",
+            "StoreSPUInd": "Y",
+            "Zipcode": "85286",
+            "spuEligible": "Y",
+            "storeAddress": "2010 S. DOBSON RD.",
+            "storeId": "5038",
+            "dt": "10.61",
+            "Qty": 0,
+            "bohStatus": "Out of Stock",
+            "bopus": {
+                "Qty": 0,
+                "storeId": "5038"
+            },
+            "ShopMyStore": {
+                "Qty": 0,
+                "storeId": "5038"
+            },
+            "SDD": {
+                "Qty": 0,
+                "storeId": "5038"
+            }
+        }
+    ]
+}
