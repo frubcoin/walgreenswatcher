@@ -23,12 +23,6 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
 try:
-    import zendriver as zd
-    from zendriver import cdp as zendriver_cdp
-except ImportError:  # pragma: no cover - optional runtime dependency
-    zd = None
-    zendriver_cdp = None
-try:
     from playwright.async_api import async_playwright
 except ImportError:  # pragma: no cover - optional runtime dependency
     async_playwright = None
@@ -230,57 +224,11 @@ class CvsStockChecker:
         return ""
 
     @staticmethod
-    def _zendriver_browser_executable_path() -> str | None:
-        for env_var in (
-            "CVS_ZENDRIVER_BROWSER_EXECUTABLE_PATH",
-            "ZENDRIVER_BROWSER_EXECUTABLE_PATH",
-            "BROWSER_EXECUTABLE_PATH",
-            "CHROME_BINARY",
-            "CHROMIUM_BINARY",
-        ):
-            configured_path = os.getenv(env_var, "").strip()
-            if configured_path:
-                if os.path.exists(configured_path):
-                    logger.info("CVS zendriver browser path resolved from %s: %s", env_var, configured_path)
-                    return configured_path
-                logger.warning(
-                    "CVS zendriver browser path set via %s but file does not exist: %s",
-                    env_var,
-                    configured_path,
-                )
-
-        for candidate in (
-            shutil.which("google-chrome"),
-            shutil.which("google-chrome-stable"),
-            shutil.which("chromium"),
-            shutil.which("chromium-browser"),
-            shutil.which("chrome"),
-            shutil.which("msedge"),
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        ):
-            if candidate and os.path.exists(candidate):
-                logger.info("CVS zendriver browser auto-detected at %s", candidate)
-                return candidate
-        logger.warning("CVS zendriver could not find a browser executable on PATH or known locations")
-        return None
-
-    @staticmethod
     def _env_bool(name: str, default: bool = False) -> bool:
         value = os.getenv(name)
         if value is None:
             return default
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
-
-    @staticmethod
-    def _zendriver_user_data_dir() -> str | None:
-        configured = os.getenv("CVS_ZENDRIVER_USER_DATA_DIR", "").strip()
-        if not configured:
-            return None
-        os.makedirs(configured, exist_ok=True)
-        return configured
 
     @staticmethod
     def _blocked_cooldown_seconds() -> int:
@@ -292,14 +240,6 @@ class CvsStockChecker:
         except ValueError:
             return 30 * 60
         return max(0, minutes) * 60
-
-    @classmethod
-    def _zendriver_proxy_url(cls) -> str:
-        explicit_proxy = os.getenv("CVS_ZENDRIVER_PROXY_URL", "").strip()
-        if explicit_proxy:
-            return explicit_proxy
-        candidates = cls._proxy_candidates()
-        return str(candidates[0] if candidates else "").strip()
 
     @staticmethod
     def _playwright_enabled() -> bool:
@@ -348,7 +288,6 @@ class CvsStockChecker:
         for env_var in (
             "CVS_PLAYWRIGHT_BROWSER_EXECUTABLE_PATH",
             "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH",
-            "CVS_ZENDRIVER_BROWSER_EXECUTABLE_PATH",
             "CHROME_BINARY",
             "CHROMIUM_BINARY",
         ):
@@ -356,7 +295,7 @@ class CvsStockChecker:
             if configured_path and os.path.exists(configured_path):
                 logger.info("CVS Playwright browser path resolved from %s: %s", env_var, configured_path)
                 return configured_path
-        return CvsStockChecker._zendriver_browser_executable_path()
+        return None
 
     @staticmethod
     def _playwright_proxy_candidates() -> List[str]:
@@ -493,194 +432,6 @@ class CvsStockChecker:
             first = result[0]
             return getattr(first, "value", None)
         return getattr(result, "value", None)
-
-    @classmethod
-    def _zendriver_payload(cls, product_id: str, zip_code: str, api_key: str) -> Dict[str, Any]:
-        return {
-            "getStoreDetailsAndInventoryRequest": {
-                "header": cls._request_body_header(api_key, secrets.token_hex(8)),
-                "productId": product_id,
-                "addressLine": zip_code,
-            }
-        }
-
-    @classmethod
-    async def _fetch_inventory_payload_via_zendriver_async(
-        cls,
-        *,
-        product_id: str,
-        zip_code: str,
-        referer: str,
-        api_key: str,
-    ) -> Dict[str, Any]:
-        if zd is None or zendriver_cdp is None:
-            raise RuntimeError("zendriver is not installed")
-
-        browser_kwargs: Dict[str, Any] = {
-            "headless": True,
-            "sandbox": True,
-        }
-        browser_executable_path = cls._zendriver_browser_executable_path()
-        if browser_executable_path:
-            browser_kwargs["browser_executable_path"] = browser_executable_path
-        user_data_dir = cls._zendriver_user_data_dir()
-        if user_data_dir:
-            browser_kwargs["user_data_dir"] = user_data_dir
-            logger.info("CVS zendriver using persistent user data dir: %s", user_data_dir)
-        if cls._env_bool("CVS_ZENDRIVER_USE_PROXY", False):
-            proxy_url = cls._zendriver_proxy_url()
-            if proxy_url:
-                proxy_label = cls._proxy_label(proxy_url)
-                proxy_arg = f"--proxy-server={proxy_url}"
-                browser_kwargs["browser_args"] = [proxy_arg]
-                logger.info("CVS zendriver browser-context using proxy routing via %s", proxy_label)
-
-        try:
-            browser = await zd.start(**browser_kwargs)
-        except TypeError as exc:
-            browser_args = browser_kwargs.pop("browser_args", None)
-            if browser_args:
-                logger.warning("CVS zendriver rejected browser_args, retrying with args: %s", exc)
-                browser_kwargs["args"] = browser_args
-                browser = await zd.start(**browser_kwargs)
-            else:
-                raise
-        try:
-            page = await browser.get(referer)
-            await page.sleep(8)
-
-            # Extract product image URL from the page
-            image_extraction_script = """
-            (() => {
-              // Try meta og:image first
-              const ogImage = document.querySelector('meta[property="og:image"]');
-              if (ogImage && ogImage.content && ogImage.content.includes('cvs.com')) {
-                return ogImage.content;
-              }
-              // Try product schema
-              const scripts = document.querySelectorAll('script[type="application/ld+json"]');
-              for (const script of scripts) {
-                try {
-                  const data = JSON.parse(script.textContent);
-                  const products = Array.isArray(data) ? data : [data];
-                  for (const p of products) {
-                    if (p.image) {
-                      const img = Array.isArray(p.image) ? p.image[0] : p.image;
-                      if (img && img.includes('cvs.com')) return img;
-                    }
-                  }
-                } catch (e) {}
-              }
-              // Try high_res images
-              const images = document.querySelectorAll('img');
-              for (const img of images) {
-                const src = img.src || img.dataset.src || img.dataset.lazySrc;
-                if (src && src.includes('/bizcontent/merchandising/productimages/high_res/')) {
-                  return src;
-                }
-              }
-              // Try any productimages
-              for (const img of images) {
-                const src = img.src || img.dataset.src || img.dataset.lazySrc;
-                if (src && src.includes('/bizcontent/merchandising/productimages/')) {
-                  return src;
-                }
-              }
-              return null;
-            })()
-            """
-            image_result = await page.send(
-                zendriver_cdp.runtime.evaluate(
-                    expression=image_extraction_script,
-                    await_promise=False,
-                    return_by_value=True,
-                )
-            )
-            extracted_image_url = cls._remote_value(image_result)
-
-            payload = cls._zendriver_payload(product_id, zip_code, api_key)
-            request_args = json.dumps(
-                {
-                    "url": cls.INVENTORY_URLS[0],
-                    "headers": {
-                        "accept": "application/json",
-                        "content-type": "application/json",
-                        "x-api-key": api_key,
-                    },
-                    "payload": payload,
-                }
-            )
-            script = """
-            (async () => {
-              const requestArgs = %s;
-              try {
-                const response = await fetch(requestArgs.url, {
-                  method: 'POST',
-                  headers: requestArgs.headers,
-                  body: JSON.stringify(requestArgs.payload),
-                  credentials: 'include'
-                });
-                const text = await response.text();
-                let jsonBody = null;
-                try {
-                  jsonBody = JSON.parse(text);
-                } catch (parseError) {
-                  jsonBody = null;
-                }
-                return {
-                  status: response.status,
-                  text,
-                  jsonBody,
-                };
-              } catch (error) {
-                return {
-                  status: 0,
-                  text: String(error || 'unknown browser fetch error'),
-                  jsonBody: null,
-                };
-              }
-            })()
-            """ % request_args
-            result = await page.send(
-                zendriver_cdp.runtime.evaluate(
-                    expression=script,
-                    await_promise=True,
-                    return_by_value=True,
-                )
-            )
-            response_value = cls._remote_value(result) or {}
-            data = response_value.get("jsonBody")
-            if cls._looks_like_inventory_response(data):
-                logger.info("CVS inventory response accepted from browser page context via zendriver")
-                # Include extracted product image URL
-                if extracted_image_url:
-                    data["_extracted_image_url"] = extracted_image_url
-                return data
-
-            snippet = str(response_value.get("text") or "")[:200].replace("\n", " ")
-            raise ValueError(
-                "zendriver browser-context inventory request failed with "
-                f"HTTP {response_value.get('status') or 'unknown'}: {snippet}"
-            )
-        finally:
-            await browser.stop()
-
-    def _fetch_inventory_payload_via_zendriver(
-        self,
-        *,
-        product_id: str,
-        zip_code: str,
-        referer: str,
-        api_key: str,
-    ) -> Dict[str, Any]:
-        return self._run_async(
-            self._fetch_inventory_payload_via_zendriver_async(
-                product_id=product_id,
-                zip_code=zip_code,
-                referer=referer,
-                api_key=api_key,
-            )
-        )
 
     @staticmethod
     async def _playwright_click_check_more_stores(page: Any) -> bool:
@@ -1251,26 +1002,6 @@ class CvsStockChecker:
                             self._blocked_until_by_product[product_id] = time.time() + cooldown_seconds
                     raise
 
-        if api_key_candidates:
-            try:
-                logger.info("CVS inventory attempting zendriver browser-context fetch")
-                return self._fetch_inventory_payload_via_zendriver(
-                    product_id=product_id,
-                    zip_code=zip_code,
-                    referer=referer,
-                    api_key=api_key_candidates[0],
-                )
-            except Exception as exc:
-                failures.append(f"zendriver browser context {type(exc).__name__}: {exc}")
-                logger.warning("CVS zendriver inventory attempt failed: %s", exc)
-                if browser_only_mode:
-                    if "HTTP 403" in str(exc):
-                        cooldown_seconds = self._blocked_cooldown_seconds()
-                        if cooldown_seconds > 0:
-                            self._blocked_until_by_product[product_id] = time.time() + cooldown_seconds
-                    raise CvsBlockedError(
-                        "CVS browser-context inventory fetch failed while CVS_BROWSER_ONLY_MODE is enabled"
-                    ) from exc
 
         if playwright_enabled and not playwright_first and api_key_candidates:
             try:
