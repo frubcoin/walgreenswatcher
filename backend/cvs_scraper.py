@@ -11,7 +11,7 @@ import secrets
 import shutil
 import time
 from typing import Any, Dict, Iterable, List
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import requests
 try:
@@ -24,6 +24,10 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     zd = None
     zendriver_cdp = None
+try:
+    from playwright.async_api import async_playwright
+except ImportError:  # pragma: no cover - optional runtime dependency
+    async_playwright = None
 
 from config import CVS_PROXY_URLS, TARGET_ZIP_CODE
 
@@ -36,6 +40,11 @@ CVS_BROWSER_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/141.0.0.0 Safari/537.36"
+)
+CVS_PLAYWRIGHT_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/134.0.0.0 Safari/537.36"
 )
 CVS_BROWSER_SEC_CH_UA = '"Chromium";v="141", "Not?A_Brand";v="8"'
 CVS_BROWSER_SEC_CH_UA_MOBILE = "?0"
@@ -228,6 +237,138 @@ class CvsStockChecker:
         return str(candidates[0] if candidates else "").strip()
 
     @staticmethod
+    def _playwright_enabled() -> bool:
+        return CvsStockChecker._env_bool("CVS_PLAYWRIGHT_ENABLED", False)
+
+    @staticmethod
+    def _playwright_first() -> bool:
+        return CvsStockChecker._env_bool("CVS_PLAYWRIGHT_FIRST", False)
+
+    @staticmethod
+    def _playwright_only_mode() -> bool:
+        return CvsStockChecker._env_bool("CVS_PLAYWRIGHT_ONLY_MODE", False)
+
+    @staticmethod
+    def _playwright_headless() -> bool:
+        return CvsStockChecker._env_bool("CVS_PLAYWRIGHT_HEADLESS", True)
+
+    @staticmethod
+    def _playwright_timeout_ms() -> int:
+        raw = os.getenv("CVS_PLAYWRIGHT_TIMEOUT_MS", "").strip()
+        if not raw:
+            return 30000
+        try:
+            timeout_ms = int(raw)
+        except ValueError:
+            return 30000
+        return max(5000, min(timeout_ms, 120000))
+
+    @staticmethod
+    def _playwright_inventory_wait_ms() -> int:
+        raw = os.getenv("CVS_PLAYWRIGHT_INVENTORY_WAIT_MS", "").strip()
+        if not raw:
+            return 12000
+        try:
+            timeout_ms = int(raw)
+        except ValueError:
+            return 12000
+        return max(5000, min(timeout_ms, 120000))
+
+    @staticmethod
+    def _playwright_timezone() -> str:
+        return os.getenv("CVS_PLAYWRIGHT_TIMEZONE", "America/New_York").strip() or "America/New_York"
+
+    @staticmethod
+    def _playwright_browser_executable_path() -> str | None:
+        for env_var in (
+            "CVS_PLAYWRIGHT_BROWSER_EXECUTABLE_PATH",
+            "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH",
+            "CVS_ZENDRIVER_BROWSER_EXECUTABLE_PATH",
+            "CHROME_BINARY",
+            "CHROMIUM_BINARY",
+        ):
+            configured_path = os.getenv(env_var, "").strip()
+            if configured_path and os.path.exists(configured_path):
+                logger.info("CVS Playwright browser path resolved from %s: %s", env_var, configured_path)
+                return configured_path
+        return CvsStockChecker._zendriver_browser_executable_path()
+
+    @staticmethod
+    def _playwright_proxy_candidates() -> List[str]:
+        candidates: List[str] = []
+        for env_var in ("CVS_PLAYWRIGHT_PROXY_URLS", "CVS_PROXY_URLS"):
+            raw = os.getenv(env_var, "").strip()
+            if raw:
+                candidates.extend(part.strip() for part in raw.split(",") if part.strip())
+        for env_var in ("CVS_PLAYWRIGHT_PROXY_URL", "CVS_PROXY_URL"):
+            raw = os.getenv(env_var, "").strip()
+            if raw:
+                candidates.append(raw)
+        for candidate in CvsStockChecker._proxy_candidates():
+            if candidate:
+                candidates.append(candidate)
+
+        deduped: List[str] = []
+        seen = set()
+        for candidate in candidates:
+            normalized = str(candidate or "").strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped.append(normalized)
+
+        if CvsStockChecker._env_bool("CVS_PLAYWRIGHT_INCLUDE_DIRECT", True):
+            deduped.append("")
+        return deduped or [""]
+
+    @staticmethod
+    def _parse_playwright_proxy(proxy_value: str) -> Dict[str, str] | None:
+        raw = str(proxy_value or "").strip().strip("'\"")
+        if not raw:
+            return None
+
+        if "://" not in raw:
+            parts = raw.split(":")
+            if len(parts) >= 4:
+                host = parts[0].strip()
+                port = parts[1].strip()
+                username = parts[2].strip()
+                password = ":".join(parts[3:]).strip()
+                if host and port and username:
+                    return {
+                        "server": f"http://{host}:{port}",
+                        "username": username,
+                        "password": password,
+                    }
+
+        normalized = raw if re.match(r"^[a-z]+://", raw, re.IGNORECASE) else f"http://{raw}"
+        parsed = urlsplit(normalized)
+        if not parsed.scheme or not parsed.hostname:
+            return None
+
+        server = f"{parsed.scheme}://{parsed.hostname}"
+        if parsed.port:
+            server = f"{server}:{parsed.port}"
+
+        result = {"server": server}
+        if parsed.username:
+            result["username"] = unquote(parsed.username)
+        if parsed.password:
+            result["password"] = unquote(parsed.password)
+        return result
+
+    @staticmethod
+    def _detect_browser_challenge(text: str) -> str:
+        normalized = str(text or "").lower()
+        if "_incapsula_resource" in normalized or "incapsula" in normalized:
+            return "incapsula"
+        if "captcha" in normalized:
+            return "captcha"
+        if "access denied" in normalized:
+            return "access_denied"
+        return ""
+
+    @staticmethod
     def _run_async(coro: Any) -> Any:
         try:
             asyncio.get_running_loop()
@@ -382,6 +523,299 @@ class CvsStockChecker:
             )
         )
 
+    @staticmethod
+    async def _playwright_click_check_more_stores(page: Any) -> bool:
+        clicked = await page.evaluate(
+            """
+            () => {
+              for (const selector of ['a', 'button', 'span', '[role="button"]', 'div']) {
+                for (const element of document.querySelectorAll(selector)) {
+                  const text = (element.textContent || '').trim().toLowerCase();
+                  if (text === 'check more stores' || text.includes('check more store')) {
+                    element.scrollIntoView({ behavior: 'instant', block: 'center' });
+                    element.click();
+                    return true;
+                  }
+                }
+              }
+              return false;
+            }
+            """
+        )
+        if clicked:
+            return True
+
+        try:
+            await page.get_by_text("Check more stores", exact=False).first.click(timeout=8000)
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    async def _playwright_submit_store_search(page: Any) -> str:
+        return str(
+            await page.evaluate(
+                """
+                () => {
+                  const dialog = document.querySelector('[role="dialog"]');
+                  if (!dialog) return '';
+                  for (const element of dialog.querySelectorAll('button, [role="button"]')) {
+                    const text = (element.textContent || '').trim().toLowerCase();
+                    if (
+                      text.includes('search') ||
+                      text.includes('find') ||
+                      text.includes('show') ||
+                      text.includes('update') ||
+                      text.includes('go')
+                    ) {
+                      element.click();
+                      return text;
+                    }
+                  }
+                  for (const element of dialog.querySelectorAll('button')) {
+                    const text = (element.textContent || '').trim().toLowerCase();
+                    if (text && !text.includes('close')) {
+                      element.click();
+                      return `fallback:${text}`;
+                    }
+                  }
+                  return '';
+                }
+                """
+            )
+            or ""
+        ).strip()
+
+    @classmethod
+    async def _fetch_inventory_payload_via_playwright_async(
+        cls,
+        *,
+        product: Dict[str, Any],
+        product_id: str,
+        zip_code: str,
+        api_key: str,
+    ) -> Dict[str, Any]:
+        if async_playwright is None:
+            raise RuntimeError("playwright is not installed")
+
+        product_url = str(product.get("source_url", "")).strip()
+        if not product_url:
+            raise ValueError("CVS Playwright flow requires a source_url product page")
+
+        timeout_ms = cls._playwright_timeout_ms()
+        inventory_wait_ms = cls._playwright_inventory_wait_ms()
+        executable_path = cls._playwright_browser_executable_path()
+        proxy_candidates = cls._playwright_proxy_candidates()
+        failures: List[str] = []
+        blocked_routes: List[str] = []
+
+        async with async_playwright() as playwright:
+            for proxy_value in proxy_candidates:
+                proxy_label = cls._proxy_label(proxy_value) if proxy_value else "direct browser IP"
+                proxy_config = cls._parse_playwright_proxy(proxy_value)
+                launch_kwargs: Dict[str, Any] = {
+                    "headless": cls._playwright_headless(),
+                    "args": [
+                        "--disable-blink-features=AutomationControlled",
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-accelerated-2d-canvas",
+                        "--no-first-run",
+                        "--no-zygote",
+                        "--disable-gpu",
+                        "--window-size=1920,1080",
+                    ],
+                }
+                if executable_path:
+                    launch_kwargs["executable_path"] = executable_path
+                if proxy_config:
+                    launch_kwargs["proxy"] = proxy_config
+                    logger.info("CVS Playwright browser-context using proxy routing via %s", proxy_label)
+
+                browser = None
+                context = None
+                response_tasks: List[asyncio.Task[Any]] = []
+                try:
+                    browser = await playwright.chromium.launch(**launch_kwargs)
+                    context = await browser.new_context(
+                        viewport={"width": 1920, "height": 1080},
+                        user_agent=CVS_PLAYWRIGHT_USER_AGENT,
+                        locale="en-US",
+                        timezone_id=cls._playwright_timezone(),
+                        permissions=["geolocation"],
+                        extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
+                    )
+                    await context.add_init_script(
+                        """
+                        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                        Object.defineProperty(navigator, 'plugins', {
+                          get: () => {
+                            const plugins = [
+                              { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                              { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                              { name: 'Native Client', filename: 'internal-nacl-plugin' }
+                            ];
+                            plugins.__proto__ = PluginArray.prototype;
+                            return plugins;
+                          }
+                        });
+                        Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+                        Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+                        Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+                        Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+                        Object.defineProperty(screen, 'width', { get: () => 1920 });
+                        Object.defineProperty(screen, 'height', { get: () => 1080 });
+                        Object.defineProperty(screen, 'availWidth', { get: () => 1920 });
+                        Object.defineProperty(screen, 'availHeight', { get: () => 1040 });
+                        Object.defineProperty(screen, 'colorDepth', { get: () => 24 });
+                        Object.defineProperty(screen, 'pixelDepth', { get: () => 24 });
+                        Object.defineProperty(window, 'outerWidth', { get: () => 1920 });
+                        Object.defineProperty(window, 'outerHeight', { get: () => 1080 });
+                        window.chrome = window.chrome || {
+                          runtime: {
+                            connect: () => {},
+                            sendMessage: () => {},
+                            onMessage: { addListener: () => {} }
+                          },
+                          loadTimes: function () {},
+                          csi: function () {},
+                          app: {}
+                        };
+                        const originalPermissionsQuery = window.navigator.permissions.query.bind(window.navigator.permissions);
+                        window.navigator.permissions.query = (parameters) =>
+                          parameters && parameters.name === 'notifications'
+                            ? Promise.resolve({ state: Notification.permission })
+                            : originalPermissionsQuery(parameters);
+                        const originalGetParameter = WebGLRenderingContext.prototype.getParameter;
+                        WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                          if (parameter === 37445) return 'Intel Inc.';
+                          if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+                          return originalGetParameter.call(this, parameter);
+                        };
+                        """
+                    )
+                    page = await context.new_page()
+                    inventory_payload: Dict[str, Any] = {}
+                    inventory_event = asyncio.Event()
+
+                    async def handle_response(response: Any) -> None:
+                        if "getStoreDetailsAndInventory" not in str(getattr(response, "url", "")):
+                            return
+                        if int(getattr(response, "status", 0) or 0) != 200:
+                            return
+                        try:
+                            data = await response.json()
+                        except Exception:
+                            return
+                        if cls._looks_like_inventory_response(data):
+                            inventory_payload["data"] = data
+                            inventory_event.set()
+
+                    def response_listener(response: Any) -> None:
+                        response_tasks.append(asyncio.create_task(handle_response(response)))
+
+                    async def inventory_route_handler(route: Any) -> None:
+                        request = route.request
+                        body_text = request.post_data or ""
+                        if body_text:
+                            try:
+                                body = json.loads(body_text)
+                            except ValueError:
+                                body = None
+                            request_payload = body.get("getStoreDetailsAndInventoryRequest") if isinstance(body, dict) else None
+                            if isinstance(request_payload, dict):
+                                request_payload["addressLine"] = zip_code
+                                request_payload["geolatitude"] = ""
+                                request_payload["geolongitude"] = ""
+                                if api_key and isinstance(request_payload.get("header"), dict):
+                                    request_payload["header"]["apiKey"] = request_payload["header"].get("apiKey") or api_key
+                                await route.continue_(post_data=json.dumps(body))
+                                return
+                        await route.continue_()
+
+                    page.on("response", response_listener)
+                    await page.route("**/*getStoreDetailsAndInventory*", inventory_route_handler)
+                    await page.goto(product_url, wait_until="domcontentloaded", timeout=timeout_ms)
+                    await page.wait_for_timeout(5000)
+
+                    html = await page.content()
+                    challenge = cls._detect_browser_challenge(html)
+                    if challenge:
+                        blocked_routes.append(proxy_label)
+                        raise ValueError(f"CVS browser page challenge ({challenge})")
+
+                    await page.evaluate("window.scrollTo(0, 600)")
+                    await page.wait_for_timeout(1500)
+
+                    button_clicked = await cls._playwright_click_check_more_stores(page)
+                    if button_clicked:
+                        await page.wait_for_selector('[role="dialog"] input[type="text"]', timeout=8000)
+                        modal_input = page.locator('[role="dialog"] input[type="text"]').first
+                        await modal_input.click()
+                        await modal_input.press("Control+A")
+                        await modal_input.press("Backspace")
+                        await modal_input.type(zip_code, delay=80)
+                        await page.wait_for_timeout(500)
+
+                        search_action = await cls._playwright_submit_store_search(page)
+                        if search_action:
+                            logger.info("CVS Playwright dialog submit action: %s", search_action)
+                        else:
+                            await modal_input.press("Enter")
+                    else:
+                        logger.info("CVS Playwright could not find 'Check more stores'; waiting for existing inventory calls")
+
+                    try:
+                        await asyncio.wait_for(inventory_event.wait(), timeout=inventory_wait_ms / 1000)
+                    except asyncio.TimeoutError as exc:
+                        raise ValueError("CVS Playwright flow did not capture an inventory response in time") from exc
+
+                    if cls._looks_like_inventory_response(inventory_payload.get("data")):
+                        logger.info("CVS inventory response accepted from browser page context via Playwright")
+                        return inventory_payload["data"]
+                    raise ValueError("CVS Playwright flow did not return a valid inventory payload")
+                except Exception as exc:
+                    failures.append(f"{proxy_label} {type(exc).__name__}: {exc}")
+                    logger.warning("CVS Playwright attempt failed via %s: %s", proxy_label, exc)
+                finally:
+                    for task in response_tasks:
+                        if not task.done():
+                            task.cancel()
+                    if context is not None:
+                        await context.close()
+                    if browser is not None:
+                        await browser.close()
+
+        unique_blocked_routes = list(dict.fromkeys(blocked_routes))
+        if unique_blocked_routes and len(unique_blocked_routes) == len({cls._proxy_label(value) if value else "direct browser IP" for value in proxy_candidates}):
+            raise CvsBlockedError(
+                "CVS Playwright flow hit blocking on every configured route: "
+                + ", ".join(unique_blocked_routes)
+            )
+
+        failure_detail = "; ".join(failures[:4]).strip()
+        if failure_detail:
+            raise ValueError(f"CVS Playwright flow failed: {failure_detail}")
+        raise ValueError("CVS Playwright flow did not return store inventory")
+
+    def _fetch_inventory_payload_via_playwright(
+        self,
+        *,
+        product: Dict[str, Any],
+        product_id: str,
+        zip_code: str,
+        api_key: str,
+    ) -> Dict[str, Any]:
+        return self._run_async(
+            self._fetch_inventory_payload_via_playwright_async(
+                product=product,
+                product_id=product_id,
+                zip_code=zip_code,
+                api_key=api_key,
+            )
+        )
+
     def _bootstrap_session(self, session: requests.Session, product: Dict[str, Any]) -> tuple[str, str]:
         referer = str(product.get("source_url", "")).strip() or "https://www.cvs.com/"
         api_key = ""
@@ -512,6 +946,27 @@ class CvsStockChecker:
         referer = str(product.get("source_url", "")).strip() or "https://www.cvs.com/"
         api_key_candidates = list(dict.fromkeys(key for key in (CVS_INVENTORY_PUBLIC_API_KEY,) if key))
         browser_only_mode = self._env_bool("CVS_BROWSER_ONLY_MODE", False)
+        playwright_enabled = self._playwright_enabled() or self._playwright_only_mode()
+        playwright_first = self._playwright_first() or self._playwright_only_mode()
+
+        if playwright_enabled and playwright_first and api_key_candidates:
+            try:
+                logger.info("CVS inventory attempting Playwright browser-context fetch")
+                return self._fetch_inventory_payload_via_playwright(
+                    product=product,
+                    product_id=product_id,
+                    zip_code=zip_code,
+                    api_key=api_key_candidates[0],
+                )
+            except Exception as exc:
+                failures.append(f"playwright browser context {type(exc).__name__}: {exc}")
+                logger.warning("CVS Playwright inventory attempt failed: %s", exc)
+                if self._playwright_only_mode():
+                    if "403" in str(exc).lower() or "block" in str(exc).lower():
+                        cooldown_seconds = self._blocked_cooldown_seconds()
+                        if cooldown_seconds > 0:
+                            self._blocked_until_by_product[product_id] = time.time() + cooldown_seconds
+                    raise
 
         if api_key_candidates:
             try:
@@ -533,6 +988,25 @@ class CvsStockChecker:
                     raise CvsBlockedError(
                         "CVS browser-context inventory fetch failed while CVS_BROWSER_ONLY_MODE is enabled"
                     ) from exc
+
+        if playwright_enabled and not playwright_first and api_key_candidates:
+            try:
+                logger.info("CVS inventory attempting Playwright browser-context fetch")
+                return self._fetch_inventory_payload_via_playwright(
+                    product=product,
+                    product_id=product_id,
+                    zip_code=zip_code,
+                    api_key=api_key_candidates[0],
+                )
+            except Exception as exc:
+                failures.append(f"playwright browser context {type(exc).__name__}: {exc}")
+                logger.warning("CVS Playwright inventory attempt failed: %s", exc)
+                if self._playwright_only_mode():
+                    if "403" in str(exc).lower() or "block" in str(exc).lower():
+                        cooldown_seconds = self._blocked_cooldown_seconds()
+                        if cooldown_seconds > 0:
+                            self._blocked_until_by_product[product_id] = time.time() + cooldown_seconds
+                    raise
 
         proxy_candidates = self._proxy_candidates()
         if proxy_candidates:

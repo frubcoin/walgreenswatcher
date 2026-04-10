@@ -96,6 +96,30 @@ Notes:
   - `playwright install chromium`
 - Install deps first with `pip install -r backend/requirements.txt` if you have not already.
 
+### CVS Playwright Fallback On A VPS
+If CVS is blocking the direct API path on your VPS, the app can now use a Playwright browser flow that follows the product page and store-check modal flow before capturing the live inventory response.
+
+Recommended env vars:
+
+```bash
+CVS_PLAYWRIGHT_ENABLED=1
+CVS_PLAYWRIGHT_FIRST=1
+CVS_PLAYWRIGHT_HEADLESS=0
+CVS_PLAYWRIGHT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
+CVS_PROXY_URLS=http://USERNAME:PASSWORD@HOST:PORT
+```
+
+If you want that browser path to run in a virtual display on Linux, launch the service under `xvfb-run`:
+
+```bash
+xvfb-run -a python backend/app.py
+```
+
+Useful notes:
+- `CVS_PLAYWRIGHT_HEADLESS=0` is the intended setting when you are wrapping the process with `xvfb-run`.
+- `CVS_PLAYWRIGHT_ONLY_MODE=1` forces the app to use the Playwright browser flow and skip the older CVS browser fallback.
+- `CVS_PROXY_URLS` accepts normal authenticated proxy URLs such as `http://user:pass@host:port`.
+
 ### Decodo Web Scraping API Local Test
 To test CVS inventory via Decodo Web Scraping API (instead of raw proxy requests):
 
