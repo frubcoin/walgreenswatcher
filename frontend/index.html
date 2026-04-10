@@ -7086,7 +7086,7 @@
     let trackedProductsCache = [];
     let trendingProductsCache = [];
     let trendingRetentionHours = 24;
-    let trendingDisplayLimit = 8;
+    let trendingDisplayLimit = 16;
     let editingProductId = null;
     let currentUser = null;
     let authState = null;
@@ -9542,7 +9542,7 @@
       }
 
       trendingRetentionHours = Math.max(1, Number(result.retention_hours) || trendingRetentionHours || 24);
-      trendingDisplayLimit = 8;
+      trendingDisplayLimit = 16;
       updateTrendingProductsSummary(trendingRetentionHours);
       renderTrendingProducts(result.products || [], trendingRetentionHours);
       return result;

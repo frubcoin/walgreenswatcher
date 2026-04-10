@@ -1466,7 +1466,7 @@ def resolve_product(user: Dict[str, Any]):
 @app.route("/api/products/trending", methods=["GET"])
 @require_auth
 def get_trending_products(user: Dict[str, Any]):
-    limit = request.args.get("limit", default=8, type=int)
+    limit = request.args.get("limit", default=48, type=int)
     products = db.list_trending_products(int(user["id"]), limit=limit)
     return jsonify(
         {

@@ -1445,6 +1445,37 @@ class CvsStockChecker:
         except (TypeError, ValueError):
             return None
 
+    @staticmethod
+    def _extract_coordinate(store: Dict[str, Any], lat_key: str, lng_key: str) -> tuple[float | None, float | None]:
+        """Extract latitude/longitude from store data with multiple fallback keys."""
+        lat_fields = [lat_key, "latitude", "Latitude", "lat", "Lat", "storeLatitude", "geoLatitude", "geolatitude"]
+        lng_fields = [lng_key, "longitude", "Longitude", "lng", "Lng", "long", "Long", "storeLongitude", "geoLongitude", "geolongitude"]
+
+        latitude = None
+        longitude = None
+
+        for field in lat_fields:
+            val = store.get(field)
+            if val is not None:
+                try:
+                    latitude = float(val)
+                    if -90 <= latitude <= 90:
+                        break
+                except (TypeError, ValueError):
+                    continue
+
+        for field in lng_fields:
+            val = store.get(field)
+            if val is not None:
+                try:
+                    longitude = float(val)
+                    if -180 <= longitude <= 180:
+                        break
+                except (TypeError, ValueError):
+                    continue
+
+        return (latitude, longitude)
+
     def _filter_locations_by_search_radius(self, locations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         radius = self._normalize_distance(self.search_radius_miles)
         if radius is None or radius <= 0:
@@ -1472,14 +1503,15 @@ class CvsStockChecker:
             or (store.get("SDD") or {}).get("storeId")
             or ""
         ).strip()
+        latitude, longitude = self._extract_coordinate(store, "latitude", "longitude")
         return {
             "store_id": store_id,
             "name": f"CVS #{store_id}" if store_id else "CVS",
             "address": self._normalize_address(store),
             "distance": self._normalize_distance(store.get("dt")),
             "inventory_count": self._inventory_count(store),
-            "latitude": None,
-            "longitude": None,
+            "latitude": latitude,
+            "longitude": longitude,
         }
 
     def check_product_availability(
