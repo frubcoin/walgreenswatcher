@@ -108,6 +108,26 @@ run_as_app_user() {
   fail "Need sudo or runuser to execute commands as ${target_user}"
 }
 
+fix_permissions() {
+  local target_user="${1:-}"
+  local data_dir="${APP_DIR}/data"
+  local db_file="${data_dir}/watcher.sqlite3"
+
+  log "Fixing permissions for ${target_user}"
+
+  # Ensure data directory exists and is writable by the app user
+  if [[ -d "$data_dir" ]]; then
+    chown -R "${target_user}:${target_user}" "$data_dir" 2>/dev/null || true
+    chmod u+rwx "$data_dir" 2>/dev/null || true
+  fi
+
+  # Ensure database file is writable
+  if [[ -f "$db_file" ]]; then
+    chown "${target_user}:${target_user}" "$db_file" 2>/dev/null || true
+    chmod u+rw "$db_file" 2>/dev/null || true
+  fi
+}
+
 cleanup_python_artifacts() {
   local target_user="${1:-}"
 
@@ -232,6 +252,9 @@ main() {
 
   log "Verifying zendriver import"
   run_as_app_user "$target_user" "$python_bin" -c "import zendriver; print(zendriver.__version__)"
+
+  # Fix permissions on data directory and database
+  fix_permissions "$target_user"
 
   local browser_bin=""
   if browser_bin="$(find_browser)"; then

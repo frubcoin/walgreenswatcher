@@ -1560,6 +1560,7 @@ class CvsStockChecker:
             full_address = f"{address}, {city}, {state} {zipcode}".strip()
             logger.info("CVS geocoding requesting: %s", full_address)
             
+            logger.info("CVS geocoding requesting: %s", query)
             response = requests.get(
                 POSITIONSTACK_GEOCODE_URL,
                 params={
@@ -1571,8 +1572,10 @@ class CvsStockChecker:
                 timeout=10,
             )
             logger.info("CVS geocoding response status: %s", response.status_code)
+            logger.info("CVS geocoding response status: %s", response.status_code)
             response.raise_for_status()
             data = response.json()
+            logger.debug("CVS geocoding response data: %s", data)
             logger.debug("CVS geocoding response data: %s", data)
 
             # positionstack returns { "data": [ {...} ] }
@@ -1586,7 +1589,7 @@ class CvsStockChecker:
             lng = self._safe_float(result.get("longitude"))
 
             if lat is None or lng is None:
-                logger.warning("CVS geocoding invalid coordinates for: %s, result=%s", full_address, result)
+                logger.warning("CVS geocoding invalid coordinates for: %s, result=%s", query, result)
                 return None, None
 
             logger.info(
@@ -1658,8 +1661,33 @@ class CvsStockChecker:
         # Try to extract coordinates from store data first
         latitude, longitude = self._extract_coordinate(store, "latitude", "longitude")
 
-        # Note: Geocoding is done on the frontend to avoid server-side rate limits
-        # Frontend will geocode using Nominatim when stores are rendered on the map
+        # If not found, geocode from address
+        if latitude is None or longitude is None:
+            address = str(store.get("storeAddress", "")).strip()
+            city = str(store.get("City", "")).strip()
+            state = str(store.get("State", "")).strip()
+            zipcode = str(store.get("Zipcode", "")).strip()
+            logger.info(
+                "CVS store %s coordinate extraction failed, attempting geocoding. Address: '%s', City: '%s', State: '%s', Zip: '%s'",
+                store_id, address, city, state, zipcode
+            )
+            if address and city and state:
+                latitude, longitude = self._geocode_address(
+                    address,
+                    city,
+                    state,
+                    zipcode,
+                    store_id,
+                )
+                logger.info(
+                    "CVS store %s geocoding result: lat=%s, lng=%s",
+                    store_id, latitude, longitude
+                )
+            else:
+                logger.warning(
+                    "CVS store %s cannot geocode - missing address/city/state: '%s', '%s', '%s'",
+                    store_id, address, city, state
+                )
 
         return {
             "store_id": store_id,
