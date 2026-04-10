@@ -17,6 +17,8 @@ const WINDOWS_SEC_CH_UA = '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chr
 const WINDOWS_SEC_CH_UA_PLATFORM = '"Windows"';
 const WINDOWS_SEC_CH_UA_MOBILE = '?0';
 const RESULT_MARKER = '__CVS_XVFB_RESULT__=';
+const CVS_PRODUCT_IMAGE_PATTERN =
+    /(?:(?:https?:)?\/\/www\.cvs\.com)?(\/bizcontent\/merchandising\/productimages\/(?:large|high_res)\/[^"'<>\s]+?\.(?:jpe?g|png|webp)(?:\?[^"'<>\s]*)?)/i;
 
 const targetUrl = String(process.argv[2] || process.env.CVS_TEST_URL || DEFAULT_URL).trim();
 const targetZip = String(process.argv[3] || process.env.CVS_TEST_ZIP || DEFAULT_ZIP).trim();
@@ -59,6 +61,88 @@ function detectChallenge(text) {
     if (normalized.includes('captcha')) return 'captcha';
     if (normalized.includes('access denied')) return 'access_denied';
     return '';
+}
+
+function normalizeCvsImageUrl(rawValue) {
+    const value = String(rawValue || '').trim();
+    if (!value) return '';
+    try {
+        if (value.startsWith('//')) {
+            return `https:${value}`;
+        }
+        if (value.startsWith('/')) {
+            return new URL(value, 'https://www.cvs.com').toString();
+        }
+        return new URL(value, 'https://www.cvs.com').toString();
+    } catch {
+        return '';
+    }
+}
+
+function firstSrcsetCandidate(rawValue) {
+    return String(rawValue || '')
+        .split(',', 1)[0]
+        .trim()
+        .split(/\s+/, 1)[0]
+        .trim();
+}
+
+async function extractProductImageUrl(page, html = '') {
+    const domCandidate = await page.evaluate(() => {
+        const normalizeValue = (value) => String(value || '').trim();
+        const firstSrcset = (value) =>
+            String(value || '')
+                .split(',', 1)[0]
+                .trim()
+                .split(/\s+/, 1)[0]
+                .trim();
+
+        const collect = [];
+
+        const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute('content');
+        if (ogImage) collect.push(ogImage);
+
+        document
+            .querySelectorAll('link[rel="preload"][as="image"]')
+            .forEach((element) => {
+                collect.push(element.getAttribute('href'));
+                collect.push(firstSrcset(element.getAttribute('imagesrcset') || element.getAttribute('imageSrcSet')));
+            });
+
+        document.querySelectorAll('img').forEach((element) => {
+            [
+                'src',
+                'data-src',
+                'data-lazy-src',
+                'data-zoom-src',
+                'data-image',
+                'data-srcset',
+            ].forEach((attribute) => {
+                const value = element.getAttribute(attribute);
+                collect.push(attribute.includes('srcset') ? firstSrcset(value) : normalizeValue(value));
+            });
+        });
+
+        for (const candidate of collect) {
+            const normalized = normalizeValue(candidate);
+            if (normalized && normalized.toLowerCase().includes('/bizcontent/merchandising/productimages/')) {
+                return normalized;
+            }
+        }
+
+        return '';
+    }).catch(() => '');
+
+    const normalizedDomCandidate = normalizeCvsImageUrl(domCandidate);
+    if (normalizedDomCandidate) {
+        return normalizedDomCandidate;
+    }
+
+    const normalizedHtml = String(html || '').replace(/\\\//g, '/');
+    const htmlMatch = normalizedHtml.match(CVS_PRODUCT_IMAGE_PATTERN);
+    if (!htmlMatch) return '';
+
+    return normalizeCvsImageUrl(htmlMatch[1] || htmlMatch[0]);
 }
 
 function normalizeDistance(value) {
@@ -366,6 +450,7 @@ async function runAttempt(proxyConfig) {
     const page = await context.newPage();
     let responseCount = 0;
     let capturedInventory = null;
+    let extractedImageUrl = '';
     let buttonClicked = false;
     let pageChallenge = '';
 
@@ -434,6 +519,10 @@ async function runAttempt(proxyConfig) {
         if (pageChallenge) {
             console.log(`[page] challenge marker detected: ${pageChallenge}`);
         }
+        extractedImageUrl = await extractProductImageUrl(page, html);
+        if (extractedImageUrl) {
+            console.log(`[page] product image=${extractedImageUrl}`);
+        }
 
         await page.evaluate(() => window.scrollTo(0, 600));
         await page.waitForTimeout(2000);
@@ -481,6 +570,7 @@ async function runAttempt(proxyConfig) {
             proxy: proxyLabel(proxyConfig),
             buttonClicked,
             inventoryCaptured: Boolean(capturedInventory),
+            image_url: extractedImageUrl,
             payload: capturedInventory,
         };
     } catch (error) {
@@ -490,6 +580,7 @@ async function runAttempt(proxyConfig) {
             ok: false,
             proxy: proxyLabel(proxyConfig),
             buttonClicked,
+            image_url: extractedImageUrl,
             error: pageChallenge && !String(error?.message || '').includes('page challenge detected:')
                 ? `${error.message}; page challenge detected: ${pageChallenge}`
                 : error.message,

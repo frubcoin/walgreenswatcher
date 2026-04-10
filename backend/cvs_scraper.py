@@ -74,6 +74,7 @@ class CvsStockChecker:
         self.current_zip_code = TARGET_ZIP_CODE
         self.search_radius_miles = int(SEARCH_RADIUS_MILES or 20)
         self._blocked_until_by_product: Dict[str, float] = {}
+        self._last_extracted_image_url = ""
 
     def _emit_progress(self, progress_info: Dict[str, Any]) -> None:
         if self.progress_callback:
@@ -896,6 +897,7 @@ class CvsStockChecker:
         zip_code: str,
         api_key: str,
     ) -> Dict[str, Any]:
+        self._last_extracted_image_url = ""
         if not self._playwright_use_node_script():
             return self._run_async(
                 self._fetch_inventory_payload_via_playwright_async(
@@ -956,6 +958,10 @@ class CvsStockChecker:
                 "CVS Playwright node-script run did not produce a parseable result"
                 + (f": {snippet}" if snippet else "")
             ) from exc
+
+        extracted_image_url = str(result.get("image_url") or "").strip()
+        if extracted_image_url:
+            self._last_extracted_image_url = extracted_image_url
 
         if result.get("ok") and self._looks_like_inventory_response(result.get("payload")):
             logger.info("CVS inventory response accepted from Node/Playwright browser-context flow")
@@ -1416,6 +1422,7 @@ class CvsStockChecker:
         total_units = max(2, (product_total * 2) + 2)
         base_units = 1 + ((product_index - 1) * 2)
         self.current_zip_code = zip_code
+        self._last_extracted_image_url = ""
 
         self._emit_progress(
             {
@@ -1500,4 +1507,5 @@ class CvsStockChecker:
             "availability": availability,
             "stores": store_details,
             "location_ids": location_ids,
+            "_extracted_image_url": self._last_extracted_image_url,
         }
