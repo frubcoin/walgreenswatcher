@@ -139,13 +139,32 @@ class CvsStockChecker:
         return parsed.hostname
 
     @staticmethod
+    def _convert_proxy_format(proxy_url: str) -> str:
+        """Convert proxy from host:port:username:password to http://user:pass@host:port format."""
+        if not proxy_url:
+            return proxy_url
+        # If already a proper URL (has ://), return as-is
+        if "://" in proxy_url:
+            return proxy_url
+        # Try to parse host:port:username:password format
+        parts = proxy_url.split(":")
+        if len(parts) >= 4:
+            host = parts[0]
+            port = parts[1]
+            username = parts[2]
+            password = ":".join(parts[3:])  # Password might contain colons
+            return f"http://{username}:{password}@{host}:{port}"
+        return proxy_url
+
+    @staticmethod
     def _new_session(proxy_url: str = "") -> requests.Session:
         if curl_requests is not None:
             session = curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
         else:
             session = requests.Session()
         if proxy_url:
-            session.proxies.update({"http": proxy_url, "https": proxy_url})
+            converted = CvsStockChecker._convert_proxy_format(proxy_url)
+            session.proxies.update({"http": converted, "https": converted})
         return session
 
     @staticmethod
