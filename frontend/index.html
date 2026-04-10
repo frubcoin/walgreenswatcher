@@ -4814,6 +4814,7 @@
       transform: none;
       left: auto;
       bottom: auto;
+      flex-wrap: wrap;
     }
 
     .site-footer-copy {
@@ -5808,6 +5809,21 @@
 
       body:not(.auth-gate-active) .results-map-list {
         overflow: visible;
+      }
+
+      body:not(.auth-gate-active) .tab-panel.active {
+        overflow: visible;
+        flex: none;
+      }
+
+      body:not(.auth-gate-active) .app-window {
+        display: block;
+        overflow: visible;
+      }
+
+      body:not(.auth-gate-active) .results-view.active {
+        overflow: visible;
+        min-height: auto;
       }
 
       body:not(.auth-gate-active) .results-map-card .leaflet-popup-content-wrapper {
