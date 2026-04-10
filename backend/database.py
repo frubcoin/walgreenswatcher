@@ -1231,11 +1231,42 @@ class StockDatabase:
                 )
         return cursor.rowcount > 0
 
+    def update_product_image(
+        self,
+        user_id: int,
+        article_id: str,
+        *,
+        image_url: str,
+        retailer: str = "",
+    ) -> bool:
+        """Update the image_url for a tracked product."""
+        with self._connect() as conn:
+            if retailer:
+                cursor = conn.execute(
+                    """
+                    UPDATE tracked_products
+                    SET image_url = ?
+                    WHERE user_id = ? AND article_id = ? AND retailer = ? AND (image_url IS NULL OR image_url = '')
+                    """,
+                    (image_url, user_id, article_id, retailer),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    UPDATE tracked_products
+                    SET image_url = ?
+                    WHERE user_id = ? AND article_id = ? AND (image_url IS NULL OR image_url = '')
+                    """,
+                    (image_url, user_id, article_id),
+                )
+            return cursor.rowcount > 0
+
     def update_product_discord_exclusion(
         self,
         user_id: int,
         article_id: str,
-        exclude_from_discord: bool,
+        *,
+        exclude_from_discord: bool = True,
         retailer: str = "",
     ) -> bool:
         with self._connect() as conn:

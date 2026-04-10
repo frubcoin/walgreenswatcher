@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 CVS_PRODUCT_ID_PATTERN = re.compile(r"-prodid-(?P<product_id>\d+)(?:[/?#]|$)", re.IGNORECASE)
 CVS_TITLE_SUFFIX_PATTERN = re.compile(r"\s*-\s*CVS Pharmacy\s*$", re.IGNORECASE)
 CVS_PRODUCT_IMAGE_PATH_PATTERN = re.compile(
-    r"(?P<url>(?:https?:)?//www\.cvs\.com)?(?P<path>/bizcontent/merchandising/productimages/[^\"'<>\s]+?\.(?:jpe?g|png|webp)(?:\?[^\"'<>\s]*)?)",
+    r"(?P<url>(?:https?:)?//www\.cvs\.com)?(?P<path>/bizcontent/merchandising/productimages/(?:large|high_res)/[^\"'<>\s]+?\.(?:jpe?g|png|webp)(?:\?[^\"'<>\s]*)?)",
     re.IGNORECASE,
 )
 CVS_PRODUCT_TIMEOUT = (8, 15)
@@ -210,27 +210,44 @@ class CvsProductResolver:
         return cls._normalize_url(candidate)
 
     @classmethod
-    def _extract_image_url(cls, soup: BeautifulSoup, html: str, product_schema: Dict[str, Any]) -> str:
+    def _extract_image_url(cls, soup: BeautifulSoup, html: str, product_schema: Dict[str, Any], product_link: str = "") -> str:
+        # 1. Try product schema image first
         schema_image = product_schema.get("image")
         if isinstance(schema_image, list):
             for candidate in schema_image:
                 normalized = cls._normalize_url(candidate)
-                if normalized:
+                if normalized and "cvs.com" in normalized:
                     return normalized
         else:
             normalized = cls._normalize_url(schema_image)
-            if normalized:
+            if normalized and "cvs.com" in normalized:
                 return normalized
 
-        preload = soup.find("link", attrs={"rel": "preload", "as": "image"})
-        if preload:
+        # 2. Look for preload links
+        for preload in soup.find_all("link", attrs={"rel": "preload", "as": "image"}):
             normalized = cls._first_non_empty(
                 cls._normalize_url(preload.get("href", "")),
                 cls._normalize_srcset_candidate(preload.get("imagesrcset") or preload.get("imageSrcSet") or ""),
             )
-            if normalized:
+            if normalized and "/bizcontent/merchandising/productimages/" in normalized.lower():
                 return normalized
 
+        # 3. Look for meta og:image
+        og_image = soup.find("meta", property="og:image")
+        if og_image:
+            normalized = cls._normalize_url(og_image.get("content", ""))
+            if normalized and "/bizcontent/merchandising/productimages/" in normalized.lower():
+                return normalized
+
+        # 4. Look for high_res images in the page
+        for image in soup.find_all("img"):
+            for attr in ("src", "data-src", "data-lazy-src", "data-zoom-src", "data-image", "data-srcset"):
+                raw_value = image.get(attr, "")
+                normalized = cls._normalize_srcset_candidate(raw_value) if "srcset" in attr else cls._normalize_url(raw_value)
+                if normalized and "/bizcontent/merchandising/productimages/high_res/" in normalized.lower():
+                    return normalized
+
+        # 5. Look for any productimages path
         for image in soup.find_all("img"):
             for attr in ("src", "data-src", "data-lazy-src", "data-zoom-src", "data-image", "data-srcset"):
                 raw_value = image.get(attr, "")
@@ -238,6 +255,7 @@ class CvsProductResolver:
                 if normalized and "/bizcontent/merchandising/productimages/" in normalized.lower():
                     return normalized
 
+        # 6. Search in raw HTML
         normalized_html = unescape((html or "").replace("\\/", "/"))
         match = CVS_PRODUCT_IMAGE_PATH_PATTERN.search(normalized_html)
         if match:
@@ -288,7 +306,7 @@ class CvsProductResolver:
                 cls._normalize_url(
                     (soup.find("meta", property="og:image") or {}).get("content", "")
                 ),
-                cls._extract_image_url(soup, html, product_schema),
+                cls._extract_image_url(soup, html, product_schema, product_link),
             )
 
         return {

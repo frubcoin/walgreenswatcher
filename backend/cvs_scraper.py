@@ -515,6 +515,56 @@ class CvsStockChecker:
         try:
             page = await browser.get(referer)
             await page.sleep(8)
+
+            # Extract product image URL from the page
+            image_extraction_script = """
+            (() => {
+              // Try meta og:image first
+              const ogImage = document.querySelector('meta[property="og:image"]');
+              if (ogImage && ogImage.content && ogImage.content.includes('cvs.com')) {
+                return ogImage.content;
+              }
+              // Try product schema
+              const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+              for (const script of scripts) {
+                try {
+                  const data = JSON.parse(script.textContent);
+                  const products = Array.isArray(data) ? data : [data];
+                  for (const p of products) {
+                    if (p.image) {
+                      const img = Array.isArray(p.image) ? p.image[0] : p.image;
+                      if (img && img.includes('cvs.com')) return img;
+                    }
+                  }
+                } catch (e) {}
+              }
+              // Try high_res images
+              const images = document.querySelectorAll('img');
+              for (const img of images) {
+                const src = img.src || img.dataset.src || img.dataset.lazySrc;
+                if (src && src.includes('/bizcontent/merchandising/productimages/high_res/')) {
+                  return src;
+                }
+              }
+              // Try any productimages
+              for (const img of images) {
+                const src = img.src || img.dataset.src || img.dataset.lazySrc;
+                if (src && src.includes('/bizcontent/merchandising/productimages/')) {
+                  return src;
+                }
+              }
+              return null;
+            })()
+            """
+            image_result = await page.send(
+                zendriver_cdp.runtime.evaluate(
+                    expression=image_extraction_script,
+                    await_promise=False,
+                    return_by_value=True,
+                )
+            )
+            extracted_image_url = cls._remote_value(image_result)
+
             payload = cls._zendriver_payload(product_id, zip_code, api_key)
             request_args = json.dumps(
                 {
@@ -569,6 +619,9 @@ class CvsStockChecker:
             data = response_value.get("jsonBody")
             if cls._looks_like_inventory_response(data):
                 logger.info("CVS inventory response accepted from browser page context via zendriver")
+                # Include extracted product image URL
+                if extracted_image_url:
+                    data["_extracted_image_url"] = extracted_image_url
                 return data
 
             snippet = str(response_value.get("text") or "")[:200].replace("\n", " ")
@@ -818,6 +871,43 @@ class CvsStockChecker:
                         blocked_routes.append(proxy_label)
                         raise ValueError(f"CVS browser page challenge ({challenge})")
 
+                    # Extract product image URL from the page
+                    extracted_image_url = await page.evaluate("""
+                        () => {
+                            const ogImage = document.querySelector('meta[property="og:image"]');
+                            if (ogImage && ogImage.content && ogImage.content.includes('cvs.com')) {
+                                return ogImage.content;
+                            }
+                            const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+                            for (const script of scripts) {
+                                try {
+                                    const data = JSON.parse(script.textContent);
+                                    const products = Array.isArray(data) ? data : [data];
+                                    for (const p of products) {
+                                        if (p.image) {
+                                            const img = Array.isArray(p.image) ? p.image[0] : p.image;
+                                            if (img && img.includes('cvs.com')) return img;
+                                        }
+                                    }
+                                } catch (e) {}
+                            }
+                            const images = document.querySelectorAll('img');
+                            for (const img of images) {
+                                const src = img.src || img.dataset.src || img.dataset.lazySrc;
+                                if (src && src.includes('/bizcontent/merchandising/productimages/high_res/')) {
+                                    return src;
+                                }
+                            }
+                            for (const img of images) {
+                                const src = img.src || img.dataset.src || img.dataset.lazySrc;
+                                if (src && src.includes('/bizcontent/merchandising/productimages/')) {
+                                    return src;
+                                }
+                            }
+                            return null;
+                        }
+                    """)
+
                     await page.evaluate("window.scrollTo(0, 600)")
                     await page.wait_for_timeout(1500)
 
@@ -846,6 +936,9 @@ class CvsStockChecker:
 
                     if cls._looks_like_inventory_response(inventory_payload.get("data")):
                         logger.info("CVS inventory response accepted from browser page context via Playwright")
+                        # Include extracted product image URL
+                        if extracted_image_url:
+                            inventory_payload["data"]["_extracted_image_url"] = extracted_image_url
                         return inventory_payload["data"]
                     raise ValueError("CVS Playwright flow did not return a valid inventory payload")
                 except Exception as exc:
@@ -1484,4 +1577,5 @@ class CvsStockChecker:
             "availability": availability,
             "stores": store_details,
             "location_ids": location_ids,
+            "_extracted_image_url": payload.get("_extracted_image_url", ""),
         }

@@ -665,6 +665,22 @@ class StockCheckScheduler:
                             product_index=index,
                             product_total=len(product_specs),
                         )
+                        # Update product image if extracted from browser
+                        extracted_image = product_result.get("_extracted_image_url", "")
+                        if extracted_image and product.get("article_id"):
+                            try:
+                                self.db.update_product_image(
+                                    self.user_id,
+                                    product["article_id"],
+                                    image_url=extracted_image,
+                                    retailer="cvs",
+                                )
+                            except Exception as img_exc:
+                                logger.warning(
+                                    "Failed to update product image for %s: %s",
+                                    product_display_name,
+                                    img_exc,
+                                )
                     except CvsDisabledError as exc:
                         logger.info(
                             "CVS inventory skipped for user %s product %s: %s",
