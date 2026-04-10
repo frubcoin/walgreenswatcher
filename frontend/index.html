@@ -9643,6 +9643,22 @@
       return Number.isFinite(coordinate) ? coordinate : null;
     }
 
+    function hasRenderableStoreCoordinates(latitude, longitude, retailer = '') {
+      if (latitude === null || longitude === null) return false;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+
+      if (retailerKey(retailer || 'walgreens') === 'cvs') {
+        if (Math.abs(latitude) < 1 && Math.abs(longitude) < 1) {
+          return false;
+        }
+        if (latitude < 18 || latitude > 72 || longitude < -180 || longitude > -60) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
     function calculateDistanceMiles(originLatitude, originLongitude, targetLatitude, targetLongitude) {
       const toRadians = value => (value * Math.PI) / 180;
       const earthRadiusMiles = 3958.7613;
@@ -9687,7 +9703,7 @@
           const latitude = normalizeCoordinate(store.latitude);
           const longitude = normalizeCoordinate(store.longitude);
 
-          if (latitude === null || longitude === null) {
+          if (!hasRenderableStoreCoordinates(latitude, longitude, productRetailer)) {
             missingCoordinates += 1;
             return;
           }
@@ -10463,7 +10479,7 @@
         stores.forEach(store => {
           const latitude = normalizeCoordinate(store?.latitude);
           const longitude = normalizeCoordinate(store?.longitude);
-          if (latitude !== null && longitude !== null) return;
+          if (hasRenderableStoreCoordinates(latitude, longitude, 'cvs')) return;
 
           const address = String(store?.address || '').trim();
           if (!address || address === 'Address unavailable') return;
@@ -10505,8 +10521,11 @@
           const cachedCoords = storedCoordinates[group.cacheKey];
           if (
             cachedCoords &&
-            Number.isFinite(Number(cachedCoords.latitude)) &&
-            Number.isFinite(Number(cachedCoords.longitude))
+            hasRenderableStoreCoordinates(
+              Number(cachedCoords.latitude),
+              Number(cachedCoords.longitude),
+              'cvs'
+            )
           ) {
             applyCoordinatesToCvsStores(group.stores, {
               latitude: Number(cachedCoords.latitude),
