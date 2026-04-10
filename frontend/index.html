@@ -6,19 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Local Pick-up Monitor by frub</title>
   <meta name="description"
-    content="Private Walgreens stock alerts with Google sign-in, per-user settings, Discord webhooks, and hosted background checks.">
+    content="Private stock alerts with Google account sync, map view, Discord notifications, and configurable settings.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Local Pick-up Monitor by frub">
   <meta property="og:title" content="Local Pick-up Monitor by frub">
   <meta property="og:description"
-    content="Private Walgreens stock alerts with Google sign-in, per-user settings, Discord webhooks, and hosted background checks.">
+    content="Private stock alerts with Google account sync, map view, Discord notifications, and configurable settings.">
   <meta property="og:image" content="/og/home-og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Local Pick-up Monitor by frub">
   <meta name="twitter:description"
-    content="Private Walgreens stock alerts with Google sign-in, per-user settings, Discord webhooks, and hosted background checks.">
+    content="Private stock alerts with Google account sync, map view, Discord notifications, and configurable settings.">
   <meta name="twitter:image" content="/og/home-og.png">
   <link rel="icon" type="image/png" href="/frubgreens.webp">
   <link rel="manifest" href="/manifest.webmanifest">
@@ -4963,10 +4963,15 @@
       }
 
       .results-map-card,
-      .results-map-sidebar,
       .results-map-canvas {
         height: 360px;
         min-height: 0;
+      }
+
+      .results-map-sidebar {
+        height: auto;
+        min-height: 0;
+        max-height: none;
       }
 
       .map-location-search {
