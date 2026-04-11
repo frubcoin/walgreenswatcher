@@ -10,6 +10,16 @@ from ace_scraper import AceStockChecker
 PRODUCT_URL = "https://www.acehardware.com/departments/home-and-decor/novelty-items/toys-and-games/9125200"
 EXPECTED_NAME = "Pokemon Perfect Order Sleeved Booster Trading Cards"
 
+import logging
+
+# Configure logging to see the debug output from the checker
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
+
 if __name__ == "__main__":
     # --- Step 1: Verify the resolver fetches the correct product name ---
     print("=== Testing AceProductResolver ===")

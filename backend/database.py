@@ -26,7 +26,7 @@ DEFAULT_POKEMON_BACKGROUND_THEME = "gyra"
 DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645
 DEFAULT_ADMIN_ALERT_NEW_USERS = True
 DEFAULT_ADMIN_ALERT_USER_ACTIONS = True
-TRENDING_PRODUCTS_RETENTION_HOURS = 24
+TRENDING_PRODUCTS_RETENTION_HOURS = 0
 DEFAULT_MAX_NOTIFICATION_DISTANCE_MILES = int(SEARCH_RADIUS_MILES or 20)
 
 
@@ -124,6 +124,7 @@ class StockDatabase:
                     image_url TEXT DEFAULT '',
                     source_url TEXT DEFAULT '',
                     product_id TEXT DEFAULT '',
+                    first_tracked_at TEXT NOT NULL DEFAULT '',
                     last_tracked_at TEXT NOT NULL,
                     PRIMARY KEY (user_id, retailer, article_id),
                     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -220,8 +221,13 @@ class StockDatabase:
                 "max_notification_distance_miles",
                 f"INTEGER NOT NULL DEFAULT {DEFAULT_MAX_NOTIFICATION_DISTANCE_MILES}",
             )
+            self._ensure_column(
+                conn,
+                "trending_products",
+                "first_tracked_at",
+                "TEXT NOT NULL DEFAULT ''",
+            )
             self._backfill_recent_trending_products(conn)
-            self._prune_expired_trending_products(conn)
 
     @staticmethod
     def _product_key(article_id: Any, retailer: Any) -> str:
@@ -247,6 +253,23 @@ class StockDatabase:
 
         if not normalized_sql:
             return
+        function updateTrendingProductsSummary(retentionHours = trendingRetentionHours) {
+      const normalizedHours = Number(retentionHours) || 0;
+      const copy = document.getElementById('trending-products-copy');
+      const highlightLabel = document.getElementById('trending-products-highlight-label');
+
+      if (copy) {
+        if (normalizedHours > 0) {
+          copy.textContent = `Community links tracked within the last ${normalizedHours} hours. Add any of them straight to your monitor without pasting the URL.`;
+        } else {
+          copy.textContent = `Top tracked community links. Add any of them straight to your monitor without pasting the URL.`;
+        }
+      }
+
+      if (highlightLabel) {
+        highlightLabel.textContent = normalizedHours > 0 ? `Last ${normalizedHours}h` : 'All-time';
+      }
+    }
         if "primary key (user_id, retailer, article_id)" in normalized_sql:
             return
         if "primary key (user_id, article_id)" not in normalized_sql:
@@ -299,18 +322,8 @@ class StockDatabase:
         )
         conn.execute("DROP TABLE tracked_products_legacy")
 
-    def _prune_expired_trending_products(
-        self,
-        conn: sqlite3.Connection,
-        now: Optional[datetime] = None,
-    ) -> None:
-        conn.execute(
-            "DELETE FROM trending_products WHERE last_tracked_at < ?",
-            (self._trending_retention_cutoff(now),),
-        )
-
     def _backfill_recent_trending_products(self, conn: sqlite3.Connection) -> None:
-        cutoff = self._trending_retention_cutoff()
+        """Sync all tracked products (with a source_url) into trending_products."""
         rows = conn.execute(
             """
             SELECT
@@ -324,10 +337,8 @@ class StockDatabase:
                 COALESCE(NULLIF(TRIM(product_id), ''), '') AS product_id,
                 created_at AS last_tracked_at
             FROM tracked_products
-            WHERE created_at >= ?
-              AND COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
+            WHERE COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
             """,
-            (cutoff,),
         ).fetchall()
         for row in rows:
             self._upsert_trending_product(
@@ -365,6 +376,7 @@ class StockDatabase:
         if self._is_trending_product_hidden(conn, normalized_article_id, normalized_retailer):
             return
 
+        now_str = str(tracked_at or datetime.utcnow().isoformat())
         conn.execute(
             """
             INSERT INTO trending_products (
@@ -376,9 +388,10 @@ class StockDatabase:
                 image_url,
                 source_url,
                 product_id,
+                first_tracked_at,
                 last_tracked_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, retailer, article_id) DO UPDATE
             SET name = excluded.name,
                 planogram = excluded.planogram,
@@ -386,6 +399,7 @@ class StockDatabase:
                 source_url = excluded.source_url,
                 product_id = excluded.product_id,
                 last_tracked_at = excluded.last_tracked_at
+            -- first_tracked_at is intentionally NOT updated so the original add date is preserved
             """,
             (
                 int(user_id),
@@ -396,7 +410,8 @@ class StockDatabase:
                 str(image_url or "").strip(),
                 normalized_source_url,
                 str(product_id or "").strip(),
-                str(tracked_at or datetime.utcnow().isoformat()),
+                now_str,
+                now_str,
             ),
         )
 
@@ -674,11 +689,10 @@ class StockDatabase:
         ]
 
     def list_trending_products(self, viewer_user_id: int, limit: int = 8) -> List[Dict[str, Any]]:
-        capped_limit = max(1, min(int(limit or 8), 24))
+        capped_limit = max(1, min(int(limit or 8), 200))
 
         with self._connect() as conn:
             self._backfill_recent_trending_products(conn)
-            self._prune_expired_trending_products(conn)
             rows = conn.execute(
                 """
                 WITH grouped AS (
@@ -686,7 +700,7 @@ class StockDatabase:
                         article_id,
                         retailer,
                         COUNT(DISTINCT user_id) AS tracked_by_count,
-                        MIN(last_tracked_at) AS first_tracked_at,
+                        MIN(NULLIF(TRIM(first_tracked_at), '')) AS first_tracked_at,
                         MAX(last_tracked_at) AS last_tracked_at
                     FROM trending_products
                     WHERE COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
@@ -775,7 +789,6 @@ class StockDatabase:
 
         with self._connect() as conn:
             self._backfill_recent_trending_products(conn)
-            self._prune_expired_trending_products(conn)
             rows = conn.execute(
                 """
                 WITH grouped AS (
@@ -783,7 +796,7 @@ class StockDatabase:
                         article_id,
                         retailer,
                         COUNT(DISTINCT user_id) AS tracked_by_count,
-                        MIN(last_tracked_at) AS first_tracked_at,
+                        MIN(NULLIF(TRIM(first_tracked_at), '')) AS first_tracked_at,
                         MAX(last_tracked_at) AS last_tracked_at
                     FROM trending_products
                     WHERE COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
@@ -861,7 +874,6 @@ class StockDatabase:
 
     def list_hidden_trending_products_for_admin(self, limit: int = 48) -> List[Dict[str, Any]]:
         capped_limit = max(1, min(int(limit or 48), 200))
-        cutoff = self._trending_retention_cutoff()
 
         with self._connect() as conn:
             self._backfill_recent_trending_products(conn)
@@ -872,73 +884,44 @@ class StockDatabase:
                     h.retailer,
                     h.hidden_at,
                     h.hidden_by_user_id,
+                    u.email AS hidden_by_email,
+                    u.name AS hidden_by_name,
                     (
                         SELECT COALESCE(NULLIF(TRIM(tp.name), ''), tp.article_id)
-                        FROM tracked_products tp
+                        FROM trending_products tp
                         WHERE tp.article_id = h.article_id
                           AND tp.retailer = h.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
                         LIMIT 1
                     ) AS name,
                     (
-                        SELECT COALESCE(NULLIF(TRIM(tp.planogram), ''), '')
-                        FROM tracked_products tp
-                        WHERE tp.article_id = h.article_id
-                          AND tp.retailer = h.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
-                        LIMIT 1
-                    ) AS planogram,
-                    (
                         SELECT COALESCE(NULLIF(TRIM(tp.image_url), ''), '')
-                        FROM tracked_products tp
+                        FROM trending_products tp
                         WHERE tp.article_id = h.article_id
                           AND tp.retailer = h.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
                         LIMIT 1
                     ) AS image_url,
                     (
-                        SELECT COALESCE(NULLIF(TRIM(tp.source_url), ''), '')
-                        FROM tracked_products tp
-                        WHERE tp.article_id = h.article_id
-                          AND tp.retailer = h.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
-                        LIMIT 1
-                    ) AS source_url,
-                    (
-                        SELECT COALESCE(NULLIF(TRIM(tp.product_id), ''), '')
-                        FROM tracked_products tp
-                        WHERE tp.article_id = h.article_id
-                          AND tp.retailer = h.retailer
-                        ORDER BY tp.created_at DESC, tp.user_id DESC
-                        LIMIT 1
-                    ) AS product_id,
-                    (
                         SELECT COUNT(DISTINCT tp.user_id)
-                        FROM tracked_products tp
+                        FROM trending_products tp
                         WHERE tp.article_id = h.article_id
                           AND tp.retailer = h.retailer
                           AND COALESCE(NULLIF(TRIM(tp.source_url), ''), '') <> ''
-                          AND tp.created_at >= ?
                     ) AS tracked_by_count,
                     (
-                        SELECT MAX(tp.created_at)
-                        FROM tracked_products tp
+                        SELECT MAX(tp.last_tracked_at)
+                        FROM trending_products tp
                         WHERE tp.article_id = h.article_id
                           AND tp.retailer = h.retailer
                           AND COALESCE(NULLIF(TRIM(tp.source_url), ''), '') <> ''
-                          AND tp.created_at >= ?
-                    ) AS last_tracked_at,
-                    (
-                        SELECT COALESCE(NULLIF(TRIM(u.email), ''), '')
-                        FROM users u
-                        WHERE u.id = h.hidden_by_user_id
-                        LIMIT 1
-                    ) AS hidden_by_email
+                    ) AS last_tracked_at
                 FROM hidden_trending_products h
+                LEFT JOIN users u ON u.id = h.hidden_by_user_id
                 ORDER BY h.hidden_at DESC, lower(COALESCE(name, h.article_id)) ASC, h.article_id ASC
                 LIMIT ?
                 """,
-                (cutoff, cutoff, capped_limit),
+                (capped_limit,),
             ).fetchall()
 
         return [

@@ -507,11 +507,31 @@ async ({ pid, codes, headers }) => {
                 },
             )
             if not payload.get("ok"):
-                 continue
+                logger.warning(
+                    "Ace locationInventory returned HTTP %s for codes %s (pid=%s)",
+                    payload.get("status"), codes_str[:80], product_id,
+                )
+                continue
             try:
                 data = json.loads(payload.get("text") or "{}")
-                all_items.extend(data.get("items") or [])
+                items_chunk = data.get("items") or []
+                if items_chunk:
+                    # Log the first item's keys so we know the real field names
+                    logger.debug(
+                        "Ace locationInventory sample item keys (pid=%s): %s",
+                        product_id, list((items_chunk[0] or {}).keys()),
+                    )
+                else:
+                    logger.warning(
+                        "Ace locationInventory returned 0 items for codes %s (pid=%s); raw=%s",
+                        codes_str[:80], product_id, (payload.get("text") or "")[:300],
+                    )
+                all_items.extend(items_chunk)
             except ValueError:
+                logger.warning(
+                    "Ace locationInventory returned non-JSON for codes %s (pid=%s): %s",
+                    codes_str[:80], product_id, (payload.get("text") or "")[:200],
+                )
                 pass
                 
         return all_items
@@ -583,7 +603,19 @@ async ({ pid, codes, headers }) => {
                         stores_result = {}
                         for item in inventory_items:
                             loc_code = str(item.get("locationCode") or "").strip()
-                            stock = int(item.get("stockAvailable") or 0)
+                            # Kibo field names vary by tenant/version; try all known variants
+                            raw_stock = (
+                                item.get("stockAvailable")
+                                or item.get("softStockAvailable")
+                                or item.get("available")
+                                or item.get("quantity")
+                                or item.get("onHand")
+                                or 0
+                            )
+                            try:
+                                stock = int(raw_stock)
+                            except (TypeError, ValueError):
+                                stock = 0
                             if loc_code and stock > 0 and loc_code in store_lookup:
                                 matched = store_lookup[loc_code]
                                 stores_result[loc_code] = {
@@ -591,6 +623,12 @@ async ({ pid, codes, headers }) => {
                                     "inventory_count": stock,
                                     "availability_text": f"In Stock: {stock}"
                                 }
+                            elif loc_code and loc_code in store_lookup:
+                                # Log misses so we can identify the right field
+                                logger.debug(
+                                    "Ace store %s has no stock; item fields: %s",
+                                    loc_code, {k: v for k, v in item.items() if k != "locationCode"},
+                                )
 
                         context["stores"] = stores_result
 

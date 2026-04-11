@@ -985,7 +985,7 @@ def _admin_overview_payload(admin_user: Optional[Dict[str, Any]] = None) -> Dict
             "count": len(trending_products),
             "hidden_products": hidden_trending_products,
             "hidden_count": len(hidden_trending_products),
-            "retention_hours": TRENDING_PRODUCTS_RETENTION_HOURS,
+            "retention_hours": 0,
             "viewer_user_id": int(admin_user["id"]) if admin_user else None,
         },
         "platform": {
@@ -1493,7 +1493,7 @@ def get_trending_products(user: Dict[str, Any]):
         {
             "products": products,
             "count": len(products),
-            "retention_hours": TRENDING_PRODUCTS_RETENTION_HOURS,
+            "retention_hours": 0,
         }
     )
 
