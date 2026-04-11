@@ -4035,6 +4035,37 @@
       color: var(--text-primary);
     }
 
+    .fulfillment-badges {
+      display: inline-flex;
+      gap: 6px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .fulfillment-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 6px;
+      height: 18px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .fulfillment-badge.type-pickup {
+      background: rgba(46, 213, 115, 0.15);
+      color: #2ed573;
+      border: 1px solid rgba(46, 213, 115, 0.2);
+    }
+
+    .fulfillment-badge.type-delivery {
+      background: rgba(255, 165, 2, 0.15);
+      color: #ffa502;
+      border: 1px solid rgba(255, 165, 2, 0.2);
+    }
+
     .history-list {
       display: flex;
       flex-direction: column;
@@ -9363,6 +9394,19 @@
       return `<img class="${escapeHtml(className)}" src="${escapeHtml(iconPath)}" alt="${escapeHtml(label)}" title="${escapeHtml(label)}" loading="lazy" decoding="async">`;
     }
 
+    function renderFulfillmentBadges(store) {
+      if (!store) return '';
+      const badges = [];
+      if (store.pickup_available) {
+        badges.push('<span class="fulfillment-badge type-pickup">Pickup</span>');
+      }
+      if (store.delivery_available) {
+        badges.push('<span class="fulfillment-badge type-delivery">Delivery</span>');
+      }
+      if (badges.length === 0) return '';
+      return `<span class="fulfillment-badges">${badges.join('')}</span>`;
+    }
+
     function productIdentityKey(productId, retailer = 'walgreens') {
       return `${retailerKey(retailer)}:${String(productId || '').trim()}`;
     }
@@ -10058,7 +10102,7 @@
         `).join('');
 
       return `
-          <div class="map-popup-title">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(location.name)}</div>
+          <div class="map-popup-title">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(location.name)} ${renderFulfillmentBadges(location)}</div>
           <div class="map-popup-address">${renderAddressLink(location.address)}</div>
           <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
           <div class="map-popup-products">${productsHtml}</div>
@@ -12210,7 +12254,7 @@
       <div class="result-store-index">${index + 1}.</div>
       <div class="result-store-copy">
         ${renderAddressLink(store.address)}
-        <div class="result-store-meta">Qty: <strong>${Number(store.inventory_count || 0)}</strong> | Distance: ${escapeHtml(formatDistance(getEffectiveStoreDistance(store)))}</div>
+        <div class="result-store-meta">Qty: <strong>${Number(store.inventory_count || 0)}</strong> | Distance: ${escapeHtml(formatDistance(getEffectiveStoreDistance(store)))}${renderFulfillmentBadges(store)}</div>
       </div>
     </div>
   `).join('');

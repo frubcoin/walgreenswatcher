@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 ACE_LOCATION_API_BASE = "https://www.acehardware.com/api/commerce/storefront/locationUsageTypes/SP/locations"
 ACE_RADIUS_METERS = 48280.3  # 30 miles
-ACE_PRODUCT_ID_PATTERN = re.compile(r"/(?P<product_id>\d+)(?:[/?#]|$)")
+ACE_PRODUCT_ID_PATTERN = re.compile(r"/(?P<product_id>[A-Z]*\d+)(?:[/?#]|$)", re.IGNORECASE)
 ACE_DEBUG_DIR = Path(__file__).resolve().parent / "output" / "ace-debug"
 ACE_BROWSER_TIMEOUT_MS = 30_000
 ACE_BROWSER_WAIT_MS = 2_000
@@ -78,8 +78,25 @@ class AceBrowserClient:
 
     @staticmethod
     def extract_product_id(product_link: str) -> str:
-        match = ACE_PRODUCT_ID_PATTERN.search(str(product_link or "").strip())
+        link = str(product_link or "").strip()
+        parsed = urlparse(link)
+        
+        # 1. Check for variationProductCode in query string (priority)
+        from urllib.parse import parse_qs
+        qs = parse_qs(parsed.query)
+        v_codes = qs.get("variationProductCode") or qs.get("variationproductcode")
+        if v_codes and v_codes[0]:
+            return str(v_codes[0]).strip()
+            
+        # 2. Extract from path using pattern
+        match = ACE_PRODUCT_ID_PATTERN.search(link)
         if not match:
+            # Fallback for simple /p/ID or path/ID if pattern search fails
+            path_parts = parsed.path.strip("/").split("/")
+            if path_parts:
+                last_part = path_parts[-1]
+                if any(c.isdigit() for c in last_part):
+                    return last_part
             raise ValueError("Could not find an Ace Hardware product id in the link")
         return str(match.group("product_id") or "").strip()
 
@@ -540,7 +557,7 @@ async ({ lat, lng, radius, headers }) => {
                             raise AceBrowserError("Ace did not return any store candidates for that ZIP")
 
                         # Summarize availability based on fulfillmentTypes
-                        # Presence of 'SP' (Store Pickup) indicates In Store Pickup availability
+                        # SP = In Store Pickup, DL = Delivery
                         for candidate in context["store_candidates"]:
                             loc_code = str(candidate.get("code") or "").strip()
                             if not loc_code:
@@ -552,18 +569,31 @@ async ({ lat, lng, radius, headers }) => {
                                 for ft in fulfillment_types 
                                 if isinstance(ft, dict)
                             )
+                            has_delivery = any(
+                                str(ft.get("code") or "").upper() == "DL" 
+                                for ft in fulfillment_types 
+                                if isinstance(ft, dict)
+                            )
                             
-                            if has_pickup:
+                            if has_pickup or has_delivery:
                                 context["stores"][loc_code] = {
                                     **candidate,
                                     "inventory_count": 1,  # Binary status
-                                    "availability_text": "Available for In Store Pickup"
+                                    "pickup_available": has_pickup,
+                                    "delivery_available": has_delivery,
+                                    "availability_text": "Available"
                                 }
+                                if has_pickup and has_delivery:
+                                    context["stores"][loc_code]["availability_text"] = "Pickup & Delivery Available"
+                                elif has_pickup:
+                                    context["stores"][loc_code]["availability_text"] = "Available for Pickup"
+                                elif has_delivery:
+                                    context["stores"][loc_code]["availability_text"] = "Available for Delivery"
                             else:
-                                logger.debug("Ace store %s lacks SP fulfillment", loc_code)
+                                logger.debug("Ace store %s lacks both SP and DL fulfillment", loc_code)
 
                         logger.info(
-                            "Ace check complete: found %d stores with pickup for pid=%s",
+                            "Ace check complete: found %d stores with stock for pid=%s",
                             len(context["stores"]),
                             context["product"].get("product_id")
                         )

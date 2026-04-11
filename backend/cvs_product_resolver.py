@@ -16,6 +16,7 @@ try:
     from curl_cffi import requests as curl_requests
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
+from scrapling.engines._browsers._stealth import StealthySession
 
 from config import CVS_PROXY_URLS, USER_AGENTS
 
@@ -119,73 +120,39 @@ class CvsProductResolver:
 
     @classmethod
     def _fetch_html(cls, product_link: str) -> str:
+        proxy_candidates = cls._proxy_candidates() or [None]
         last_error: Exception | None = None
-        accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
-        proxy_candidates = cls._proxy_candidates() or [""]
-        blocked_routes: List[str] = []
+        
+        # Ensure direct fetch is also tried if proxies are provided
+        if proxy_candidates and proxy_candidates[0] is not None:
+             proxy_candidates.append(None)
 
-        for proxy_url in proxy_candidates:
-            session = cls._new_session(proxy_url)
-            proxy_label = cls._proxy_label(proxy_url) if proxy_url else "direct server IP"
-            if proxy_url:
-                logger.info("CVS resolver is using proxy routing via %s", proxy_label)
+        for proxy in proxy_candidates:
+            proxy_label = cls._proxy_label(proxy) if proxy else "direct server IP"
+            logger.info("CVS resolver attempting Scrapling fetch via %s", proxy_label)
             try:
-                for _ in range(CVS_RESOLVE_ATTEMPTS):
-                    bootstrap_headers = cls._request_headers(accept=accept)
-                    route_blocked = False
-                    for bootstrap_url in ("https://www.cvs.com/", product_link):
-                        try:
-                            response = session.get(
-                                bootstrap_url,
-                                headers=bootstrap_headers,
-                                timeout=CVS_BOOTSTRAP_TIMEOUT
-                                if bootstrap_url == "https://www.cvs.com/"
-                                else CVS_PRODUCT_TIMEOUT,
-                            )
-                            if response.status_code >= 400:
-                                last_error = ValueError(f"HTTP {response.status_code} for {bootstrap_url}")
-                                logger.warning(
-                                    "CVS resolver bootstrap blocked for %s via %s with HTTP %s",
-                                    bootstrap_url,
-                                    proxy_label,
-                                    response.status_code,
-                                )
-                                if response.status_code == 403:
-                                    blocked_routes.append(proxy_label)
-                                    route_blocked = True
-                                    break
-                                if bootstrap_url == product_link:
-                                    break
-                                continue
-                            if bootstrap_url == product_link and "html" in response.headers.get("content-type", "").lower():
-                                return response.text
-                        except Exception as exc:
-                            last_error = exc
-                            logger.warning("CVS resolver bootstrap request failed for %s via %s: %s", bootstrap_url, proxy_label, exc)
-                            if bootstrap_url == product_link:
-                                break
-                    if route_blocked:
-                        break
-            finally:
-                session.close()
+                # Use Scrapling for robust Cloudflare/bot bypass
+                with StealthySession(
+                    proxy=proxy,
+                    headless=True,
+                    real_chrome=True,
+                    solve_cloudflare=True,
+                    timeout=30_000,
+                ) as session:
+                    # Some CVS pages like certain referers
+                    response = session.fetch(product_link, referer="https://www.google.com/")
+                    if response.status < 400:
+                        return response.text
+                    
+                    last_error = ValueError(f"HTTP {response.status} via {proxy_label}")
+                    logger.warning("CVS resolver blocked (HTTP %d) via %s", response.status, proxy_label)
+            except Exception as exc:
+                last_error = exc
+                logger.warning("CVS resolver Scrapling fetch failed via %s: %s", proxy_label, exc)
 
-        unique_blocked_routes = list(dict.fromkeys(blocked_routes))
-        attempted_route_labels = [
-            cls._proxy_label(proxy_url) if proxy_url else "direct server IP"
-            for proxy_url in proxy_candidates
-        ]
-        if unique_blocked_routes and len(unique_blocked_routes) == len(set(attempted_route_labels)):
-            raise ValueError(
-                "CVS blocked every configured route while resolving that product link: "
-                + ", ".join(unique_blocked_routes)
-            )
-
-        if last_error is not None:
-            raise ValueError(
-                "CVS blocked or timed out while resolving that product link. "
-                "Try again from a network CVS accepts, or add the product again after confirming the URL."
-            ) from last_error
-        raise ValueError("CVS did not return an HTML product page for that link")
+        if last_error:
+            raise last_error
+        raise ValueError("CVS resolution failed on all available routes")
 
     @staticmethod
     def _slug_fallback_name(product_link: str) -> str:
@@ -280,6 +247,11 @@ class CvsProductResolver:
         hostname = (parsed.hostname or "").lower()
         if hostname != "cvs.com" and not hostname.endswith(".cvs.com"):
             raise ValueError("CVS product links must point to cvs.com")
+
+        # Append cgaa Googlebot bypass hint if not present
+        if "cgaa=" not in product_link:
+            sep = "&" if "?" in product_link else "?"
+            product_link = f"{product_link}{sep}cgaa=QWxsb3dHb29nbGVUb0FjY2Vzc0NWU1BhZ2Vz"
 
         product_id = cls.extract_product_id(product_link)
         canonical_url = product_link

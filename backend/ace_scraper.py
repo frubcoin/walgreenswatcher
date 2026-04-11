@@ -71,8 +71,19 @@ class AceStockChecker:
             normalized_store_id = str(store_id or "").strip()
             if not normalized_store_id:
                 continue
+            
+            # Merge the in-stock store data with the normalized store details from the lookup
+            # This ensures top-level latitude and longitude are present for the map.
+            lookup_detail = store_lookup.get(normalized_store_id) or {}
+            
             availability[normalized_store_id] = True
-            store_details[normalized_store_id] = dict(store)
+            store_details[normalized_store_id] = {
+                **lookup_detail,
+                "inventory_count": store.get("inventory_count", 1),
+                "pickup_available": store.get("pickup_available", False),
+                "delivery_available": store.get("delivery_available", False),
+                "availability_text": store.get("availability_text", "In Stock"),
+            }
 
         total_stores = len(all_store_ids)
         self._emit_progress(

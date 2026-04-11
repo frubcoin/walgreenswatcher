@@ -1,0 +1,32 @@
+﻿=== Testing CVS Resolver for https://www.cvs.com/shop/gillette-venus-comfortglide-white-tea-3-blade-razor-2-razor-blade-refills-prodid-1010317?skuId=482401&cgaa=QWxsb3dHb29nbGVUb0FjY2Vzc0NWU1BhZ2Vz ===
+2026-04-11 02:11:19,075 - cvs_product_resolver - INFO - CVS resolver attempting Scrapling fetch via 140.233.248.195:61234
+2026-04-11 02:11:20,853 - scrapling - ERROR - No Cloudflare challenge found.
+2026-04-11 02:11:20,870 - scrapling - INFO - Fetched (403) <GET https://www.cvs.com/shop/gillette-venus-comfortglide-white-tea-3-blade-razor-2-razor-blade-refills-prodid-1010317?skuId=482401&cgaa=QWxsb3dHb29nbGVUb0FjY2Vzc0NWU1BhZ2Vz> (referer: https://www.google.com/)
+2026-04-11 02:11:20,879 - cvs_product_resolver - WARNING - CVS resolver blocked (HTTP 403) via 140.233.248.195:61234
+2026-04-11 02:11:21,014 - cvs_product_resolver - INFO - CVS resolver attempting Scrapling fetch via 155.117.149.186:61232
+2026-04-11 02:11:23,178 - scrapling - ERROR - No Cloudflare challenge found.
+2026-04-11 02:11:23,196 - scrapling - INFO - Fetched (403) <GET https://www.cvs.com/shop/gillette-venus-comfortglide-white-tea-3-blade-razor-2-razor-blade-refills-prodid-1010317?skuId=482401&cgaa=QWxsb3dHb29nbGVUb0FjY2Vzc0NWU1BhZ2Vz> (referer: https://www.google.com/)
+2026-04-11 02:11:23,203 - cvs_product_resolver - WARNING - CVS resolver blocked (HTTP 403) via 155.117.149.186:61232
+2026-04-11 02:11:23,320 - cvs_product_resolver - INFO - CVS resolver attempting Scrapling fetch via 154.16.13.115:61234
+2026-04-11 02:11:25,650 - scrapling - ERROR - No Cloudflare challenge found.
+2026-04-11 02:11:25,667 - scrapling - INFO - Fetched (403) <GET https://www.cvs.com/shop/gillette-venus-comfortglide-white-tea-3-blade-razor-2-razor-blade-refills-prodid-1010317?skuId=482401&cgaa=QWxsb3dHb29nbGVUb0FjY2Vzc0NWU1BhZ2Vz> (referer: https://www.google.com/)
+2026-04-11 02:11:25,676 - cvs_product_resolver - WARNING - CVS resolver blocked (HTTP 403) via 154.16.13.115:61234
+2026-04-11 02:11:25,791 - cvs_product_resolver - INFO - CVS resolver attempting Scrapling fetch via 45.45.154.91:61234
+2026-04-11 02:11:27,629 - scrapling - ERROR - No Cloudflare challenge found.
+2026-04-11 02:11:27,645 - scrapling - INFO - Fetched (403) <GET https://www.cvs.com/shop/gillette-venus-comfortglide-white-tea-3-blade-razor-2-razor-blade-refills-prodid-1010317?skuId=482401&cgaa=QWxsb3dHb29nbGVUb0FjY2Vzc0NWU1BhZ2Vz> (referer: https://www.google.com/)
+2026-04-11 02:11:27,654 - cvs_product_resolver - WARNING - CVS resolver blocked (HTTP 403) via 45.45.154.91:61234
+2026-04-11 02:11:27,765 - cvs_product_resolver - INFO - CVS resolver attempting Scrapling fetch via direct server IP
+2026-04-11 02:11:29,325 - scrapling - ERROR - No Cloudflare challenge found.
+2026-04-11 02:11:29,343 - scrapling - INFO - Fetched (403) <GET https://www.cvs.com/shop/gillette-venus-comfortglide-white-tea-3-blade-razor-2-razor-blade-refills-prodid-1010317?skuId=482401&cgaa=QWxsb3dHb29nbGVUb0FjY2Vzc0NWU1BhZ2Vz> (referer: https://www.google.com/)
+2026-04-11 02:11:29,352 - cvs_product_resolver - WARNING - CVS resolver blocked (HTTP 403) via direct server IP
+
+SUCCESS!
+{
+  "retailer": "cvs",
+  "product_id": "1010317",
+  "article_id": "1010317",
+  "planogram": "1010317",
+  "name": "Gillette Venus Comfortglide White Tea 3 Blade Razor 2 Razor Blade Refills",
+  "image_url": "",
+  "canonical_url": "https://www.cvs.com/shop/gillette-venus-comfortglide-white-tea-3-blade-razor-2-razor-blade-refills-prodid-1010317?skuId=482401&cgaa=QWxsb3dHb29nbGVUb0FjY2Vzc0NWU1BhZ2Vz"
+}
