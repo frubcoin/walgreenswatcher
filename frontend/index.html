@@ -2264,6 +2264,54 @@
       color: var(--text-muted);
     }
 
+    .inline-status-spinner,
+    .link-add-status-spinner {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .inline-status-spinner[hidden],
+    .link-add-status-spinner[hidden] {
+      display: none;
+    }
+
+    .inline-status-spinner .lds-spinner,
+    .link-add-status-spinner .lds-spinner {
+      transform: scale(0.45);
+      transform-origin: center;
+    }
+
+    .link-add-status {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      min-height: 20px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .link-add-status.is-visible {
+      display: inline-flex;
+    }
+
+    .link-add-status.is-success {
+      color: #82e3ac;
+    }
+
+    .link-add-status.is-error {
+      color: #ff98aa;
+    }
+
+    .link-add-status.is-info {
+      color: var(--text-secondary);
+    }
+
     .toggle-row {
       display: flex;
       align-items: center;
@@ -6495,7 +6543,25 @@
               <ul class="onboarding-step-list" id="onboarding-step-list"></ul>
             </div>
             <div id="onboarding-step-form" class="onboarding-step-form" hidden></div>
-            <div id="onboarding-inline-status" class="onboarding-inline-status" aria-live="polite"></div>
+            <div id="onboarding-inline-status" class="onboarding-inline-status" aria-live="polite">
+              <span id="onboarding-inline-status-spinner" class="inline-status-spinner" aria-hidden="true" hidden>
+                <div class="lds-spinner">
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                </div>
+              </span>
+              <span id="onboarding-inline-status-text"></span>
+            </div>
           </div>
           <div class="onboarding-actions">
             <div class="onboarding-actions-group">
@@ -6911,6 +6977,25 @@
               the product metadata and image automatically. If you enter a custom name, that label will be
               used everywhere in the app and Discord alerts.</div>
             <button class="btn btn-primary" type="button" data-action="add-product">+ Add Product From Link</button>
+            <div id="product-add-status" class="link-add-status" aria-live="polite">
+              <span id="product-add-status-spinner" class="link-add-status-spinner" aria-hidden="true" hidden>
+                <div class="lds-spinner">
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                </div>
+              </span>
+              <span id="product-add-status-text"></span>
+            </div>
 
             <div class="trending-products-panel">
               <div class="trending-products-header">
@@ -7102,9 +7187,12 @@
     let onboardingStepIndex = 0;
     let onboardingAutoPrompted = false;
     let onboardingDraft = null;
-    let onboardingFeedback = { message: '', type: 'info' };
+    let onboardingFeedback = { message: '', type: 'info', loading: false };
     let onboardingBusy = false;
+    let onboardingBusyLabel = '';
     let onboardingProductsAddedCount = 0;
+    let productAddBusy = false;
+    let productAddBusyLabel = '';
     let deferredInstallPrompt = null;
     let installDisplayModeQueries = [];
     let shellScrollbarFrame = 0;
@@ -8024,12 +8112,43 @@
       return onboardingDraft;
     }
 
-    function setOnboardingFeedback(message = '', type = 'info') {
-      onboardingFeedback = { message, type };
+    function setOnboardingFeedback(message = '', type = 'info', options = {}) {
+      const loading = Boolean(options.loading);
+      onboardingFeedback = { message, type, loading };
       const node = document.getElementById('onboarding-inline-status');
       if (!node) return;
-      node.textContent = message;
+      const textNode = document.getElementById('onboarding-inline-status-text');
+      const spinnerNode = document.getElementById('onboarding-inline-status-spinner');
+      if (textNode) textNode.textContent = message;
+      if (spinnerNode) spinnerNode.hidden = !loading;
       node.className = `onboarding-inline-status${message ? ` is-${type}` : ''}`;
+    }
+
+    function setProductAddUiState({ busy = false, label = '', message = '', tone = 'info', loading = false } = {}) {
+      productAddBusy = Boolean(busy);
+      productAddBusyLabel = productAddBusy ? String(label || '').trim() : '';
+
+      const urlInput = document.getElementById('new-product-url');
+      const nameInput = document.getElementById('new-product-name');
+      const button = document.querySelector('[data-action="add-product"]');
+      const statusNode = document.getElementById('product-add-status');
+      const statusTextNode = document.getElementById('product-add-status-text');
+      const spinnerNode = document.getElementById('product-add-status-spinner');
+
+      [urlInput, nameInput, button].forEach(node => {
+        if (node) node.disabled = productAddBusy;
+      });
+
+      if (button) {
+        button.textContent = productAddBusy ? (productAddBusyLabel || 'Working...') : '+ Add Product From Link';
+        button.setAttribute('aria-busy', productAddBusy ? 'true' : 'false');
+      }
+
+      if (statusTextNode) statusTextNode.textContent = message;
+      if (spinnerNode) spinnerNode.hidden = !loading;
+      if (statusNode) {
+        statusNode.className = `link-add-status${message ? ' is-visible' : ''}${message ? ` is-${tone}` : ''}`;
+      }
     }
 
     function syncOnboardingDraftFromCurrentStep() {
@@ -8320,11 +8439,20 @@
             }
           });
         }
+
+        if (onboardingBusy) {
+          formNode.querySelectorAll('input, textarea, select, button').forEach(node => {
+            node.disabled = true;
+          });
+        }
       }
       if (backButton) backButton.disabled = onboardingBusy || onboardingStepIndex === 0;
       if (nextButton) {
         nextButton.disabled = onboardingBusy;
-        nextButton.textContent = onboardingBusy ? 'Saving...' : (step.nextLabel || (onboardingStepIndex === steps.length - 1 ? 'Finish' : 'Next step'));
+        nextButton.textContent = onboardingBusy
+          ? ((step.tag === 'Product' && onboardingBusyLabel) ? onboardingBusyLabel : 'Saving...')
+          : (step.nextLabel || (onboardingStepIndex === steps.length - 1 ? 'Finish' : 'Next step'));
+        nextButton.setAttribute('aria-busy', onboardingBusy ? 'true' : 'false');
       }
       if (jumpButton) {
         jumpButton.hidden = !step.action;
@@ -8335,7 +8463,7 @@
         skipButton.disabled = onboardingBusy;
         skipButton.textContent = onboardingStepIndex === steps.length - 1 ? 'Close' : 'Skip guide';
       }
-      setOnboardingFeedback(onboardingFeedback.message, onboardingFeedback.type);
+      setOnboardingFeedback(onboardingFeedback.message, onboardingFeedback.type, { loading: onboardingFeedback.loading });
     }
 
     function syncModalBodyState() {
@@ -8443,6 +8571,7 @@
         return;
       }
 
+      onboardingBusyLabel = '';
       onboardingBusy = true;
       renderOnboarding();
       let result = false;
@@ -8450,6 +8579,7 @@
         result = await step.onNext();
       } finally {
         onboardingBusy = false;
+        onboardingBusyLabel = '';
       }
 
       if (result === false) {
@@ -8575,8 +8705,12 @@
         return false;
       }
 
+      onboardingBusyLabel = 'Resolving Link...';
+      setOnboardingFeedback('Resolving product details from that link...', 'info', { loading: true });
+      renderOnboarding();
       const resolved = await apiCall('/api/products/resolve', 'POST', { url });
       if (!resolved) {
+        onboardingBusyLabel = '';
         setOnboardingFeedback('That link did not resolve. Double-check the product URL.', 'error');
         return false;
       }
@@ -8584,8 +8718,12 @@
       const payload = { url };
       if (customName) payload.name = customName;
 
+      onboardingBusyLabel = 'Adding Product...';
+      setOnboardingFeedback(`Adding ${customName || resolved.name || 'product'} to your tracker...`, 'info', { loading: true });
+      renderOnboarding();
       const result = await apiCall('/api/products/add', 'POST', payload);
       if (!result) {
+        onboardingBusyLabel = '';
         setOnboardingFeedback('The product could not be added right now. Try again in a moment.', 'error');
         return false;
       }
@@ -8601,6 +8739,7 @@
       document.getElementById('new-product-name').value = '';
       await loadSettings();
       latestStatusSnapshot = await loadStatus();
+      onboardingBusyLabel = '';
       setOnboardingFeedback(`Added ${customName || resolved.name}. Add another product or continue to launch.`, 'success');
       return 'stay';
     }
@@ -12989,6 +13128,8 @@
     }
 
     async function addProduct() {
+      if (productAddBusy) return;
+
       const url = document.getElementById('new-product-url').value.trim();
       const customName = document.getElementById('new-product-name').value.trim();
 
@@ -12997,23 +13138,43 @@
         return;
       }
 
-      const resolved = await apiCall('/api/products/resolve', 'POST', { url });
-      if (!resolved) {
-        showToast('Could not read product details from that link', 'error');
-        return;
-      }
+      try {
+        setProductAddUiState({
+          busy: true,
+          label: 'Resolving Link...',
+          message: 'Resolving product details from that link...',
+          tone: 'info',
+          loading: true
+        });
 
-      const payload = { url };
-      if (customName) payload.name = customName;
+        const resolved = await apiCall('/api/products/resolve', 'POST', { url });
+        if (!resolved) {
+          showToast('Could not read product details from that link', 'error');
+          return;
+        }
 
-      const result = await apiCall('/api/products/add', 'POST', payload);
-      if (result) {
-        showToast(`Added ${customName || resolved.name}`, 'success');
-        document.getElementById('new-product-url').value = '';
-        document.getElementById('new-product-name').value = '';
-        await loadSettings();
-      } else {
-        showToast('Failed to add product', 'error');
+        const payload = { url };
+        if (customName) payload.name = customName;
+
+        setProductAddUiState({
+          busy: true,
+          label: 'Adding Product...',
+          message: `Adding ${customName || resolved.name || 'product'} to your tracker...`,
+          tone: 'info',
+          loading: true
+        });
+
+        const result = await apiCall('/api/products/add', 'POST', payload);
+        if (result) {
+          showToast(`Added ${customName || resolved.name}`, 'success');
+          document.getElementById('new-product-url').value = '';
+          document.getElementById('new-product-name').value = '';
+          await loadSettings();
+        } else {
+          showToast('Failed to add product', 'error');
+        }
+      } finally {
+        setProductAddUiState();
       }
     }
 
