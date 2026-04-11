@@ -2,14 +2,29 @@
 
 from __future__ import annotations
 
+import logging
+import re
 from typing import Dict
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from ace import AceBrowserClient
+
+logger = logging.getLogger(__name__)
 
 
 class AceProductResolver:
     """Resolve Ace product URLs into normalized product metadata."""
+
+    @staticmethod
+    def _slug_fallback_name(product_link: str) -> str:
+        path = urlparse(str(product_link or "").strip()).path or ""
+        parts = [p for p in path.split("/") if p and not re.fullmatch(r"\d+", p) and p.lower() != "p"]
+        if parts:
+            slug = unquote(parts[-1]).replace("-", " ").strip()
+            slug = re.sub(r"\s+", " ", slug)
+            if slug:
+                return slug.title()
+        return "Ace Hardware Product"
 
     @classmethod
     def resolve_product_link(cls, product_link: str) -> Dict[str, str]:
@@ -21,15 +36,12 @@ class AceProductResolver:
         if hostname != "www.acehardware.com" and hostname != "acehardware.com":
             raise ValueError("Ace Hardware product links must point to acehardware.com")
 
-        context = AceBrowserClient.fetch_product_context(normalized)
-        product = dict(context.get("product") or {})
-        product_id = str(product.get("product_id") or AceBrowserClient.extract_product_id(normalized)).strip()
-        name = str(product.get("name") or "").strip()
-        image_url = str(product.get("image_url") or "").strip()
-        canonical_url = str(product.get("canonical_url") or AceBrowserClient.canonical_product_url(normalized)).strip()
-
-        if not product_id or not name:
-            raise ValueError("Ace product metadata was incomplete for this link")
+        product_id = AceBrowserClient.extract_product_id(normalized)
+        if not product_id:
+            raise ValueError("Ace Hardware product metadata was incomplete for this link")
+            
+        name = cls._slug_fallback_name(normalized)
+        canonical_url = AceBrowserClient.canonical_product_url(normalized)
 
         return {
             "retailer": "ace",
@@ -37,6 +49,6 @@ class AceProductResolver:
             "article_id": product_id,
             "planogram": product_id,
             "name": name,
-            "image_url": image_url,
+            "image_url": "",
             "canonical_url": canonical_url or normalized,
         }
