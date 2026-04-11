@@ -80,7 +80,14 @@ function normalizeCvsImageUrl(rawValue) {
         if (value.startsWith('/')) {
             return new URL(value, 'https://www.cvs.com').toString();
         }
-        return new URL(value, 'https://www.cvs.com').toString();
+        const parsed = new URL(value, 'https://www.cvs.com');
+        if (
+            ['localhost', '127.0.0.1', '0.0.0.0'].includes(String(parsed.hostname || '').toLowerCase()) &&
+            String(parsed.pathname || '').toLowerCase().startsWith('/bizcontent/merchandising/productimages/')
+        ) {
+            return new URL(parsed.pathname, 'https://www.cvs.com').toString();
+        }
+        return parsed.toString();
     } catch {
         return '';
     }

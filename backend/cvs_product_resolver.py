@@ -72,6 +72,13 @@ class CvsProductResolver:
             return f"https:{normalized}"
         if normalized.startswith("/"):
             return f"https://www.cvs.com{normalized}"
+        parsed = urlparse(normalized)
+        hostname = (parsed.hostname or "").lower()
+        if (
+            hostname in {"localhost", "127.0.0.1", "0.0.0.0"}
+            and str(parsed.path or "").lower().startswith("/bizcontent/merchandising/productimages/")
+        ):
+            return f"https://www.cvs.com{parsed.path}"
         return normalized
 
     @staticmethod

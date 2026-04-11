@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import time
 from typing import Any, Dict, Iterable, List
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urlsplit, urlparse
 
 import requests
 try:
@@ -124,6 +124,24 @@ class CvsStockChecker:
         if parsed.port:
             return f"{parsed.hostname}:{parsed.port}"
         return parsed.hostname
+
+    @staticmethod
+    def _normalize_extracted_image_url(value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            return ""
+        if normalized.startswith("//"):
+            return f"https:{normalized}"
+        if normalized.startswith("/"):
+            return f"https://www.cvs.com{normalized}"
+        parsed = urlparse(normalized)
+        hostname = (parsed.hostname or "").lower()
+        if (
+            hostname in {"localhost", "127.0.0.1", "0.0.0.0"}
+            and str(parsed.path or "").lower().startswith("/bizcontent/merchandising/productimages/")
+        ):
+            return f"https://www.cvs.com{parsed.path}"
+        return normalized
 
     @staticmethod
     def _convert_proxy_format(proxy_url: str) -> str:
@@ -968,7 +986,7 @@ class CvsStockChecker:
                 + (f": {snippet}" if snippet else "")
             ) from exc
 
-        extracted_image_url = str(result.get("image_url") or "").strip()
+        extracted_image_url = self._normalize_extracted_image_url(str(result.get("image_url") or "").strip())
         if extracted_image_url:
             self._last_extracted_image_url = extracted_image_url
 
