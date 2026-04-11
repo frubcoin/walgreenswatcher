@@ -480,100 +480,41 @@ async ({ lat, lng, radius, headers }) => {
         return items
 
     @staticmethod
-    def _seed_store_context(page: Any, store_code: str) -> None:
-        page.evaluate(
-            """
-(code) => {
-  sessionStorage.setItem('myStoreCode', JSON.stringify({ value: code, expirationDate: null }));
-  for (const key of Object.keys(localStorage)) {
-    if (key.startsWith('cache-8-')) {
-      localStorage.removeItem(key);
-    }
-  }
+    def _browser_fetch_location_inventory(page: Any, product_id: str, location_codes: List[str]) -> List[Dict[str, Any]]:
+        batch_size = 20
+        all_items = []
+        for i in range(0, len(location_codes), batch_size):
+            chunk = location_codes[i:i+batch_size]
+            codes_str = ",".join(chunk)
+            payload = page.evaluate(
+                """
+async ({ pid, codes, headers }) => {
+  const url = `/api/commerce/catalog/storefront/products/${pid}/locationInventory?locationCodes=${codes}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    credentials: 'include',
+    headers,
+  });
+  const contentType = response.headers.get('content-type') || '';
+  const text = await response.text();
+  return { ok: response.ok, status: response.status, contentType, text };
 }
-            """,
-            store_code,
-        )
-
-    @classmethod
-    def _open_nearby_store_tray(cls, page: Any) -> None:
-        for selector in ("text=Get it at", "text=CHECK NEARBY STORES", "text=Check Nearby Stores"):
+                """,
+                {
+                    "pid": product_id,
+                    "codes": codes_str,
+                    "headers": ACE_DEFAULT_HEADERS,
+                },
+            )
+            if not payload.get("ok"):
+                 continue
             try:
-                locator = page.locator(selector).first
-                if locator.is_visible(timeout=1500):
-                    if cls._human_click_locator(page, locator):
-                        cls._human_pause(page, 1700, 2800)
-                        return
-            except Exception:
-                continue
-        raise AceBrowserError("Ace nearby-store button was not found on the product page")
-
-    @staticmethod
-    def _extract_nearby_store_cards(page: Any) -> List[str]:
-        cards = page.evaluate(
-            """
-() => Array.from(document.querySelectorAll('#storeLocationTray .store-card-wrapper'))
-  .map(el => (el.innerText || '').trim())
-  .filter(Boolean)
-            """
-        )
-        return cards if isinstance(cards, list) else []
-
-    @classmethod
-    def _parse_store_card_blocks(
-        cls,
-        blocks: List[str],
-        store_lookup: Dict[str, Dict[str, Any]],
-    ) -> Dict[str, Dict[str, Any]]:
-        results: Dict[str, Dict[str, Any]] = {}
-        index_by_match: Dict[str, Dict[str, Any]] = {
-            cls._normalize_match_key(store.get("name", ""), store.get("address", "")): store
-            for store in store_lookup.values()
-        }
-
-        for block in blocks:
-            lines = [line.strip() for line in str(block or "").splitlines() if str(line or "").strip()]
-            if len(lines) < 4:
-                continue
-            name = lines[0]
-            address = ", ".join(lines[1:3])
-            distance = None
-            status_line = ""
-            for line in lines[3:]:
-                lowered = line.lower()
-                if distance is None and re.fullmatch(r"\d+(?:\.\d+)?\s*mi", lowered):
-                    try:
-                        distance = float(lowered.replace("mi", "").strip())
-                    except ValueError:
-                        distance = None
-                if "in stock" in lowered or "unavailable" in lowered or "out of stock" in lowered:
-                    status_line = line
-            if "in stock" not in status_line.lower():
-                continue
-
-            matched = index_by_match.get(cls._normalize_match_key(name, address))
-            if not matched:
-                matched = next(
-                    (
-                        store
-                        for store in store_lookup.values()
-                        if store.get("name") == name and address.lower().endswith(store.get("address", "").lower().split(", ", 1)[-1])
-                    ),
-                    None,
-                )
-            if not matched:
-                continue
-
-            store_id = str(matched.get("store_id") or "").strip()
-            if not store_id:
-                continue
-            results[store_id] = {
-                **matched,
-                "distance": distance,
-                "inventory_count": 1,
-                "availability_text": status_line,
-            }
-        return results
+                data = json.loads(payload.get("text") or "{}")
+                all_items.extend(data.get("items") or [])
+            except ValueError:
+                pass
+                
+        return all_items
 
     @classmethod
     def fetch_product_context(
@@ -617,8 +558,6 @@ async ({ lat, lng, radius, headers }) => {
                         nonlocal debug_screenshot
                         cls._maybe_dismiss_cookie_banner(page)
                         cls._humanize_page(page)
-                        cls._maybe_click_view_details(page)
-                        cls._humanize_page(page)
 
                         context["product"] = cls.extract_product_metadata(page, product_url)
                         context["cookies"] = [dict(cookie) for cookie in page.context.cookies()]
@@ -635,21 +574,25 @@ async ({ lat, lng, radius, headers }) => {
                         if not store_lookup:
                             raise AceBrowserError("Ace did not return any store candidates for that ZIP")
 
-                        nearest_store_code = next(iter(store_lookup.keys()))
-                        cls._seed_store_context(page, nearest_store_code)
-                        page.goto(cls.product_url_with_main_pdp(product_url) or product_url, timeout=ACE_BROWSER_TIMEOUT_MS)
-                        page.wait_for_timeout(2500)
-                        cls._maybe_dismiss_cookie_banner(page)
-                        cls._humanize_page(page)
-                        cls._maybe_click_view_details(page)
-                        cls._humanize_page(page)
-                        cls._open_nearby_store_tray(page)
-                        cards = cls._extract_nearby_store_cards(page)
-                        if not cards:
-                            debug_screenshot = cls.save_debug_screenshot(page, "ace_nearby_tray_empty")
-                            raise AceBrowserError("Ace nearby-store tray opened but did not contain store cards")
-                        context["store_cards"] = cards
-                        context["stores"] = cls._parse_store_card_blocks(cards, store_lookup)
+                        inventory_items = cls._browser_fetch_location_inventory(
+                            page,
+                            context["product"]["product_id"],
+                            list(store_lookup.keys())
+                        )
+
+                        stores_result = {}
+                        for item in inventory_items:
+                            loc_code = str(item.get("locationCode") or "").strip()
+                            stock = int(item.get("stockAvailable") or 0)
+                            if loc_code and stock > 0 and loc_code in store_lookup:
+                                matched = store_lookup[loc_code]
+                                stores_result[loc_code] = {
+                                    **matched,
+                                    "inventory_count": stock,
+                                    "availability_text": f"In Stock: {stock}"
+                                }
+
+                        context["stores"] = stores_result
 
                     response = session.fetch(product_url, page_action=action)
                     if response.status >= 400:
