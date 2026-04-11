@@ -479,62 +479,7 @@ async ({ lat, lng, radius, headers }) => {
             raise AceBrowserError("Ace browser store lookup did not return any nearby stores")
         return items
 
-    @staticmethod
-    def _browser_fetch_location_inventory(page: Any, product_id: str, location_codes: List[str]) -> List[Dict[str, Any]]:
-        batch_size = 20
-        all_items = []
-        for i in range(0, len(location_codes), batch_size):
-            chunk = location_codes[i:i+batch_size]
-            codes_str = ",".join(chunk)
-            payload = page.evaluate(
-                """
-async ({ pid, codes, headers }) => {
-  const url = `/api/commerce/catalog/storefront/products/${pid}/locationInventory?locationCodes=${codes}`;
-  const response = await fetch(url, {
-    method: 'GET',
-    credentials: 'include',
-    headers,
-  });
-  const contentType = response.headers.get('content-type') || '';
-  const text = await response.text();
-  return { ok: response.ok, status: response.status, contentType, text };
-}
-                """,
-                {
-                    "pid": product_id,
-                    "codes": codes_str,
-                    "headers": ACE_DEFAULT_HEADERS,
-                },
-            )
-            if not payload.get("ok"):
-                logger.warning(
-                    "Ace locationInventory returned HTTP %s for codes %s (pid=%s)",
-                    payload.get("status"), codes_str[:80], product_id,
-                )
-                continue
-            try:
-                data = json.loads(payload.get("text") or "{}")
-                items_chunk = data.get("items") or []
-                if items_chunk:
-                    # Log the first item's keys so we know the real field names
-                    logger.debug(
-                        "Ace locationInventory sample item keys (pid=%s): %s",
-                        product_id, list((items_chunk[0] or {}).keys()),
-                    )
-                else:
-                    logger.warning(
-                        "Ace locationInventory returned 0 items for codes %s (pid=%s); raw=%s",
-                        codes_str[:80], product_id, (payload.get("text") or "")[:300],
-                    )
-                all_items.extend(items_chunk)
-            except ValueError:
-                logger.warning(
-                    "Ace locationInventory returned non-JSON for codes %s (pid=%s): %s",
-                    codes_str[:80], product_id, (payload.get("text") or "")[:200],
-                )
-                pass
-                
-        return all_items
+
 
     @classmethod
     def fetch_product_context(
