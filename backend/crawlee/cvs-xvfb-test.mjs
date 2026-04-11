@@ -48,6 +48,13 @@ const apiKey = String(process.env.CVS_XVFB_API_KEY || process.env.CVS_API_KEY ||
 
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
+function randomInt(min, max) {
+    const safeMin = Math.ceil(Number(min) || 0);
+    const safeMax = Math.floor(Number(max) || safeMin);
+    if (safeMax <= safeMin) return safeMin;
+    return Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin;
+}
+
 function parseCsv(value) {
     return String(value || '')
         .split(/[\r\n,;]+/)
@@ -277,6 +284,29 @@ function findLinuxChromiumExecutable() {
 }
 
 async function clickCheckMoreStores(page) {
+    const selectors = [
+        'button:has-text("Check more stores")',
+        'a:has-text("Check more stores")',
+        '[role="button"]:has-text("Check more stores")',
+        'text=Check more stores',
+    ];
+
+    for (const selector of selectors) {
+        try {
+            const locator = page.locator(selector).first();
+            if (!(await locator.isVisible({ timeout: 1500 }).catch(() => false))) continue;
+            await locator.scrollIntoViewIfNeeded().catch(() => {});
+            await page.waitForTimeout(randomInt(140, 320));
+            await locator.hover({ timeout: 2000 }).catch(() => {});
+            await page.waitForTimeout(randomInt(120, 260));
+            await locator.click({ timeout: 5000 });
+            await page.waitForTimeout(randomInt(450, 900));
+            return true;
+        } catch {
+            continue;
+        }
+    }
+
     const clicked = await page.evaluate(() => {
         for (const selector of ['a', 'button', 'span', '[role="button"]', 'div']) {
             for (const element of document.querySelectorAll(selector)) {
@@ -290,14 +320,7 @@ async function clickCheckMoreStores(page) {
         }
         return false;
     });
-    if (clicked) return true;
-
-    try {
-        await page.getByText('Check more stores', { exact: false }).first().click({ timeout: 8000 });
-        return true;
-    } catch {
-        return false;
-    }
+    return Boolean(clicked);
 }
 
 async function submitDialogSearch(page) {
@@ -328,10 +351,29 @@ async function submitDialogSearch(page) {
     });
 }
 
+async function humanizePage(page) {
+    try {
+        const viewport = page.viewportSize() || { width: 1920, height: 1080 };
+        await page.mouse.move(randomInt(160, 380), randomInt(120, 260), { steps: randomInt(10, 22) });
+        await page.waitForTimeout(randomInt(160, 320));
+        await page.mouse.wheel(0, randomInt(260, 520));
+        await page.waitForTimeout(randomInt(180, 340));
+        await page.mouse.move(
+            randomInt(Math.floor(viewport.width / 3), Math.max(Math.floor(viewport.width / 3), viewport.width - 180)),
+            randomInt(160, Math.max(220, viewport.height - 220)),
+            { steps: randomInt(10, 24) },
+        );
+        await page.waitForTimeout(randomInt(120, 260));
+        await page.mouse.wheel(0, -randomInt(120, 260));
+        await page.waitForTimeout(randomInt(180, 320));
+    } catch {}
+}
+
 async function runAttempt(proxyConfig) {
     const executablePath = findLinuxChromiumExecutable();
     const launchOptions = {
         headless,
+        ...(proxyConfig ? { proxy: proxyConfig } : {}),
         args: [
             '--disable-blink-features=AutomationControlled',
             '--no-sandbox',
@@ -355,7 +397,6 @@ async function runAttempt(proxyConfig) {
 
     const browser = await chromium.launch(launchOptions);
     const context = await browser.newContext({
-        ...(proxyConfig ? { proxy: proxyConfig } : {}),
         viewport: { width: 1920, height: 1080 },
         userAgent: WINDOWS_USER_AGENT,
         locale: 'en-US',
@@ -524,11 +565,16 @@ async function runAttempt(proxyConfig) {
             console.log(`[page] product image=${extractedImageUrl}`);
         }
 
+        await humanizePage(page);
         await page.evaluate(() => window.scrollTo(0, 600));
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(randomInt(1200, 2200));
 
         buttonClicked = await clickCheckMoreStores(page);
         if (!buttonClicked) {
+            const refreshedChallenge = detectChallenge(await page.content().catch(() => ''));
+            if (refreshedChallenge) {
+                pageChallenge = refreshedChallenge;
+            }
             const screenshotPath = path.join(OUTPUT_DIR, `debug_nobutton_${Date.now()}.png`);
             await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
             const reason = pageChallenge ? `; page challenge detected: ${pageChallenge}` : '';
@@ -542,12 +588,15 @@ async function runAttempt(proxyConfig) {
         console.log(`[dialog] input id="${inputId}"`);
 
         await page.click(inputSel);
+        await page.waitForTimeout(randomInt(120, 260));
         await page.keyboard.press('Control+A');
+        await page.waitForTimeout(randomInt(60, 140));
         await page.keyboard.press('Backspace');
+        await page.waitForTimeout(randomInt(80, 180));
         await page.type(inputSel, targetZip, { delay: 80 });
         console.log(`[dialog] typed zip=${targetZip}`);
 
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(randomInt(350, 700));
 
         const searchClicked = await submitDialogSearch(page);
         if (searchClicked) {

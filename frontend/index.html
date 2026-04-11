@@ -9120,6 +9120,14 @@
       );
     }
 
+    function isAllowedAceHost(hostname) {
+      const normalized = String(hostname || '').trim().toLowerCase();
+      return Boolean(normalized) && (
+        normalized === 'acehardware.com' ||
+        normalized.endsWith('.acehardware.com')
+      );
+    }
+
     function isAllowedFiveBelowImageHost(hostname) {
       const normalized = String(hostname || '').trim().toLowerCase();
       return Boolean(normalized) && (
@@ -9128,13 +9136,22 @@
       );
     }
 
+    function isAllowedAceImageHost(hostname) {
+      const normalized = String(hostname || '').trim().toLowerCase();
+      return Boolean(normalized) && (
+        isAllowedAceHost(normalized) ||
+        normalized === 'mozu.com' ||
+        normalized.endsWith('.mozu.com')
+      );
+    }
+
     function isAllowedProductSourceHost(hostname) {
-      return isAllowedWalgreensHost(hostname) || isAllowedCvsHost(hostname) || isAllowedFiveBelowHost(hostname);
+      return isAllowedWalgreensHost(hostname) || isAllowedCvsHost(hostname) || isAllowedFiveBelowHost(hostname) || isAllowedAceHost(hostname);
     }
 
     function isAllowedProductImageHost(hostname) {
       const normalized = String(hostname || '').trim().toLowerCase();
-      return isAllowedProductSourceHost(normalized) || isAllowedFiveBelowImageHost(normalized);
+      return isAllowedProductSourceHost(normalized) || isAllowedFiveBelowImageHost(normalized) || isAllowedAceImageHost(normalized);
     }
 
     function sanitizeHttpUrl(value, { hostValidator = null } = {}) {
@@ -9163,6 +9180,7 @@
       const normalized = String(retailer || '').trim().toLowerCase();
       if (normalized === 'cvs') return 'cvs';
       if (normalized === 'fivebelow') return 'fivebelow';
+      if (normalized === 'ace') return 'ace';
       return 'walgreens';
     }
 
@@ -9172,6 +9190,8 @@
           return 'CVS';
         case 'fivebelow':
           return 'Five Below';
+        case 'ace':
+          return 'Ace Hardware';
         default:
           return 'Walgreens';
       }
@@ -9183,6 +9203,8 @@
           return '/icons/cvs.svg';
         case 'fivebelow':
           return '/icons/fivebelow.svg';
+        case 'ace':
+          return '/icons/Ace_Hardware.svg';
         default:
           return '/icons/walgreens.png';
       }

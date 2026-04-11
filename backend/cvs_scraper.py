@@ -425,16 +425,25 @@ class CvsStockChecker:
     def _playwright_node_bin() -> str:
         return os.getenv("CVS_PLAYWRIGHT_NODE_BIN", "node").strip() or "node"
 
-    @staticmethod
-    def _playwright_node_timeout_seconds() -> int:
+    @classmethod
+    def _playwright_node_timeout_seconds(cls) -> int:
         raw = os.getenv("CVS_PLAYWRIGHT_NODE_TIMEOUT_SECONDS", "").strip()
+        default_timeout_seconds = 180
         if not raw:
-            return 90
+            timeout_seconds = default_timeout_seconds
+        else:
+            try:
+                timeout_seconds = int(raw)
+            except ValueError:
+                timeout_seconds = default_timeout_seconds
+
+        configured_proxy_count = len(cls._configured_proxy_urls()) or 1
+        recommended_timeout_seconds = max(60, min(480, configured_proxy_count * 45))
+        timeout_seconds = max(timeout_seconds, recommended_timeout_seconds)
         try:
-            timeout_seconds = int(raw)
-        except ValueError:
-            return 90
-        return max(20, min(timeout_seconds, 300))
+            return max(60, min(int(timeout_seconds), 480))
+        except (TypeError, ValueError):
+            return default_timeout_seconds
 
     @staticmethod
     def _playwright_node_script_path() -> Path:

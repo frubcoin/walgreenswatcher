@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from ace import AceBrowserClient, AceBrowserError
+from ace_scraper import AceStockChecker
 from config import (
     DEFAULT_CHECK_INTERVAL_MINUTES,
     DEFAULT_TRACKED_PRODUCTS,
@@ -68,6 +70,7 @@ class StockCheckScheduler:
         self.walgreens_checker = WalgreensStockChecker()
         self.cvs_checker = CvsStockChecker()
         self.fivebelow_checker = FiveBelowStockChecker()
+        self.ace_checker = AceStockChecker()
 
         self.notifier = DiscordNotifier([])
         self.is_running = False
@@ -125,6 +128,7 @@ class StockCheckScheduler:
         products = self.db.list_tracked_products(self.user_id)
 
         CvsStockChecker.set_proxy_urls_override(admin_settings.get("cvs_proxy_urls"))
+        AceBrowserClient.set_proxy_urls_override(admin_settings.get("cvs_proxy_urls"))
 
         if not products:
             for article_id, product in DEFAULT_TRACKED_PRODUCTS.items():
@@ -169,6 +173,8 @@ class StockCheckScheduler:
         self.cvs_checker.current_zip_code = self.current_zipcode
         self.cvs_checker.search_radius_miles = self.max_notification_distance_miles
         self.fivebelow_checker.current_zip_code = self.current_zipcode
+        self.ace_checker.current_zip_code = self.current_zipcode
+        self.ace_checker.search_radius_miles = self.max_notification_distance_miles
 
     @staticmethod
     def _validate_interval_minutes(interval_minutes: Any) -> int:
@@ -561,12 +567,18 @@ class StockCheckScheduler:
             self.cvs_checker.search_radius_miles = self.max_notification_distance_miles
             self.fivebelow_checker.progress_callback = update_progress
             self.fivebelow_checker.current_zip_code = self.current_zipcode
+            self.ace_checker.progress_callback = update_progress
+            self.ace_checker.current_zip_code = self.current_zipcode
+            self.ace_checker.search_radius_miles = self.max_notification_distance_miles
 
             walgreens_products = [
                 product for product in product_specs if product.get("retailer", "walgreens") == "walgreens"
             ]
             fivebelow_products = [
                 product for product in product_specs if product.get("retailer", "walgreens") == "fivebelow"
+            ]
+            ace_products = [
+                product for product in product_specs if product.get("retailer", "walgreens") == "ace"
             ]
             walgreens_stores: List[Dict[str, Any]] = []
             fivebelow_stores: List[Dict[str, Any]] = []
@@ -632,6 +644,15 @@ class StockCheckScheduler:
                     current_phase="stores_loaded",
                     progress_message=f"Found {len(fivebelow_stores)} Five Below stores near {self.current_zipcode}",
                     current_store="Store list ready",
+                    progress_completed_units=1.0,
+                    progress_total_units=progress_total_units,
+                )
+
+            if ace_products:
+                self._set_progress(
+                    current_phase="stores_loaded",
+                    progress_message=f"Ace checks will use the live nearby-store tray near {self.current_zipcode}",
+                    current_store="Ace browser flow ready",
                     progress_completed_units=1.0,
                     progress_total_units=progress_total_units,
                 )
@@ -712,6 +733,41 @@ class StockCheckScheduler:
                         product_index=index,
                         product_total=len(product_specs),
                     )
+                elif retailer == "ace":
+                    try:
+                        product_result = self.ace_checker.check_product_availability(
+                            product,
+                            self.current_zipcode,
+                            product_index=index,
+                            product_total=len(product_specs),
+                        )
+                        extracted_image = product_result.get("_extracted_image_url", "")
+                        if extracted_image and product.get("article_id"):
+                            try:
+                                self.db.update_product_image(
+                                    self.user_id,
+                                    product["article_id"],
+                                    image_url=extracted_image,
+                                    retailer="ace",
+                                )
+                            except Exception as img_exc:
+                                logger.warning(
+                                    "Failed to update Ace product image for %s: %s",
+                                    product_display_name,
+                                    img_exc,
+                                )
+                    except AceBrowserError as exc:
+                        logger.warning(
+                            "Ace inventory blocked or failed for user %s product %s: %s",
+                            self.user_id,
+                            product_display_name,
+                            exc,
+                        )
+                        product_result = {
+                            "availability": {},
+                            "stores": {},
+                            "location_ids": [],
+                        }
                 else:
                     raise ValueError(f"Unsupported retailer: {retailer}")
 

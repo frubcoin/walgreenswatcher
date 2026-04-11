@@ -109,6 +109,7 @@ function retailerLabel(retailer) {
   if (normalized === 'cvs') return 'CVS';
   if (normalized === 'bestbuy') return 'Best Buy';
   if (normalized === 'fivebelow') return 'Five Below';
+  if (normalized === 'ace') return 'Ace Hardware';
   return 'Walgreens';
 }
 

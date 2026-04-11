@@ -123,7 +123,12 @@ class WalgreensStockChecker:
             headers={
                 "User-Agent": random.choice(USER_AGENTS),
                 "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
                 "Content-Type": "application/json",
+                "Origin": "https://www.walgreens.com",
+                "Referer": "https://www.walgreens.com/",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
             },
             timeout=20,
         )

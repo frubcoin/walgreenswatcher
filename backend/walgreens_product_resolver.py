@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import random
 import re
 from typing import Any, Dict
+from urllib.parse import urlparse
 
 import requests
+
+from config import USER_AGENTS
 
 PRODUCT_ID_PATTERN = re.compile(r"ID=([A-Za-z0-9]+)-product", re.IGNORECASE)
 
@@ -35,16 +39,35 @@ class WalgreensProductResolver:
             raise ValueError("Could not find a Walgreens product ID in the link")
         return match.group(1)
 
+    @staticmethod
+    def _request_headers() -> Dict[str, str]:
+        return {
+            "User-Agent": random.choice(USER_AGENTS),
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Referer": "https://www.walgreens.com/",
+        }
+
     @classmethod
     def resolve_product_link(cls, product_link: str) -> Dict[str, str]:
         """Resolve a Walgreens product link into inventory metadata."""
+        product_link = str(product_link or "").strip()
+        if not product_link:
+            raise ValueError("Walgreens product URL required")
+
+        hostname = (urlparse(product_link).hostname or "").lower()
+        if hostname != "walgreens.com" and not hostname.endswith(".walgreens.com"):
+            raise ValueError("Walgreens product links must point to walgreens.com")
+
         product_id = cls.extract_product_id(product_link)
 
         response = requests.get(
             cls.PRODUCT_API_URL,
             params={"productId": product_id},
-            headers={"Accept": "application/json, text/plain, */*"},
-            timeout=20,
+            headers=cls._request_headers(),
+            timeout=(8, 20),
         )
         response.raise_for_status()
         data: Dict[str, Any] = response.json()

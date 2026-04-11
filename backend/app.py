@@ -41,6 +41,7 @@ from config import (  # noqa: E402
     SESSION_COOKIE_SECURE,
 )
 from admin_notifications import AdminAlertService  # noqa: E402
+from ace import AceBrowserClient  # noqa: E402
 from cvs_scraper import CvsStockChecker  # noqa: E402
 from database import StockDatabase, TRENDING_PRODUCTS_RETENTION_HOURS  # noqa: E402
 from product_resolver import resolve_product_link  # noqa: E402
@@ -105,6 +106,7 @@ CORS(
 db = StockDatabase()
 admin_alerts = AdminAlertService(db)
 CvsStockChecker.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
+AceBrowserClient.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
 scheduler_manager = SchedulerManager(db)
 scheduler_manager.start_enabled_schedulers()
 SERVICE_UPTIME_HEARTBEAT_SECONDS = 30
@@ -181,6 +183,20 @@ def _is_allowed_fivebelow_image_host(hostname: str) -> bool:
     )
 
 
+def _is_allowed_ace_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return bool(normalized) and (normalized == "acehardware.com" or normalized.endswith(".acehardware.com"))
+
+
+def _is_allowed_ace_image_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return bool(normalized) and (
+        _is_allowed_ace_host(normalized)
+        or normalized == "mozu.com"
+        or normalized.endswith(".mozu.com")
+    )
+
+
 
 
 
@@ -189,12 +205,17 @@ def _is_allowed_product_source_host(hostname: str) -> bool:
         _is_allowed_walgreens_host(hostname)
         or _is_allowed_cvs_host(hostname)
         or _is_allowed_fivebelow_host(hostname)
+        or _is_allowed_ace_host(hostname)
     )
 
 
 def _is_allowed_product_image_host(hostname: str) -> bool:
     normalized = str(hostname or "").strip().lower()
-    return _is_allowed_product_source_host(normalized) or _is_allowed_fivebelow_image_host(normalized)
+    return (
+        _is_allowed_product_source_host(normalized)
+        or _is_allowed_fivebelow_image_host(normalized)
+        or _is_allowed_ace_image_host(normalized)
+    )
 
 
 def _normalize_external_url(
@@ -1673,6 +1694,7 @@ def update_admin_settings():
     )
     settings["cvs_proxy_urls"] = CvsStockChecker.normalize_proxy_urls(settings.get("cvs_proxy_urls"))
     CvsStockChecker.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
+    AceBrowserClient.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
     scheduler_manager.refresh_all_from_db()
     for user in db.list_users_for_admin():
         if not user.get("is_authorized_email"):
