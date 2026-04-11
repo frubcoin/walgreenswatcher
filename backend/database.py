@@ -677,6 +677,7 @@ class StockDatabase:
         capped_limit = max(1, min(int(limit or 8), 24))
 
         with self._connect() as conn:
+            self._backfill_recent_trending_products(conn)
             self._prune_expired_trending_products(conn)
             rows = conn.execute(
                 """
@@ -773,6 +774,7 @@ class StockDatabase:
         capped_limit = max(1, min(int(limit or 48), 200))
 
         with self._connect() as conn:
+            self._backfill_recent_trending_products(conn)
             self._prune_expired_trending_products(conn)
             rows = conn.execute(
                 """
@@ -862,6 +864,7 @@ class StockDatabase:
         cutoff = self._trending_retention_cutoff()
 
         with self._connect() as conn:
+            self._backfill_recent_trending_products(conn)
             rows = conn.execute(
                 """
                 SELECT
@@ -969,6 +972,7 @@ class StockDatabase:
             return None
 
         with self._connect() as conn:
+            self._backfill_recent_trending_products(conn)
             self._prune_expired_trending_products(conn)
             row = conn.execute(
                 """
