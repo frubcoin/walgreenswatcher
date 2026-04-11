@@ -253,23 +253,7 @@ class StockDatabase:
 
         if not normalized_sql:
             return
-        function updateTrendingProductsSummary(retentionHours = trendingRetentionHours) {
-      const normalizedHours = Number(retentionHours) || 0;
-      const copy = document.getElementById('trending-products-copy');
-      const highlightLabel = document.getElementById('trending-products-highlight-label');
 
-      if (copy) {
-        if (normalizedHours > 0) {
-          copy.textContent = `Community links tracked within the last ${normalizedHours} hours. Add any of them straight to your monitor without pasting the URL.`;
-        } else {
-          copy.textContent = `Top tracked community links. Add any of them straight to your monitor without pasting the URL.`;
-        }
-      }
-
-      if (highlightLabel) {
-        highlightLabel.textContent = normalizedHours > 0 ? `Last ${normalizedHours}h` : 'All-time';
-      }
-    }
         if "primary key (user_id, retailer, article_id)" in normalized_sql:
             return
         if "primary key (user_id, article_id)" not in normalized_sql:

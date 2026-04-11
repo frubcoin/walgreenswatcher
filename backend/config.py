@@ -42,7 +42,7 @@ SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN", "").strip() or None
 CORS_ALLOWED_ORIGINS = _env_csv(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:5000,http://127.0.0.1:5000,http://localhost:8788,http://127.0.0.1:8788",
+    "https://monitor.frub.dev,http://localhost:5000,http://127.0.0.1:5000,http://localhost:8788,http://127.0.0.1:8788",
 )
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://walgreens.frub.dev").rstrip("/")
 

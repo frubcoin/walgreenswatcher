@@ -446,7 +446,7 @@ class AceBrowserClient:
             """
 async ({ lat, lng, radius, headers }) => {
   const filter = `geo near(${lat},${lng},${radius})`;
-  const responseFields = 'items(code,name,address,geo,regularHours)';
+  const responseFields = 'items(code,name,address,geo,regularHours,fulfillmentTypes,supportsInventory)';
   const url = `/api/commerce/storefront/locationUsageTypes/SP/locations?filter=${encodeURIComponent(filter)}&pageSize=100&responseFields=${encodeURIComponent(responseFields)}`;
   const response = await fetch(url, {
     method: 'GET',
@@ -594,43 +594,34 @@ async ({ pid, codes, headers }) => {
                         if not store_lookup:
                             raise AceBrowserError("Ace did not return any store candidates for that ZIP")
 
-                        inventory_items = cls._browser_fetch_location_inventory(
-                            page,
-                            context["product"]["product_id"],
-                            list(store_lookup.keys())
-                        )
-
-                        stores_result = {}
-                        for item in inventory_items:
-                            loc_code = str(item.get("locationCode") or "").strip()
-                            # Kibo field names vary by tenant/version; try all known variants
-                            raw_stock = (
-                                item.get("stockAvailable")
-                                or item.get("softStockAvailable")
-                                or item.get("available")
-                                or item.get("quantity")
-                                or item.get("onHand")
-                                or 0
+                        # Summarize availability based on fulfillmentTypes
+                        # Presence of 'SP' (Store Pickup) indicates In Store Pickup availability
+                        for candidate in context["store_candidates"]:
+                            loc_code = str(candidate.get("code") or "").strip()
+                            if not loc_code:
+                                continue
+                            
+                            fulfillment_types = candidate.get("fulfillmentTypes") or []
+                            has_pickup = any(
+                                str(ft.get("code") or "").upper() == "SP" 
+                                for ft in fulfillment_types 
+                                if isinstance(ft, dict)
                             )
-                            try:
-                                stock = int(raw_stock)
-                            except (TypeError, ValueError):
-                                stock = 0
-                            if loc_code and stock > 0 and loc_code in store_lookup:
-                                matched = store_lookup[loc_code]
-                                stores_result[loc_code] = {
-                                    **matched,
-                                    "inventory_count": stock,
-                                    "availability_text": f"In Stock: {stock}"
+                            
+                            if has_pickup:
+                                context["stores"][loc_code] = {
+                                    **candidate,
+                                    "inventory_count": 1,  # Binary status
+                                    "availability_text": "Available for In Store Pickup"
                                 }
-                            elif loc_code and loc_code in store_lookup:
-                                # Log misses so we can identify the right field
-                                logger.debug(
-                                    "Ace store %s has no stock; item fields: %s",
-                                    loc_code, {k: v for k, v in item.items() if k != "locationCode"},
-                                )
+                            else:
+                                logger.debug("Ace store %s lacks SP fulfillment", loc_code)
 
-                        context["stores"] = stores_result
+                        logger.info(
+                            "Ace check complete: found %d stores with pickup for pid=%s",
+                            len(context["stores"]),
+                            context["product"].get("product_id")
+                        )
 
                     response = session.fetch(product_url, page_action=action)
                     if response.status >= 400:
