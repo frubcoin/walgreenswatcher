@@ -98,6 +98,7 @@ class StockDatabase:
                     source_url TEXT DEFAULT '',
                     product_id TEXT DEFAULT '',
                     created_at TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (user_id, retailer, article_id),
                     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
@@ -227,6 +228,12 @@ class StockDatabase:
                 "first_tracked_at",
                 "TEXT NOT NULL DEFAULT ''",
             )
+            self._ensure_column(
+                conn,
+                "tracked_products",
+                "sort_order",
+                "INTEGER NOT NULL DEFAULT 0",
+            )
             self._backfill_recent_trending_products(conn)
 
     @staticmethod
@@ -272,6 +279,7 @@ class StockDatabase:
                 source_url TEXT DEFAULT '',
                 product_id TEXT DEFAULT '',
                 created_at TEXT NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (user_id, retailer, article_id),
                 FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
             );
@@ -288,7 +296,8 @@ class StockDatabase:
                 image_url,
                 source_url,
                 product_id,
-                created_at
+                created_at,
+                COALESCE(sort_order, 0)
             )
             SELECT
                 user_id,
@@ -299,7 +308,8 @@ class StockDatabase:
                 image_url,
                 source_url,
                 product_id,
-                created_at
+                created_at,
+                COALESCE(sort_order, 0)
             FROM tracked_products_legacy
             ORDER BY created_at ASC, article_id ASC
             """

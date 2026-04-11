@@ -42,13 +42,27 @@ class AceProductResolver:
 
         canonical_url = AceBrowserClient.canonical_product_url(normalized)
 
-        # Attempt to fetch the real product name from the PDP via the browser.
-        # Ace URLs often look like /departments/.../category-name/<product_id> with
-        # no product-name slug in the path, so the slug fallback would return the
-        # category name instead of the product name.
+        # Attempt to fetch product metadata via high-speed instant API.
+        try:
+            instant_meta = AceBrowserClient.fetch_product_metadata_instant(normalized)
+            return {
+                "retailer": "ace",
+                "product_id": product_id,
+                "article_id": product_id,
+                "planogram": product_id,
+                "name": instant_meta.get("name") or cls._slug_fallback_name(normalized),
+                "image_url": instant_meta.get("image_url") or "",
+                "canonical_url": instant_meta.get("canonical_url") or canonical_url,
+            }
+        except Exception as exc:
+            logger.warning("Ace instant API fetch failed, falling back to browser context: %s", exc)
+
+        # Fallback to slower browser context if instant API fails.
         name = ""
         image_url = ""
         try:
+            # Note: AceBrowserClient.fetch_product_context still uses browser-based extraction
+            # and could be updated or kept as a secondary fallback.
             context = AceBrowserClient.fetch_product_context(normalized)
             product_meta = context.get("product") or {}
             name = str(product_meta.get("name") or "").strip()
@@ -57,7 +71,7 @@ class AceProductResolver:
             if fetched_url:
                 canonical_url = fetched_url
         except Exception as exc:
-            logger.warning("Ace browser fetch failed during product resolve, using slug fallback: %s", exc)
+            logger.error("Ace browser fetch failed during product resolve: %s", exc)
 
         if not name:
             name = cls._slug_fallback_name(normalized)

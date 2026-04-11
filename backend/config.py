@@ -40,11 +40,23 @@ SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "walgreens_watcher_sessio
 SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", False)
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN", "").strip() or None
-CORS_ALLOWED_ORIGINS = _env_csv(
-    "CORS_ALLOWED_ORIGINS",
-    "https://monitor.frub.dev,http://localhost:5000,http://127.0.0.1:5000,http://localhost:8788,http://127.0.0.1:8788",
-)
-FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://walgreens.frub.dev").rstrip("/")
+# Automatically allow the frontend domain if specified
+_default_origins = [
+    "https://monitor.frub.dev",
+    "https://api.frub.dev",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "http://localhost:8788",
+    "http://127.0.0.1:8788",
+]
+CORS_ALLOWED_ORIGINS = _env_csv("CORS_ALLOWED_ORIGINS")
+for origin in _default_origins:
+    if origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(origin)
+
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://monitor.frub.dev").rstrip("/")
+if FRONTEND_BASE_URL and FRONTEND_BASE_URL not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_BASE_URL)
 
 # Discord Configuration
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
