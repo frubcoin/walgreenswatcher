@@ -39,9 +39,28 @@ class AceProductResolver:
         product_id = AceBrowserClient.extract_product_id(normalized)
         if not product_id:
             raise ValueError("Ace Hardware product metadata was incomplete for this link")
-            
-        name = cls._slug_fallback_name(normalized)
+
         canonical_url = AceBrowserClient.canonical_product_url(normalized)
+
+        # Attempt to fetch the real product name from the PDP via the browser.
+        # Ace URLs often look like /departments/.../category-name/<product_id> with
+        # no product-name slug in the path, so the slug fallback would return the
+        # category name instead of the product name.
+        name = ""
+        image_url = ""
+        try:
+            context = AceBrowserClient.fetch_product_context(normalized)
+            product_meta = context.get("product") or {}
+            name = str(product_meta.get("name") or "").strip()
+            image_url = str(product_meta.get("image_url") or "").strip()
+            fetched_url = str(product_meta.get("canonical_url") or "").strip()
+            if fetched_url:
+                canonical_url = fetched_url
+        except Exception as exc:
+            logger.warning("Ace browser fetch failed during product resolve, using slug fallback: %s", exc)
+
+        if not name:
+            name = cls._slug_fallback_name(normalized)
 
         return {
             "retailer": "ace",
@@ -49,6 +68,6 @@ class AceProductResolver:
             "article_id": product_id,
             "planogram": product_id,
             "name": name,
-            "image_url": "",
+            "image_url": image_url,
             "canonical_url": canonical_url or normalized,
         }

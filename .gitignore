@@ -21,3 +21,4 @@ package.json
 data/watcher.sqlite3
 /data/watcher.sqlite3
 frontend/ace reponse
+scratch_test_ace.py
