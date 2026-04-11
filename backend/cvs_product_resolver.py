@@ -36,10 +36,19 @@ CURL_IMPERSONATION_TARGET = "chrome"
 
 class CvsProductResolver:
     """Resolve CVS product URLs into a product id plus lightweight metadata."""
+    _proxy_urls_override: List[str] = []
 
-    @staticmethod
-    def _proxy_candidates() -> List[str]:
-        proxies = list(CVS_PROXY_URLS)
+    @classmethod
+    def set_proxy_urls_override(cls, raw_value: Any) -> List[str]:
+        from cvs_scraper import CvsStockChecker
+        cls._proxy_urls_override = CvsStockChecker.normalize_proxy_urls(raw_value)
+        return list(cls._proxy_urls_override)
+
+    @classmethod
+    def _proxy_candidates(cls) -> List[str]:
+        proxies = list(cls._proxy_urls_override) if cls._proxy_urls_override else list(CVS_PROXY_URLS)
+        if not proxies:
+            return []
         if len(proxies) <= 1:
             return proxies
         start = random.randrange(len(proxies))

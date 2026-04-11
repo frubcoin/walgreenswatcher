@@ -44,7 +44,7 @@ from admin_notifications import AdminAlertService  # noqa: E402
 from ace import AceBrowserClient  # noqa: E402
 from cvs_scraper import CvsStockChecker  # noqa: E402
 from database import StockDatabase, TRENDING_PRODUCTS_RETENTION_HOURS  # noqa: E402
-from product_resolver import resolve_product_link  # noqa: E402
+from product_resolver import resolve_product_link, CvsProductResolver  # noqa: E402
 from scheduler import SchedulerManager  # noqa: E402
 
 logging.basicConfig(
@@ -106,6 +106,7 @@ CORS(
 db = StockDatabase()
 admin_alerts = AdminAlertService(db)
 CvsStockChecker.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
+CvsProductResolver.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
 AceBrowserClient.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
 scheduler_manager = SchedulerManager(db)
 scheduler_manager.start_enabled_schedulers()
@@ -1694,6 +1695,7 @@ def update_admin_settings():
     )
     settings["cvs_proxy_urls"] = CvsStockChecker.normalize_proxy_urls(settings.get("cvs_proxy_urls"))
     CvsStockChecker.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
+    CvsProductResolver.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
     AceBrowserClient.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
     scheduler_manager.refresh_all_from_db()
     for user in db.list_users_for_admin():
