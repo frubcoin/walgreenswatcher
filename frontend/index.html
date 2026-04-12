@@ -10749,7 +10749,7 @@
       const {
         animate = true,
         scrollIntoView = true,
-        duration = 0.8
+        duration = 2.0
       } = options;
 
       if (scrollIntoView) {
@@ -10761,23 +10761,23 @@
         if (focusRequestId !== resultsMapFocusRequestId) return;
         if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
 
-        resultsMap.invalidateSize();
         window.requestAnimationFrame(() => {
           if (focusRequestId !== resultsMapFocusRequestId) return;
           if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
 
-          resultsMap.invalidateSize();
           const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
-          const targetZoom = Math.max(currentZoom, 14);
+          const targetZoom = Math.max(currentZoom, 15);
           const targetLatLng = marker.getLatLng();
           const focusLatLng = getMobilePopupFramedLatLng(targetLatLng, targetZoom);
 
           const performZoomAndPopup = () => {
+            if (focusRequestId !== resultsMapFocusRequestId) return;
+            if (!resultsMap) return;
+
             resultsMap.once('moveend', () => {
               window.requestAnimationFrame(() => {
                 if (focusRequestId !== resultsMapFocusRequestId) return;
                 if (!resultsMap) return;
-                resultsMap.invalidateSize();
                 openMarkerPopupWithoutAutoPan(marker);
               });
             });
@@ -10786,22 +10786,14 @@
               resultsMap.flyTo(focusLatLng, targetZoom, {
                 animate,
                 duration,
-                easeLinearity: 0.25
+                easeLinearity: 0.1
               });
             } else {
               resultsMap.setView(focusLatLng, targetZoom, { animate });
             }
           };
 
-          if (resultsMapClusterGroup) {
-            resultsMapClusterGroup.zoomToShowLayer(marker, () => {
-              if (focusRequestId === resultsMapFocusRequestId) {
-                performZoomAndPopup();
-              }
-            });
-          } else {
-            performZoomAndPopup();
-          }
+          performZoomAndPopup();
         });
       };
 
@@ -12111,7 +12103,16 @@
 
       if (!resultsMap) return;
       ensureUserLocationMarker(lat, lng);
-      resultsMap.setView([lat, lng], 14, { animate: true });
+      
+      if (typeof resultsMap.flyTo === 'function') {
+        resultsMap.flyTo([lat, lng], 14, {
+          animate: true,
+          duration: 1.5,
+          easeLinearity: 0.15
+        });
+      } else {
+        resultsMap.setView([lat, lng], 14, { animate: true });
+      }
     }
 
     async function focusSavedMapLocation() {
@@ -12120,7 +12121,17 @@
         clearActiveResultsMapSelection();
         setMapDistanceReference(existingReference, { persist: false });
         ensureUserLocationMarker(existingReference.latitude, existingReference.longitude);
-        resultsMap.setView([existingReference.latitude, existingReference.longitude], 14, { animate: true });
+        
+        if (typeof resultsMap.flyTo === 'function') {
+          resultsMap.flyTo([existingReference.latitude, existingReference.longitude], 14, {
+            animate: true,
+            duration: 1.5,
+            easeLinearity: 0.15
+          });
+        } else {
+          resultsMap.setView([existingReference.latitude, existingReference.longitude], 14, { animate: true });
+        }
+        
         hideManualLocationFallback({ preserveQuery: true });
         showToast(
           existingReference.label === 'Current location'
@@ -12135,7 +12146,17 @@
       if (!savedReference || !resultsMap) return false;
       clearActiveResultsMapSelection();
       ensureUserLocationMarker(savedReference.latitude, savedReference.longitude);
-      resultsMap.setView([savedReference.latitude, savedReference.longitude], 14, { animate: true });
+      
+      if (typeof resultsMap.flyTo === 'function') {
+        resultsMap.flyTo([savedReference.latitude, savedReference.longitude], 14, {
+          animate: true,
+          duration: 1.5,
+          easeLinearity: 0.15
+        });
+      } else {
+        resultsMap.setView([savedReference.latitude, savedReference.longitude], 14, { animate: true });
+      }
+      
       hideManualLocationFallback({ preserveQuery: true });
       showToast(`Centered map on ${savedReference.label || 'your saved address'}`, 'success');
       return true;

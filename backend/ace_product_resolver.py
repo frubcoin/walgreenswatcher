@@ -46,14 +46,27 @@ class AceProductResolver:
         # return usable product ids/name without dropping into a slow browser flow.
         try:
             instant_meta = AceBrowserClient.fetch_product_metadata_instant(normalized)
+            if instant_meta and instant_meta.get("name") and instant_meta.get("name").lower() != "ace hardware product":
+                return {
+                    "retailer": "ace",
+                    "product_id": product_id,
+                    "article_id": product_id,
+                    "planogram": product_id,
+                    "name": instant_meta.get("name"),
+                    "image_url": instant_meta.get("image_url") or "",
+                    "canonical_url": instant_meta.get("canonical_url") or canonical_url,
+                }
+            
+            # If instant meta failed or returned generic, try slug fix from base client
+            fallback_name = AceBrowserClient._slug_fallback_name(normalized)
             return {
                 "retailer": "ace",
                 "product_id": product_id,
                 "article_id": product_id,
                 "planogram": product_id,
-                "name": instant_meta.get("name") or cls._slug_fallback_name(normalized),
-                "image_url": instant_meta.get("image_url") or "",
-                "canonical_url": instant_meta.get("canonical_url") or canonical_url,
+                "name": fallback_name,
+                "image_url": instant_meta.get("image_url") or "" if instant_meta else "",
+                "canonical_url": (instant_meta.get("canonical_url") if instant_meta else None) or canonical_url,
             }
         except Exception as exc:
             logger.warning("Ace instant metadata fetch failed during product resolve: %s", exc)
@@ -63,7 +76,7 @@ class AceProductResolver:
             "product_id": product_id,
             "article_id": product_id,
             "planogram": product_id,
-            "name": cls._slug_fallback_name(normalized),
+            "name": AceBrowserClient._slug_fallback_name(normalized),
             "image_url": "",
             "canonical_url": canonical_url or normalized,
         }

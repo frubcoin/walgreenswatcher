@@ -34,6 +34,7 @@ ACE_PRODUCT_ID_PATTERN = re.compile(r"/(?P<product_id>[A-Z]*\d+)(?:[/?#]|$)", re
 ACE_DEBUG_DIR = Path(__file__).resolve().parent / "output" / "ace-debug"
 ACE_BROWSER_TIMEOUT_MS = 30_000
 ACE_BROWSER_WAIT_MS = 2_000
+ACE_SESSION_FILE = Path(__file__).resolve().parent.parent / "data" / "ace_session.json"
 ACE_DEFAULT_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "X-Vol-Catalog": "1",
@@ -95,6 +96,34 @@ class AceBrowserClient:
     _proxy_urls_override: Optional[List[str]] = None
     _store_cache_db: Any = None
 
+    @classmethod
+    def _save_session_data(cls, cookies: List[Dict[str, Any]], user_agent: str) -> None:
+        try:
+            os.makedirs(ACE_SESSION_FILE.parent, exist_ok=True)
+            data = {
+                "cookies": cookies,
+                "user_agent": user_agent,
+                "timestamp": time.time()
+            }
+            ACE_SESSION_FILE.write_text(json.dumps(data), encoding="utf-8")
+            logger.info("Saved Ace session cookies for reuse")
+        except Exception as exc:
+            logger.warning("Failed to save Ace session data: %s", exc)
+
+    @classmethod
+    def _load_session_data(cls) -> Optional[Dict[str, Any]]:
+        try:
+            if not ACE_SESSION_FILE.exists():
+                return None
+            data = json.loads(ACE_SESSION_FILE.read_text(encoding="utf-8"))
+            # Cookies usually expire within 24 hours (or less for Akamai)
+            if time.time() - data.get("timestamp", 0) > 43200: # 12h
+                return None
+            return data
+        except Exception as exc:
+            logger.warning("Failed to load Ace session data: %s", exc)
+            return None
+
     @staticmethod
     def normalize_url(product_link: str) -> str:
         normalized = str(product_link or "").strip()
@@ -124,6 +153,18 @@ class AceBrowserClient:
     def product_url_with_main_pdp(product_link: str) -> str:
         canonical = AceBrowserClient.canonical_product_url(product_link)
         return f"{canonical}?isMainPDPRequested=true" if canonical else ""
+
+    @staticmethod
+    def _slug_fallback_name(product_link: str) -> str:
+        from urllib.parse import unquote, urlparse
+        path = urlparse(str(product_link or "").strip()).path or ""
+        parts = [p for p in path.split("/") if p and not re.fullmatch(r"\d+", p) and p.lower() != "p"]
+        if parts:
+            slug = unquote(parts[-1]).replace("-", " ").strip()
+            slug = re.sub(r"\s+", " ", slug)
+            if slug:
+                return slug.title()
+        return "Ace Hardware Product"
 
     @staticmethod
     def extract_product_id(product_link: str) -> str:
@@ -218,12 +259,8 @@ class AceBrowserClient:
                     fetched_metadata = cls._fetch_product_metadata_via_api(product_url, proxy_url)
                     product_metadata.update({key: value for key, value in fetched_metadata.items() if value})
                 except Exception as exc:
-                    logger.info(
-                        "Ace direct-API metadata enrichment failed via %s for %s: %s",
-                        proxy_label,
-                        product_id,
-                        exc,
-                    )
+                    logger.info("Ace direct-API metadata enrichment failed via %s: %s", proxy_label, exc)
+
                 return {
                     "product": product_metadata,
                     "store_candidates": stores,
@@ -249,9 +286,17 @@ class AceBrowserClient:
             **ACE_DEFAULT_HEADERS,
             **ACE_SEC_HEADERS,
             "User-Agent": ACE_HTML_HEADERS["User-Agent"],
-            "Cookie": "ak_bmsc=1;",
             "Referer": "https://www.acehardware.com/store-locator"
         }
+
+        session_data = cls._load_session_data()
+        if session_data:
+            headers["User-Agent"] = session_data.get("user_agent") or headers["User-Agent"]
+            cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in session_data.get("cookies", [])])
+            if cookie_str:
+                headers["Cookie"] = cookie_str
+        else:
+            headers["Cookie"] = "ak_bmsc=1;"
         
         # Use curl_cffi for impersonation to avoid 403s
         if curl_requests:
@@ -1086,7 +1131,10 @@ async ({ lat, lng, radius, headers }) => {
                             cls._humanize_page(page)
                             fetched_product = cls.extract_product_metadata(page, product_url)
                             context["product"].update({key: value for key, value in fetched_product.items() if value})
-                        context["cookies"] = [dict(cookie) for cookie in page.context.cookies()]
+                        # Capture cookies synchronously from the StealthySession
+                        context["cookies"] = [dict(c) for c in (session.cookies or [])]
+                        # Save session data for high-speed API reuse
+                        cls._save_session_data(context["cookies"], ACE_HTML_HEADERS["User-Agent"])
 
                         if not geocoded_location:
                             return
@@ -1171,9 +1219,7 @@ async ({ lat, lng, radius, headers }) => {
                             context["product"].get("product_id")
                         )
 
-                    response = session.fetch(product_url, page_action=action)
-                    if response.status >= 400:
-                        raise AceBrowserError(f"Ace returned HTTP {response.status} for the product page")
+                    # Store session data handled inside action callback for better reliability
 
                 if context.get("product"):
                     if debug_screenshot and not context.get("debug_screenshot"):
