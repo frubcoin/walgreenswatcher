@@ -181,21 +181,23 @@ class AceBrowserClient:
                     for future in futures:
                         future.result()
 
-                # Filter to only those that returned inventory
+                # Only count stores that have confirmed positive stock from the inventory API
                 in_stock_stores = {
                     s["code"]: {
-                        **s,
-                        "inventory_count": s.get("stock_count", 0),
+                        "store_id": s["code"],
+                        "name": s.get("name") or f"Ace Hardware #{s['code']}",
+                        "inventory_count": int(s.get("stock_count", 0)),
                         "inventory_count_known": True,
                         "availability_mode": "exact",
-                        "pickup_available": s.get("stock_count", 0) > 0,
-                        "delivery_available": False,  # API doesn't specify, safest to assume Pickup only for now
-                        "supports_inventory": True,
-                        "fulfillment_types": [{"code": "SP", "name": "In Store Pickup"}],
+                        "pickup_available": True,
+                        "delivery_available": any(
+                            str(ft.get("code") or "").upper() == "DL" 
+                            for ft in s.get("fulfillmentTypes", [])
+                        ),
                         "availability_text": f"{s.get('stock_count', 0)} In Stock"
                     }
                     for s in stores
-                    if s.get("stock_count", 0) > 0
+                    if int(s.get("stock_count", 0)) > 0
                 }
 
                 logger.info("Ace direct-API success via %s: found %d stores with stock", proxy_label, len(in_stock_stores))
@@ -989,15 +991,15 @@ async ({ lat, lng, radius, headers }) => {
                             # Use exact inventory if extracted from browser fetch, otherwise fallback to binary
                             store_inv = inventory_lookup.get(loc_code) or {}
                             stock_count = int(store_inv.get("stockAvailable") or 0)
-                            is_exact = stock_count > 0 or loc_code in inventory_lookup
+                            is_exact = loc_code in inventory_lookup
 
+                            # Only show as available if the inventory count is actually > 0
+                            # We no longer fall back to 'fulfillmentTypes' if the inventory API returned a confirmed 0
+                            has_pickup = stock_count > 0
+                            
+                            # Delivery is typically warehouse-based but we only show it if the product is actually findable
                             fulfillment_types = candidate.get("fulfillmentTypes") or []
-                            has_pickup = stock_count > 0 or any(
-                                str(ft.get("code") or "").upper() == "SP" 
-                                for ft in fulfillment_types 
-                                if isinstance(ft, dict)
-                            )
-                            has_delivery = any(
+                            has_delivery = stock_count > 0 and any(
                                 str(ft.get("code") or "").upper() == "DL" 
                                 for ft in fulfillment_types 
                                 if isinstance(ft, dict)
