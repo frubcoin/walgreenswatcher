@@ -178,7 +178,7 @@ async function stopScheduler() {
 
 async function manualCheck() {
     console.log('Performing manual check...');
-    showLoading('Checking stock... This may take a minute. Note: Ace Hardware checks can take longer.');
+    showLoading('Checking stock... This may take a minute. Note: Ace Hardware and CVS checks can take longer.');
     
     const result = await apiCall('/check', 'POST', {});
     
