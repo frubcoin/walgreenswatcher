@@ -98,39 +98,50 @@ class AceBrowserClient:
                 if any(c.isdigit() for c in last_part):
                     return last_part
             raise ValueError("Could not find an Ace Hardware product id in the link")
+        return str(match.group("product_id") or "").strip()
 
     @classmethod
     def fetch_product_metadata_instant(cls, product_link: str) -> Dict[str, Any]:
         """Fetch product metadata directly via Kibo API (no browser)."""
         product_id = cls.extract_product_id(product_link)
         url = f"https://www.acehardware.com/api/commerce/catalog/storefront/products/{product_id}"
-        
-        # Use centralized proxy synchronization
-        proxies = None
-        if cls._proxy_urls_override:
-            proxies = {"http": cls._proxy_urls_override[0], "https": cls._proxy_urls_override[0]}
-            
-        response = requests.get(url, headers=ACE_DEFAULT_HEADERS, proxies=proxies, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        content = data.get("content") or {}
-        image_url = ""
-        product_images = (content.get("productImages") or [])
-        if product_images:
-            image_url = product_images[0].get("imageUrl") or ""
-        if image_url and not image_url.startswith("http"):
-            image_url = f"https:{image_url}" if image_url.startswith("//") else f"https://www.acehardware.com{image_url}"
 
-        return {
-            "retailer": "ace",
-            "product_id": product_id,
-            "article_id": product_id,
-            "planogram": product_id,
-            "name": unescape(content.get("productName") or "").strip(),
-            "image_url": image_url,
-            "canonical_url": cls.canonical_product_url(product_link),
-        }
+        last_error: Optional[Exception] = None
+        for proxy in cls.proxy_candidates():
+            proxy_config = {"http": proxy, "https": proxy} if proxy else None
+            try:
+                response = requests.get(url, headers=ACE_DEFAULT_HEADERS, proxies=proxy_config, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+
+                content = data.get("content") or {}
+                image_url = ""
+                product_images = (content.get("productImages") or [])
+                if product_images:
+                    image_url = product_images[0].get("imageUrl") or ""
+                if image_url and not image_url.startswith("http"):
+                    image_url = (
+                        f"https:{image_url}"
+                        if image_url.startswith("//")
+                        else f"https://www.acehardware.com{image_url}"
+                    )
+
+                return {
+                    "retailer": "ace",
+                    "product_id": product_id,
+                    "article_id": product_id,
+                    "planogram": product_id,
+                    "name": unescape(content.get("productName") or "").strip(),
+                    "image_url": image_url,
+                    "canonical_url": cls.canonical_product_url(product_link),
+                }
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Ace instant API fetch failed via %s: %s", cls.proxy_label(proxy), exc)
+
+        if last_error is not None:
+            raise last_error
+        raise ValueError("Ace instant API fetch failed before any route could be attempted")
 
     @staticmethod
     def _first_non_empty(*values: Any) -> str:

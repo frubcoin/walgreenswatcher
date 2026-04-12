@@ -26,7 +26,7 @@ DEFAULT_POKEMON_BACKGROUND_THEME = "gyra"
 DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645
 DEFAULT_ADMIN_ALERT_NEW_USERS = True
 DEFAULT_ADMIN_ALERT_USER_ACTIONS = True
-TRENDING_PRODUCTS_RETENTION_HOURS = 0
+
 DEFAULT_MAX_NOTIFICATION_DISTANCE_MILES = int(SEARCH_RADIUS_MILES or 20)
 
 
@@ -242,10 +242,7 @@ class StockDatabase:
         normalized_article_id = str(article_id or "").strip()
         return f"{normalized_retailer}:{normalized_article_id}"
 
-    @staticmethod
-    def _trending_retention_cutoff(now: Optional[datetime] = None) -> str:
-        reference = now or datetime.utcnow()
-        return (reference - timedelta(hours=TRENDING_PRODUCTS_RETENTION_HOURS)).isoformat()
+
 
     def _migrate_tracked_products_primary_key(self, conn: sqlite3.Connection) -> None:
         row = conn.execute(
@@ -950,7 +947,6 @@ class StockDatabase:
 
         with self._connect() as conn:
             self._backfill_recent_trending_products(conn)
-            self._prune_expired_trending_products(conn)
             row = conn.execute(
                 """
                 WITH grouped AS (
@@ -1061,7 +1057,6 @@ class StockDatabase:
                 (normalized_article_id, normalized_retailer),
             )
 
-            cutoff = self._trending_retention_cutoff()
             tracked_rows = conn.execute(
                 """
                 SELECT
@@ -1078,10 +1073,9 @@ class StockDatabase:
                 WHERE article_id = ?
                   AND retailer = ?
                   AND COALESCE(NULLIF(TRIM(source_url), ''), '') <> ''
-                  AND created_at >= ?
                 ORDER BY created_at ASC, user_id ASC
                 """,
-                (normalized_article_id, normalized_retailer, cutoff),
+                (normalized_article_id, normalized_retailer),
             ).fetchall()
 
             for row in tracked_rows:
@@ -1160,7 +1154,6 @@ class StockDatabase:
                     product_id=product_id,
                     tracked_at=timestamp,
                 )
-                self._prune_expired_trending_products(conn)
             return True
         except sqlite3.IntegrityError:
             return False
