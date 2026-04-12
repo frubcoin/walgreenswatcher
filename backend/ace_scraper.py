@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from typing import Any, Dict, List
 
@@ -10,6 +11,19 @@ from ace import AceBrowserClient, AceBrowserError
 from config import SEARCH_RADIUS_MILES, TARGET_ZIP_CODE
 
 PROGRESS_UI_YIELD_SECONDS = 0.02
+
+
+def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    try:
+        r = 3959.0
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        return round(r * c, 2)
+    except Exception:
+        return 999.0
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +78,10 @@ class AceStockChecker:
         store_lookup = AceBrowserClient.build_store_lookup(store_candidates)
         in_stock_stores = dict(context.get("stores") or {})
 
+        target_location = AceBrowserClient.geocode_zip(active_zip)
+        target_lat = target_location.get("lat")
+        target_lng = target_location.get("lng")
+
         all_store_ids = list(store_lookup.keys())
         availability = {store_id: False for store_id in all_store_ids}
         store_details: Dict[str, Dict[str, Any]] = {}
@@ -76,9 +94,16 @@ class AceStockChecker:
             # This ensures top-level latitude and longitude are present for the map.
             lookup_detail = store_lookup.get(normalized_store_id) or {}
             
+            store_lat = lookup_detail.get("latitude")
+            store_lng = lookup_detail.get("longitude")
+            distance = 999.0
+            if target_lat is not None and target_lng is not None and store_lat is not None and store_lng is not None:
+                distance = _haversine_distance(target_lat, target_lng, store_lat, store_lng)
+            
             availability[normalized_store_id] = True
             store_details[normalized_store_id] = {
                 **lookup_detail,
+                "distance": distance,
                 "inventory_count": store.get("inventory_count", 1),
                 "inventory_count_known": bool(store.get("inventory_count_known", False)),
                 "availability_mode": str(store.get("availability_mode") or "fulfillment").strip() or "fulfillment",
