@@ -10,6 +10,9 @@ import re
 import time
 from html import unescape
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+
 import requests
 import socket
 from concurrent.futures import ThreadPoolExecutor
