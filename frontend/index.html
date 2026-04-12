@@ -3429,6 +3429,8 @@
       align-items: center;
       justify-content: center;
       pointer-events: none;
+      transform: scale(var(--map-marker-scale, 1));
+      transform-origin: center center;
     }
 
     .results-store-marker__icon-stack {
@@ -11824,6 +11826,20 @@
       } else {
         resultsMap.setView([33.4484, -112.0740], 10);
       }
+
+      function syncMarkerScale() {
+        if (!resultsMap || !mapElement) return;
+        const currentZoom = resultsMap.getZoom();
+        
+        let scale = 1.0;
+        if (currentZoom <= 13) {
+          scale = Math.max(0.35, Math.min(1.0, 0.35 + (currentZoom - 8) * 0.13));
+        }
+        mapElement.style.setProperty('--map-marker-scale', scale.toFixed(2));
+      }
+      
+      resultsMap.on('zoom', syncMarkerScale);
+      syncMarkerScale();
 
       if (selectedKey) {
         setActiveResultsMapItem(selectedKey);
