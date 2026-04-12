@@ -93,6 +93,7 @@ class AceBrowserClient:
     """Shared Ace PDP/session logic for resolver and inventory checks."""
 
     _proxy_urls_override: Optional[List[str]] = None
+    _store_cache_db: Any = None
 
     @staticmethod
     def normalize_url(product_link: str) -> str:
@@ -585,6 +586,10 @@ class AceBrowserClient:
         cls._proxy_urls_override = proxies or None
 
     @classmethod
+    def set_store_cache_db(cls, db: Any) -> None:
+        cls._store_cache_db = db
+
+    @classmethod
     def configured_proxy_urls(cls) -> List[str]:
         if cls._proxy_urls_override is not None:
             return list(cls._proxy_urls_override)
@@ -638,7 +643,24 @@ class AceBrowserClient:
         cache_key = cls._normalized_zip_cache_key(zip_code)
         if not cache_key:
             return []
-        return cls._clone_store_candidates(_store_candidates_cache.get(cache_key) or [])
+        cached = _store_candidates_cache.get(cache_key)
+        if cached:
+            return cls._clone_store_candidates(cached)
+
+        db = cls._store_cache_db
+        if db is None:
+            return []
+
+        try:
+            persisted = db.get_ace_store_candidates(cache_key)
+        except Exception as exc:
+            logger.warning("Failed to read persisted Ace store candidates for %s: %s", cache_key, exc)
+            return []
+
+        if persisted:
+            _store_candidates_cache[cache_key] = cls._clone_store_candidates(persisted)
+            return cls._clone_store_candidates(persisted)
+        return []
 
     @classmethod
     def _set_cached_store_candidates(cls, zip_code: Any, store_items: List[Dict[str, Any]]) -> None:
@@ -646,6 +668,13 @@ class AceBrowserClient:
         if not cache_key or not store_items:
             return
         _store_candidates_cache[cache_key] = cls._clone_store_candidates(store_items)
+        db = cls._store_cache_db
+        if db is None:
+            return
+        try:
+            db.store_ace_store_candidates(cache_key, store_items)
+        except Exception as exc:
+            logger.warning("Failed to persist Ace store candidates for %s: %s", cache_key, exc)
 
     @classmethod
     def _product_metadata_from_hints(
