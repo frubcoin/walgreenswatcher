@@ -1227,10 +1227,11 @@ class CvsStockChecker:
         playwright_first = self._playwright_first() or self._playwright_only_mode()
 
         # ── Direct API fast-path ─────────────────────────────────────────────
-        # Try a raw curl_cffi POST first — no browser, no page load, no Cloudflare
-        # challenge page.  This succeeds whenever the API key + TLS fingerprint are
-        # accepted by CVS's edge, which is most of the time during normal operation.
-        if not playwright_first and not browser_only_mode:
+        # Always try a raw curl_cffi POST first — no browser, no page load, no
+        # Cloudflare challenge page.  If the API key + TLS fingerprint are accepted
+        # we return immediately without ever spawning a browser subprocess.
+        # Only skipped when CVS_BROWSER_ONLY_MODE forces browser-only behaviour.
+        if not browser_only_mode:
             result = self._try_direct_api(product_id, zip_code, referer)
             if result is not None:
                 return result
