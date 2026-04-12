@@ -106,6 +106,7 @@ CORS(
 db = StockDatabase()
 admin_alerts = AdminAlertService(db)
 AceBrowserClient.set_store_cache_db(db)
+CvsStockChecker.set_store_cache_db(db)
 CvsStockChecker.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
 CvsProductResolver.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
 AceBrowserClient.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))

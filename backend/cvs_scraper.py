@@ -69,6 +69,11 @@ class CvsStockChecker:
         "https://www.cvs.com/RETAGPV3/Inventory/V1/getStoreDetailsAndInventory",
     )
     _proxy_urls_override: List[str] = []
+    _store_cache_db: Any = None
+
+    @classmethod
+    def set_store_cache_db(cls, db: Any) -> None:
+        cls._store_cache_db = db
 
     def __init__(self) -> None:
         self.progress_callback = None
@@ -1514,14 +1519,24 @@ class CvsStockChecker:
             or (store.get("SDD") or {}).get("storeId")
             or ""
         ).strip()
+
+        db = self._store_cache_db
+        latitude = None
+        longitude = None
+        if db is not None and store_id:
+            cached = db.get_cvs_store_location(store_id)
+            if cached:
+                latitude = cached.get("latitude")
+                longitude = cached.get("longitude")
+
         return {
             "store_id": store_id,
             "name": f"CVS #{store_id}" if store_id else "CVS",
             "address": self._normalize_address(store),
             "distance": self._normalize_distance(store.get("dt")),
             "inventory_count": self._inventory_count(store),
-            "latitude": None,
-            "longitude": None,
+            "latitude": latitude,
+            "longitude": longitude,
         }
 
     def check_product_availability(
@@ -1561,13 +1576,53 @@ class CvsStockChecker:
                 f"CVS inventory API returned {header.get('statusCode')}: {header.get('statusDesc') or 'Unknown error'}"
             )
 
-        locations = self._filter_locations_by_search_radius(
-            list(payload.get("atgResponse") or response.get("atgResponse") or [])
-        )
+        locations_raw = list(payload.get("atgResponse") or response.get("atgResponse") or [])
+        locations = self._filter_locations_by_search_radius(locations_raw)
         total_stores = len(locations)
         availability: Dict[str, bool] = {}
         store_details: Dict[str, Dict[str, Any]] = {}
         location_ids: List[str] = []
+
+        # Update cache for all discovered stores
+        db = self._store_cache_db
+        if db is not None:
+            # Group candidate details for ZIP cache
+            candidate_items = []
+            for store in locations_raw:
+                try:
+                    s_id = str(store.get("storeId") or "").strip()
+                    if not s_id:
+                        continue
+                    
+                    # Normalize address components
+                    s_addr = str(store.get("storeAddress") or "").strip()
+                    s_city = str(store.get("City") or "").strip()
+                    s_state = str(store.get("State") or "").strip()
+                    s_zip = str(store.get("Zipcode") or "").strip()
+
+                    candidate_items.append({
+                        "code": s_id,
+                        "name": f"CVS #{s_id}",
+                        "address": s_addr,
+                        "city": s_city,
+                        "state": s_state,
+                        "zip": s_zip
+                    })
+
+                    # If no coordinates in DB, try to at least Geocode the store ZIP
+                    # as a rough placeholder if available. 
+                    # For now, we just ensure the record exists so we can add coords later.
+                    existing = db.get_cvs_store_location(s_id)
+                    if not existing:
+                        db.store_cvs_store_location(
+                            s_id, s_addr, s_city, s_state, s_zip, 
+                            0.0, 0.0 # Placeholder
+                        )
+                except Exception as e:
+                    logger.debug("Failed to cache CVS store location %s: %s", s_id, e)
+            
+            if candidate_items:
+                db.store_cvs_store_candidates(zip_code, candidate_items)
 
         for index, store in enumerate(locations, start=1):
             detail = self._store_detail(store)

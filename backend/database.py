@@ -195,6 +195,12 @@ class StockDatabase:
                     store_items_json TEXT NOT NULL DEFAULT '[]',
                     updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS cvs_store_candidates (
+                    zipcode TEXT PRIMARY KEY,
+                    store_items_json TEXT NOT NULL DEFAULT '[]',
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
             self._migrate_tracked_products_primary_key(conn)
@@ -2041,6 +2047,49 @@ class StockDatabase:
             conn.execute(
                 """
                 INSERT INTO ace_store_candidates (zipcode, store_items_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(zipcode) DO UPDATE SET
+                    store_items_json = excluded.store_items_json,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    normalized_zipcode,
+                    json.dumps(store_items),
+                    timestamp,
+                ),
+            )
+
+    def get_cvs_store_candidates(self, zipcode: str) -> List[Dict[str, Any]]:
+        normalized_zipcode = str(zipcode or "").strip()
+        if not normalized_zipcode:
+            return []
+
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT store_items_json
+                FROM cvs_store_candidates
+                WHERE zipcode = ?
+                """,
+                (normalized_zipcode,),
+            ).fetchone()
+
+        if not row:
+            return []
+
+        items = self._decode_json(row["store_items_json"], [])
+        return items if isinstance(items, list) else []
+
+    def store_cvs_store_candidates(self, zipcode: str, store_items: List[Dict[str, Any]]) -> None:
+        normalized_zipcode = str(zipcode or "").strip()
+        if not normalized_zipcode or not isinstance(store_items, list) or not store_items:
+            return
+
+        timestamp = datetime.utcnow().isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO cvs_store_candidates (zipcode, store_items_json, updated_at)
                 VALUES (?, ?, ?)
                 ON CONFLICT(zipcode) DO UPDATE SET
                     store_items_json = excluded.store_items_json,
