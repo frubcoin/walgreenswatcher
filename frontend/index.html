@@ -30,8 +30,6 @@
   <meta name="apple-mobile-web-app-title" content="Local Pick-up Monitor">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style"
-    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
   <link
     href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet">
@@ -13488,8 +13486,6 @@
       }
     }
 
-    let progressProductStartTime = 0;
-    let progressLastProductIndex = -1;
     let progressHeartbeatInterval = null;
 
     async function triggerManualCheck() {
@@ -13543,7 +13539,7 @@
         let finalProgress = null;
 
         while (!isComplete && progressLoops < maxLoops) {
-          await new Promise(r => setTimeout(r, 150));
+          await new Promise(r => setTimeout(r, 500));
           progressLoops++;
 
           const progress = await apiCall('/api/progress');
