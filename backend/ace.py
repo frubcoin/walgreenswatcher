@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 import requests
+from bs4 import BeautifulSoup
 from scrapling.engines._browsers._stealth import StealthySession
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,9 @@ class AceBrowserClient:
         url = f"https://www.acehardware.com/api/commerce/catalog/storefront/products/{product_id}"
 
         last_error: Optional[Exception] = None
-        for proxy in cls.proxy_candidates():
+        proxy_candidates = cls.proxy_candidates()
+
+        for proxy in proxy_candidates:
             proxy_config = {"http": proxy, "https": proxy} if proxy else None
             try:
                 response = requests.get(url, headers=ACE_DEFAULT_HEADERS, proxies=proxy_config, timeout=10)
@@ -139,6 +142,13 @@ class AceBrowserClient:
                 last_error = exc
                 logger.warning("Ace instant API fetch failed via %s: %s", cls.proxy_label(proxy), exc)
 
+        for proxy in proxy_candidates:
+            try:
+                return cls._fetch_product_metadata_via_scrapling(product_link, proxy)
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Ace instant Scrapling metadata fetch failed via %s: %s", cls.proxy_label(proxy), exc)
+
         if last_error is not None:
             raise last_error
         raise ValueError("Ace instant API fetch failed before any route could be attempted")
@@ -152,6 +162,13 @@ class AceBrowserClient:
         return ""
 
     @staticmethod
+    def _load_json(value: Any) -> Any:
+        try:
+            return json.loads(value)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+
+    @staticmethod
     def _normalize_asset_url(value: Any) -> str:
         normalized = str(value or "").strip()
         if not normalized:
@@ -161,6 +178,102 @@ class AceBrowserClient:
         if normalized.startswith("/"):
             return f"https://www.acehardware.com{normalized}"
         return normalized
+
+    @classmethod
+    def _parse_instant_product_metadata(cls, html: str, product_link: str) -> Dict[str, Any]:
+        soup = BeautifulSoup(html or "", "lxml")
+
+        product_schema: Dict[str, Any] = {}
+        inline_product: Dict[str, Any] = {}
+        for script in soup.find_all("script"):
+            script_text = script.string or script.get_text(" ", strip=True)
+            if not script_text:
+                continue
+
+            if script.get("type") == "application/ld+json" and not product_schema:
+                data = cls._load_json(script_text)
+                candidates = data if isinstance(data, list) else [data]
+                for candidate in candidates:
+                    if not isinstance(candidate, dict):
+                        continue
+                    if str(candidate.get("@type") or "").strip().lower() == "product":
+                        product_schema = candidate
+                        break
+
+            if not inline_product and script_text.startswith('{"mainImage"'):
+                data = cls._load_json(script_text)
+                if isinstance(data, dict):
+                    inline_product = data
+
+            if product_schema and inline_product:
+                break
+
+        content = inline_product.get("content") or {}
+        main_image = inline_product.get("mainImage") or {}
+        product_images = content.get("productImages") or []
+        schema_image = product_schema.get("image")
+        if isinstance(schema_image, list):
+            schema_image = schema_image[0] if schema_image else ""
+
+        title = ""
+        if soup.title and soup.title.string:
+            title = soup.title.string.strip()
+
+        canonical_link = soup.find("link", rel="canonical")
+        canonical_url = cls._first_non_empty(
+            cls.normalize_url(canonical_link.get("href", "") if canonical_link else ""),
+            cls.canonical_product_url(product_link),
+        )
+        product_id = cls._first_non_empty(
+            inline_product.get("productCode"),
+            product_schema.get("sku"),
+            cls.extract_product_id(product_link),
+        )
+        name = cls._first_non_empty(
+            content.get("productName"),
+            inline_product.get("name"),
+            product_schema.get("name"),
+            title,
+        )
+        image_url = cls._first_non_empty(
+            cls._normalize_asset_url(main_image.get("imageUrl") or main_image.get("src")),
+            cls._normalize_asset_url((product_images[0] or {}).get("imageUrl") if product_images else ""),
+            cls._normalize_asset_url(schema_image),
+        )
+
+        if not product_id or not name:
+            raise ValueError("Ace instant metadata extraction was incomplete")
+
+        return {
+            "retailer": "ace",
+            "product_id": product_id,
+            "article_id": product_id,
+            "planogram": product_id,
+            "name": unescape(name),
+            "image_url": image_url,
+            "canonical_url": canonical_url,
+        }
+
+    @classmethod
+    def _fetch_product_metadata_via_scrapling(cls, product_link: str, proxy: Optional[str]) -> Dict[str, Any]:
+        fetch_url = cls.product_url_with_main_pdp(product_link) or cls.canonical_product_url(product_link)
+        with StealthySession(
+            proxy=proxy,
+            headless=False,
+            real_chrome=True,
+            solve_cloudflare=True,
+            disable_resources=False,
+            network_idle=True,
+            timeout=ACE_BROWSER_TIMEOUT_MS,
+            wait=ACE_BROWSER_WAIT_MS,
+        ) as session:
+            response = session.fetch(fetch_url, referer="https://www.google.com/")
+            if response.status >= 400:
+                raise ValueError(f"Ace Scrapling metadata fetch returned HTTP {response.status}")
+            html = (response.body or b"").decode("utf-8", errors="replace")
+            if not html.strip():
+                raise ValueError("Ace Scrapling metadata fetch returned an empty response body")
+            return cls._parse_instant_product_metadata(html, product_link)
 
     @staticmethod
     def _safe_float(value: Any) -> Optional[float]:
