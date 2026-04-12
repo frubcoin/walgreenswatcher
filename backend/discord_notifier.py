@@ -240,6 +240,12 @@ class DiscordNotifier:
         inventory_count = store.get("inventory_count", 0)
         distance = store.get("distance")
         distance_text = self._distance_text(distance)
+        
+        inventory_known = store.get("inventory_count_known", True)
+        if not inventory_known:
+            availability_text = store.get("availability_text") or "In Stock"
+            return f"{self._address_link(address)}\n{availability_text} | Distance: {distance_text}"
+
         return f"{self._address_link(address)}\nQty: **{inventory_count}** | Distance: {distance_text}"
 
     def _chunk_store_lines(self, stores: List[Dict], limit: int = 3000) -> List[str]:
