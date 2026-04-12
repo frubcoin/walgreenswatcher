@@ -34,6 +34,18 @@ ACE_DEFAULT_HEADERS = {
     "X-Vol-Site": "37138",
     "X-Vol-Tenant": "24645",
 }
+ACE_HTML_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Upgrade-Insecure-Requests": "1",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/134.0.0.0 Safari/537.36"
+    ),
+}
 
 _zip_geocode_cache: Dict[str, Dict[str, float]] = {}
 
@@ -103,55 +115,60 @@ class AceBrowserClient:
 
     @classmethod
     def fetch_product_metadata_instant(cls, product_link: str) -> Dict[str, Any]:
-        """Fetch product metadata directly via Kibo API (no browser)."""
+        """Fetch product metadata without browser automation."""
         product_id = cls.extract_product_id(product_link)
-        url = f"https://www.acehardware.com/api/commerce/catalog/storefront/products/{product_id}"
 
         last_error: Optional[Exception] = None
         proxy_candidates = cls.proxy_candidates()
 
         for proxy in proxy_candidates:
-            proxy_config = {"http": proxy, "https": proxy} if proxy else None
             try:
-                response = requests.get(url, headers=ACE_DEFAULT_HEADERS, proxies=proxy_config, timeout=10)
-                response.raise_for_status()
-                data = response.json()
+                return cls._fetch_product_metadata_via_requests_html(product_link, proxy)
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Ace instant HTML fetch failed via %s: %s", cls.proxy_label(proxy), exc)
 
-                content = data.get("content") or {}
-                image_url = ""
-                product_images = (content.get("productImages") or [])
-                if product_images:
-                    image_url = product_images[0].get("imageUrl") or ""
-                if image_url and not image_url.startswith("http"):
-                    image_url = (
-                        f"https:{image_url}"
-                        if image_url.startswith("//")
-                        else f"https://www.acehardware.com{image_url}"
-                    )
-
-                return {
-                    "retailer": "ace",
-                    "product_id": product_id,
-                    "article_id": product_id,
-                    "planogram": product_id,
-                    "name": unescape(content.get("productName") or "").strip(),
-                    "image_url": image_url,
-                    "canonical_url": cls.canonical_product_url(product_link),
-                }
+        for proxy in proxy_candidates:
+            try:
+                return cls._fetch_product_metadata_via_api(product_link, proxy)
             except Exception as exc:
                 last_error = exc
                 logger.warning("Ace instant API fetch failed via %s: %s", cls.proxy_label(proxy), exc)
 
-        for proxy in proxy_candidates:
-            try:
-                return cls._fetch_product_metadata_via_scrapling(product_link, proxy)
-            except Exception as exc:
-                last_error = exc
-                logger.warning("Ace instant Scrapling metadata fetch failed via %s: %s", cls.proxy_label(proxy), exc)
-
         if last_error is not None:
             raise last_error
-        raise ValueError("Ace instant API fetch failed before any route could be attempted")
+        raise ValueError("Ace instant metadata fetch failed before any route could be attempted")
+
+    @classmethod
+    def _fetch_product_metadata_via_api(cls, product_link: str, proxy: Optional[str]) -> Dict[str, Any]:
+        product_id = cls.extract_product_id(product_link)
+        url = f"https://www.acehardware.com/api/commerce/catalog/storefront/products/{product_id}"
+        proxy_config = {"http": proxy, "https": proxy} if proxy else None
+        response = requests.get(url, headers=ACE_DEFAULT_HEADERS, proxies=proxy_config, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        content = data.get("content") or {}
+        image_url = ""
+        product_images = (content.get("productImages") or [])
+        if product_images:
+            image_url = product_images[0].get("imageUrl") or ""
+        if image_url and not image_url.startswith("http"):
+            image_url = (
+                f"https:{image_url}"
+                if image_url.startswith("//")
+                else f"https://www.acehardware.com{image_url}"
+            )
+
+        return {
+            "retailer": "ace",
+            "product_id": product_id,
+            "article_id": product_id,
+            "planogram": product_id,
+            "name": unescape(content.get("productName") or "").strip(),
+            "image_url": image_url,
+            "canonical_url": cls.canonical_product_url(product_link),
+        }
 
     @staticmethod
     def _first_non_empty(*values: Any) -> str:
@@ -185,6 +202,10 @@ class AceBrowserClient:
 
         product_schema: Dict[str, Any] = {}
         inline_product: Dict[str, Any] = {}
+        page_image = ""
+        page_image_node = soup.select_one("img.mz-productimages-mainimage[src]")
+        if page_image_node:
+            page_image = cls._normalize_asset_url(page_image_node.get("src", ""))
         for script in soup.find_all("script"):
             script_text = script.string or script.get_text(" ", strip=True)
             if not script_text:
@@ -236,6 +257,7 @@ class AceBrowserClient:
             title,
         )
         image_url = cls._first_non_empty(
+            page_image,
             cls._normalize_asset_url(main_image.get("imageUrl") or main_image.get("src")),
             cls._normalize_asset_url((product_images[0] or {}).get("imageUrl") if product_images else ""),
             cls._normalize_asset_url(schema_image),
@@ -253,6 +275,25 @@ class AceBrowserClient:
             "image_url": image_url,
             "canonical_url": canonical_url,
         }
+
+    @classmethod
+    def _fetch_product_metadata_via_requests_html(cls, product_link: str, proxy: Optional[str]) -> Dict[str, Any]:
+        fetch_url = cls.product_url_with_main_pdp(product_link) or cls.canonical_product_url(product_link)
+        proxy_config = {"http": proxy, "https": proxy} if proxy else None
+        response = requests.get(
+            fetch_url,
+            headers=ACE_HTML_HEADERS,
+            proxies=proxy_config,
+            timeout=20,
+            allow_redirects=True,
+        )
+        response.raise_for_status()
+        html = response.text or ""
+        if not html.strip():
+            raise ValueError("Ace instant HTML fetch returned an empty response body")
+        if "Just a moment..." in html and "cf-challenge" in html.lower():
+            raise ValueError("Ace instant HTML fetch returned a Cloudflare challenge")
+        return cls._parse_instant_product_metadata(html, product_link)
 
     @classmethod
     def _fetch_product_metadata_via_scrapling(cls, product_link: str, proxy: Optional[str]) -> Dict[str, Any]:

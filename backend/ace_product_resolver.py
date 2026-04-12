@@ -42,7 +42,8 @@ class AceProductResolver:
 
         canonical_url = AceBrowserClient.canonical_product_url(normalized)
 
-        # Attempt to fetch product metadata via high-speed instant API.
+        # Keep link resolution instant. If the fast metadata path fails, we still
+        # return usable product ids/name without dropping into a slow browser flow.
         try:
             instant_meta = AceBrowserClient.fetch_product_metadata_instant(normalized)
             return {
@@ -55,33 +56,14 @@ class AceProductResolver:
                 "canonical_url": instant_meta.get("canonical_url") or canonical_url,
             }
         except Exception as exc:
-            logger.warning("Ace instant API fetch failed, falling back to browser context: %s", exc)
-
-        # Fallback to slower browser context if instant API fails.
-        name = ""
-        image_url = ""
-        try:
-            # Note: AceBrowserClient.fetch_product_context still uses browser-based extraction
-            # and could be updated or kept as a secondary fallback.
-            context = AceBrowserClient.fetch_product_context(normalized)
-            product_meta = context.get("product") or {}
-            name = str(product_meta.get("name") or "").strip()
-            image_url = str(product_meta.get("image_url") or "").strip()
-            fetched_url = str(product_meta.get("canonical_url") or "").strip()
-            if fetched_url:
-                canonical_url = fetched_url
-        except Exception as exc:
-            logger.error("Ace browser fetch failed during product resolve: %s", exc)
-
-        if not name:
-            name = cls._slug_fallback_name(normalized)
+            logger.warning("Ace instant metadata fetch failed during product resolve: %s", exc)
 
         return {
             "retailer": "ace",
             "product_id": product_id,
             "article_id": product_id,
             "planogram": product_id,
-            "name": name,
-            "image_url": image_url,
+            "name": cls._slug_fallback_name(normalized),
+            "image_url": "",
             "canonical_url": canonical_url or normalized,
         }
