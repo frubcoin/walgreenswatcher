@@ -124,6 +124,30 @@ class AceBrowserClient:
             logger.warning("Failed to load Ace session data: %s", exc)
             return None
 
+    @classmethod
+    def _get_authenticated_headers(cls, referer: str, content_type: Optional[str] = None) -> Dict[str, str]:
+        """Generate headers with bridged session cookies."""
+        headers = {
+            **ACE_DEFAULT_HEADERS,
+            **ACE_SEC_HEADERS,
+            "User-Agent": ACE_HTML_HEADERS["User-Agent"],
+            "Referer": referer,
+        }
+        if content_type:
+            headers["Content-Type"] = content_type
+
+        session_data = cls._load_session_data()
+        if session_data:
+            headers["User-Agent"] = session_data.get("user_agent") or headers["User-Agent"]
+            cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in session_data.get("cookies", [])])
+            if cookie_str:
+                headers["Cookie"] = cookie_str
+        else:
+            # Default to some trace for Akamai if no session exists yet
+            headers["Cookie"] = "ak_bmsc=1;"
+        
+        return headers
+
     @staticmethod
     def normalize_url(product_link: str) -> str:
         normalized = str(product_link or "").strip()
@@ -213,6 +237,11 @@ class AceBrowserClient:
         candidates = [None] + proxies
         cached_stores = cls._get_cached_store_candidates(zip_code)
 
+        # Proactive Warm-up: Skip direct-API and jump to browser if no session exists
+        if not cls._load_session_data():
+            logger.info("No active Ace session found, skipping direct-API to trigger browser warm-up")
+            return None
+
         for proxy_url in candidates:
             proxy_label = cls.proxy_label(proxy_url)
             try:
@@ -282,21 +311,7 @@ class AceBrowserClient:
             "pageSize": "100",
             "responseFields": "items(code,name,address,geo,fulfillmentTypes,supportsInventory)"
         }
-        headers = {
-            **ACE_DEFAULT_HEADERS,
-            **ACE_SEC_HEADERS,
-            "User-Agent": ACE_HTML_HEADERS["User-Agent"],
-            "Referer": "https://www.acehardware.com/store-locator"
-        }
-
-        session_data = cls._load_session_data()
-        if session_data:
-            headers["User-Agent"] = session_data.get("user_agent") or headers["User-Agent"]
-            cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in session_data.get("cookies", [])])
-            if cookie_str:
-                headers["Cookie"] = cookie_str
-        else:
-            headers["Cookie"] = "ak_bmsc=1;"
+        headers = cls._get_authenticated_headers("https://www.acehardware.com/store-locator")
         
         # Use curl_cffi for impersonation to avoid 403s
         if curl_requests:
@@ -327,16 +342,12 @@ class AceBrowserClient:
             "quantity": 1
         }
         
-        # This API is more sensitive, so we use exact matching headers
-        headers = {
-            **ACE_DEFAULT_HEADERS,
-            **ACE_SEC_HEADERS,
-            "User-Agent": ACE_HTML_HEADERS["User-Agent"],
-            "Content-Type": "application/json",
-            "Origin": "https://www.acehardware.com",
-            "Referer": f"https://www.acehardware.com/p/{product_id}",
-            "Cookie": "ak_bmsc=1;"
-        }
+        # This API is more sensitive, use unified authenticated headers
+        headers = cls._get_authenticated_headers(
+            f"https://www.acehardware.com/p/{product_id}",
+            "application/json"
+        )
+        headers["Origin"] = "https://www.acehardware.com"
         
         try:
             # Use curl_cffi for impersonation to avoid 403s
@@ -393,7 +404,9 @@ class AceBrowserClient:
         product_id = cls.extract_product_id(product_link)
         url = f"https://www.acehardware.com/api/commerce/catalog/storefront/products/{product_id}"
         proxy_config = {"http": proxy, "https": proxy} if proxy else None
-        response = requests.get(url, headers=ACE_DEFAULT_HEADERS, proxies=proxy_config, timeout=10)
+        
+        headers = cls._get_authenticated_headers(cls.canonical_product_url(product_link))
+        response = requests.get(url, headers=headers, proxies=proxy_config, timeout=10)
         response.raise_for_status()
         data = response.json()
 
@@ -1116,7 +1129,6 @@ async ({ lat, lng, radius, headers }) => {
                 with StealthySession(
                     proxy=proxy,
                     headless=False,
-                    real_chrome=True,
                     solve_cloudflare=True,
                     disable_resources=False,
                     network_idle=True,
@@ -1213,11 +1225,14 @@ async ({ lat, lng, radius, headers }) => {
                             else:
                                 logger.debug("Ace store %s lacks both SP and DL fulfillment", loc_code)
 
-                        logger.info(
-                            "Ace check complete: found %d stores with stock for pid=%s",
-                            len(context["stores"]),
-                            context["product"].get("product_id")
-                        )
+                        # Sync cookies from scrapling session wrapper
+                        try:
+                            context["cookies"] = [dict(c) for c in (session.cookies or [])]
+                        except:
+                            context["cookies"] = [dict(c) for c in page.context.cookies()]
+                        
+                        # Save session data for high-speed API reuse
+                        cls._save_session_data(context["cookies"], ACE_HTML_HEADERS["User-Agent"])
 
                     # Store session data handled inside action callback for better reliability
 
