@@ -10,16 +10,16 @@ import re
 import time
 from html import unescape
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
-
 import requests
+import socket
+from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from scrapling.engines._browsers._stealth import StealthySession
 
 logger = logging.getLogger(__name__)
 
-ACE_LOCATION_API_BASE = "https://www.acehardware.com/api/commerce/storefront/locationUsageTypes/SP/locations"
+ACE_STORES_API_URL = "https://www.acehardware.com/api/commerce/storefront/locationUsageTypes/SP/locations"
+ACE_INVENTORY_API_URL = "https://www.acehardware.com/getProductDetailInventory"
 ACE_RADIUS_METERS = 48280.3  # 30 miles
 ACE_PRODUCT_ID_PATTERN = re.compile(r"/(?P<product_id>[A-Z]*\d+)(?:[/?#]|$)", re.IGNORECASE)
 ACE_DEBUG_DIR = Path(__file__).resolve().parent / "output" / "ace-debug"
@@ -112,6 +112,119 @@ class AceBrowserClient:
                     return last_part
             raise ValueError("Could not find an Ace Hardware product id in the link")
         return str(match.group("product_id") or "").strip()
+
+    @classmethod
+    def _try_direct_api(
+        cls,
+        product_url: str,
+        zip_code: str,
+    ) -> Optional[Dict[str, Any]]:
+        """High-speed inventory check using Ace's direct commerce APIs."""
+        product_id = cls.extract_product_id(product_url)
+        geocoded = cls.geocode_zip(zip_code)
+        lat, lng = geocoded["lat"], geocoded["lng"]
+
+        proxies = cls.proxy_candidates()
+        random.shuffle(proxies)
+        # Prioritize direct server path, then proxies
+        candidates = [None] + proxies
+
+        for proxy_url in candidates:
+            proxy_label = cls.proxy_label(proxy_url)
+            try:
+                logger.info("Ace direct-API attempt via %s", proxy_label)
+                stores = cls._direct_api_fetch_stores(lat, lng, proxy_url)
+                if not stores:
+                    logger.warning("Ace direct-API: No stores nearby for %s", zip_code)
+                    return None
+
+                # Fetch exact inventory counts from all candidate stores concurrently
+                # Max 5 workers to be respectful and avoid rate limiting
+                with ThreadPoolExecutor(max_workers=5) as executor:
+                    futures = [
+                        executor.submit(cls._direct_api_fetch_inventory_for_store, product_id, store, proxy_url)
+                        for store in stores
+                    ]
+                    for future in futures:
+                        future.result()
+
+                # Filter to only those that returned inventory
+                in_stock_stores = {
+                    s["code"]: {
+                        **s,
+                        "inventory_count": s.get("stock_count", 0),
+                        "inventory_count_known": True,
+                        "availability_mode": "exact",
+                        "pickup_available": s.get("stock_count", 0) > 0,
+                        "delivery_available": False,  # API doesn't specify, safest to assume Pickup only for now
+                        "supports_inventory": True,
+                        "fulfillment_types": [{"code": "SP", "name": "In Store Pickup"}],
+                        "availability_text": f"{s.get('stock_count', 0)} In Stock"
+                    }
+                    for s in stores
+                    if s.get("stock_count", 0) > 0
+                }
+
+                logger.info("Ace direct-API success via %s: found %d stores with stock", proxy_label, len(in_stock_stores))
+                return {
+                    "product": cls._fetch_product_metadata_via_api(product_url, proxy_url),
+                    "store_candidates": stores,
+                    "stores": in_stock_stores,
+                    "proxy": proxy_label
+                }
+
+            except Exception as e:
+                logger.warning("Ace direct-API attempt failed via %s: %s", proxy_label, e)
+                continue
+
+        return None
+
+    @classmethod
+    def _direct_api_fetch_stores(cls, lat: float, lng: float, proxy: Optional[str]) -> List[Dict[str, Any]]:
+        filter_str = f"geo near({lat},{lng},{ACE_RADIUS_METERS})"
+        params = {
+            "filter": filter_str,
+            "pageSize": "100",
+            "responseFields": "items(code,name,address,geo,fulfillmentTypes,supportsInventory)"
+        }
+        proxies = {"http": proxy, "https": proxy} if proxy else None
+        response = requests.get(ACE_STORES_API_URL, params=params, headers=ACE_DEFAULT_HEADERS, proxies=proxies, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("items") or []
+
+    @classmethod
+    def _direct_api_fetch_inventory_for_store(cls, product_id: str, store: Dict[str, Any], proxy: Optional[str]) -> None:
+        store_code = store.get("code")
+        if not store_code:
+            return
+
+        payload = {
+            "productCode": product_id,
+            "storeCode": store_code,
+            "quantity": 1
+        }
+        proxies = {"http": proxy, "https": proxy} if proxy else None
+        
+        # This API is more sensitive, so we use common headers
+        headers = {
+            **ACE_DEFAULT_HEADERS,
+            "Content-Type": "application/json",
+            "Origin": "https://www.acehardware.com",
+            "Referer": "https://www.acehardware.com/"
+        }
+        
+        try:
+            response = requests.post(ACE_INVENTORY_API_URL, json=payload, headers=headers, proxies=proxies, timeout=8)
+            response.raise_for_status()
+            data = response.json()
+            
+            # structure: {"storeInventory": {"stockAvailable": 12, ...}, ...}
+            store_inv = data.get("storeInventory") or {}
+            store["stock_count"] = int(store_inv.get("stockAvailable") or 0)
+        except Exception as e:
+            logger.debug("Failed to fetch Ace inventory for store %s: %s", store_code, e)
+            store["stock_count"] = 0
 
     @classmethod
     def fetch_product_metadata_instant(cls, product_link: str) -> Dict[str, Any]:

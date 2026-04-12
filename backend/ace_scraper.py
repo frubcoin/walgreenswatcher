@@ -63,7 +63,7 @@ class AceStockChecker:
                 "product": product_name,
                 "product_index": product_index,
                 "product_total": product_total,
-                "store_name": "Ace browser inventory flow",
+                "store_name": "Ace direct-API start",
                 "stores_processed": 0,
                 "total_stores": 0,
                 "stores_with_stock_current": 0,
@@ -72,7 +72,15 @@ class AceStockChecker:
             }
         )
 
-        context = AceBrowserClient.fetch_product_context(source_url, zip_code=active_zip)
+        context = None
+        try:
+            context = AceBrowserClient._try_direct_api(source_url, zip_code=active_zip)
+        except Exception as e:
+            logger.warning("Ace direct-API fast-path failed for %s, falling back to browser: %s", product_name, e)
+
+        if not context:
+            logger.info("Ace direct-API failed or returned no stock, attempting browser fallback for %s", product_name)
+            context = AceBrowserClient.fetch_product_context(source_url, zip_code=active_zip)
         product_metadata = dict(context.get("product") or {})
         store_candidates = list(context.get("store_candidates") or [])
         store_lookup = AceBrowserClient.build_store_lookup(store_candidates)
