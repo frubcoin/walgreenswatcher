@@ -8063,13 +8063,18 @@
       }
 
       if (!leafletLoadPromise) {
-        leafletLoadPromise = Promise.all([
-          loadExternalStylesheet('leaflet-stylesheet', LEAFLET_STYLE_URL, LEAFLET_STYLE_INTEGRITY),
-          loadExternalScript('leaflet-script', LEAFLET_SCRIPT_URL, LEAFLET_SCRIPT_INTEGRITY),
-          loadExternalStylesheet('leaflet-marker-cluster-stylesheet', MARKER_CLUSTER_STYLE_URL),
-          loadExternalStylesheet('leaflet-marker-cluster-default-stylesheet', MARKER_CLUSTER_DEFAULT_STYLE_URL),
-          loadExternalScript('leaflet-marker-cluster-script', MARKER_CLUSTER_SCRIPT_URL)
-        ]).then(() => window.L);
+        leafletLoadPromise = (async () => {
+          await Promise.all([
+            loadExternalStylesheet('leaflet-stylesheet', LEAFLET_STYLE_URL, LEAFLET_STYLE_INTEGRITY),
+            loadExternalScript('leaflet-script', LEAFLET_SCRIPT_URL, LEAFLET_SCRIPT_INTEGRITY)
+          ]);
+          await Promise.all([
+            loadExternalStylesheet('leaflet-marker-cluster-stylesheet', MARKER_CLUSTER_STYLE_URL),
+            loadExternalStylesheet('leaflet-marker-cluster-default-stylesheet', MARKER_CLUSTER_DEFAULT_STYLE_URL),
+            loadExternalScript('leaflet-marker-cluster-script', MARKER_CLUSTER_SCRIPT_URL)
+          ]);
+          return window.L;
+        })();
       }
 
       try {
@@ -13491,6 +13496,12 @@
       progressSection.style.display = 'block';
 
       showToast('Starting stock check...', 'info');
+      
+      // Clear previous results to ensure a fresh UI state
+      latestRenderedResults = null;
+      const resultsContainer = document.getElementById('results-container');
+      if (resultsContainer) resultsContainer.innerHTML = '';
+      if (resultsMap) renderResultsMap({ locations: [], missingCoordinates: 0 });
 
       try {
         console.log('Calling /api/check');

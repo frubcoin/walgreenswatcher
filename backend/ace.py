@@ -17,6 +17,12 @@ import requests
 import socket
 from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
+
+try:
+    from curl_cffi import requests as curl_requests
+except ImportError:
+    curl_requests = None
+
 from scrapling.engines._browsers._stealth import StealthySession
 
 logger = logging.getLogger(__name__)
@@ -190,8 +196,22 @@ class AceBrowserClient:
             "pageSize": "100",
             "responseFields": "items(code,name,address,geo,fulfillmentTypes,supportsInventory)"
         }
-        proxies = {"http": proxy, "https": proxy} if proxy else None
-        response = requests.get(ACE_STORES_API_URL, params=params, headers=ACE_DEFAULT_HEADERS, proxies=proxies, timeout=10)
+        headers = {
+            **ACE_DEFAULT_HEADERS,
+            "User-Agent": ACE_HTML_HEADERS["User-Agent"]
+        }
+        
+        # Use curl_cffi for impersonation to avoid 403s
+        if curl_requests:
+            session = curl_requests.Session(impersonate="chrome")
+            if proxy:
+                session.proxies = {"http": proxy, "https": proxy}
+            response = session.get(ACE_STORES_API_URL, params=params, headers=headers, timeout=10)
+            session.close()
+        else:
+            proxies = {"http": proxy, "https": proxy} if proxy else None
+            response = requests.get(ACE_STORES_API_URL, params=params, headers=headers, proxies=proxies, timeout=10)
+            
         response.raise_for_status()
         data = response.json()
         return data.get("items") or []
@@ -207,18 +227,28 @@ class AceBrowserClient:
             "storeCode": store_code,
             "quantity": 1
         }
-        proxies = {"http": proxy, "https": proxy} if proxy else None
         
         # This API is more sensitive, so we use common headers
         headers = {
             **ACE_DEFAULT_HEADERS,
+            "User-Agent": ACE_HTML_HEADERS["User-Agent"],
             "Content-Type": "application/json",
             "Origin": "https://www.acehardware.com",
             "Referer": "https://www.acehardware.com/"
         }
         
         try:
-            response = requests.post(ACE_INVENTORY_API_URL, json=payload, headers=headers, proxies=proxies, timeout=8)
+            # Use curl_cffi for impersonation to avoid 403s
+            if curl_requests:
+                session = curl_requests.Session(impersonate="chrome")
+                if proxy:
+                    session.proxies = {"http": proxy, "https": proxy}
+                response = session.post(ACE_INVENTORY_API_URL, json=payload, headers=headers, timeout=8)
+                session.close()
+            else:
+                proxies = {"http": proxy, "https": proxy} if proxy else None
+                response = requests.post(ACE_INVENTORY_API_URL, json=payload, headers=headers, proxies=proxies, timeout=8)
+                
             response.raise_for_status()
             data = response.json()
             
@@ -395,14 +425,22 @@ class AceBrowserClient:
     @classmethod
     def _fetch_product_metadata_via_requests_html(cls, product_link: str, proxy: Optional[str]) -> Dict[str, Any]:
         fetch_url = cls.product_url_with_main_pdp(product_link) or cls.canonical_product_url(product_link)
-        proxy_config = {"http": proxy, "https": proxy} if proxy else None
-        response = requests.get(
-            fetch_url,
-            headers=ACE_HTML_HEADERS,
-            proxies=proxy_config,
-            timeout=20,
-            allow_redirects=True,
-        )
+        headers = {
+            **ACE_HTML_HEADERS,
+            "Referer": "https://www.google.com/"
+        }
+        
+        # Use curl_cffi for impersonation to avoid 403s
+        if curl_requests:
+            session = curl_requests.Session(impersonate="chrome")
+            if proxy:
+                session.proxies = {"http": proxy, "https": proxy}
+            response = session.get(fetch_url, headers=headers, timeout=20, allow_redirects=True)
+            session.close()
+        else:
+            proxy_config = {"http": proxy, "https": proxy} if proxy else None
+            response = requests.get(fetch_url, headers=headers, proxies=proxy_config, timeout=20, allow_redirects=True)
+            
         response.raise_for_status()
         html = response.text or ""
         if not html.strip():
