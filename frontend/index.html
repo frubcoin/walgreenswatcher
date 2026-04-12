@@ -10510,8 +10510,8 @@
     function getResultsMapPopupOptions() {
       const isMobileViewport = Boolean(window.matchMedia?.('(max-width: 640px)').matches);
       return {
-        autoPan: true,
-        keepInView: true,
+        autoPan: false,
+        keepInView: false,
         minWidth: isMobileViewport ? 200 : 220,
         maxWidth: isMobileViewport ? 252 : 280,
         autoPanPaddingTopLeft: L.point(18, 18),
