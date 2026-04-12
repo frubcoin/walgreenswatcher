@@ -3422,6 +3422,57 @@
       outline: none;
     }
 
+    /* Marker Cluster Styles */
+    .marker-cluster-small {
+      background-color: rgba(230, 38, 0, 0.18) !important;
+    }
+
+    .marker-cluster-small div {
+      background-color: rgba(230, 38, 0, 0.65) !important;
+    }
+
+    .marker-cluster-medium {
+      background-color: rgba(243, 117, 32, 0.22) !important;
+    }
+
+    .marker-cluster-medium div {
+      background-color: rgba(243, 117, 32, 0.72) !important;
+    }
+
+    .marker-cluster-large {
+      background-color: rgba(251, 1, 28, 0.28) !important;
+    }
+
+    .marker-cluster-large div {
+      background-color: rgba(251, 1, 28, 0.82) !important;
+    }
+
+    .marker-cluster {
+      background-clip: padding-box;
+      border-radius: 20px;
+    }
+
+    .marker-cluster div {
+      width: 30px;
+      height: 30px;
+      margin-left: 5px;
+      margin-top: 5px;
+      text-align: center;
+      border-radius: 15px;
+      font-size: 13px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .marker-cluster span {
+      line-height: 30px;
+    }
+
     .results-store-marker {
       position: relative;
       width: 20px;
@@ -6104,6 +6155,9 @@
     const LEAFLET_STYLE_INTEGRITY = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
     const LEAFLET_SCRIPT_URL = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
     const LEAFLET_SCRIPT_INTEGRITY = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+    const MARKER_CLUSTER_STYLE_URL = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
+    const MARKER_CLUSTER_DEFAULT_STYLE_URL = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
+    const MARKER_CLUSTER_SCRIPT_URL = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
     const MIN_POKEMON_BACKGROUND_TILE_SIZE = 200;
     const MAX_POKEMON_BACKGROUND_TILE_SIZE = 1200;
     const DEFAULT_THEME_TOKENS = {
@@ -7144,6 +7198,7 @@
     let resultsMap = null;
     let resultsMapBaseLayer = null;
     let resultsMapMarkers = [];
+    let resultsMapClusterGroup = null;
     let resultsMapMarkersByKey = new Map();
     let userLocationMarker = null;
     let resultsMapInvalidateTimer = 0;
@@ -8010,7 +8065,10 @@
       if (!leafletLoadPromise) {
         leafletLoadPromise = Promise.all([
           loadExternalStylesheet('leaflet-stylesheet', LEAFLET_STYLE_URL, LEAFLET_STYLE_INTEGRITY),
-          loadExternalScript('leaflet-script', LEAFLET_SCRIPT_URL, LEAFLET_SCRIPT_INTEGRITY)
+          loadExternalScript('leaflet-script', LEAFLET_SCRIPT_URL, LEAFLET_SCRIPT_INTEGRITY),
+          loadExternalStylesheet('leaflet-marker-cluster-stylesheet', MARKER_CLUSTER_STYLE_URL),
+          loadExternalStylesheet('leaflet-marker-cluster-default-stylesheet', MARKER_CLUSTER_DEFAULT_STYLE_URL),
+          loadExternalScript('leaflet-marker-cluster-script', MARKER_CLUSTER_SCRIPT_URL)
         ]).then(() => window.L);
       }
 
@@ -10312,6 +10370,7 @@
       }
       resultsMapBaseLayer = null;
       resultsMapMarkers = [];
+      resultsMapClusterGroup = null;
       resultsMapMarkersByKey = new Map();
       activeResultsMapKey = null;
       if (userLocationMarker) {
@@ -10631,23 +10690,35 @@
           const targetLatLng = marker.getLatLng();
           const focusLatLng = getMobilePopupFramedLatLng(targetLatLng, targetZoom);
 
-          resultsMap.once('moveend', () => {
-            window.requestAnimationFrame(() => {
-              if (focusRequestId !== resultsMapFocusRequestId) return;
-              if (!resultsMap) return;
-              resultsMap.invalidateSize();
-              openMarkerPopupWithoutAutoPan(marker);
+          const performZoomAndPopup = () => {
+            resultsMap.once('moveend', () => {
+              window.requestAnimationFrame(() => {
+                if (focusRequestId !== resultsMapFocusRequestId) return;
+                if (!resultsMap) return;
+                resultsMap.invalidateSize();
+                openMarkerPopupWithoutAutoPan(marker);
+              });
             });
-          });
 
-          if (typeof resultsMap.flyTo === 'function') {
-            resultsMap.flyTo(focusLatLng, targetZoom, {
-              animate,
-              duration,
-              easeLinearity: 0.25
+            if (typeof resultsMap.flyTo === 'function') {
+              resultsMap.flyTo(focusLatLng, targetZoom, {
+                animate,
+                duration,
+                easeLinearity: 0.25
+              });
+            } else {
+              resultsMap.setView(focusLatLng, targetZoom, { animate });
+            }
+          };
+
+          if (resultsMapClusterGroup) {
+            resultsMapClusterGroup.zoomToShowLayer(marker, () => {
+              if (focusRequestId === resultsMapFocusRequestId) {
+                performZoomAndPopup();
+              }
             });
           } else {
-            resultsMap.setView(focusLatLng, targetZoom, { animate });
+            performZoomAndPopup();
           }
         });
       };
@@ -11802,12 +11873,37 @@
 
       const bounds = [];
       resultsMapMarkersByKey = new Map();
+
+      resultsMapClusterGroup = L.markerClusterGroup({
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
+        maxClusterRadius: 40,
+        disableClusteringAtZoom: 17,
+        iconCreateFunction: function (cluster) {
+          const childCount = cluster.getChildCount();
+          let c = ' marker-cluster-';
+          if (childCount < 10) {
+            c += 'small';
+          } else if (childCount < 100) {
+            c += 'medium';
+          } else {
+            c += 'large';
+          }
+          return new L.DivIcon({
+            html: '<div><span>' + childCount + '</span></div>',
+            className: 'marker-cluster' + c,
+            iconSize: new L.Point(40, 40)
+          });
+        }
+      });
+
       resultsMapMarkers = locations.map(location => {
         const marker = L.marker([location.latitude, location.longitude], {
           icon: createResultsMapMarkerIcon(location),
           keyboard: false,
           locationKey: location.location_key
-        }).addTo(resultsMap);
+        });
 
         marker.bindPopup(renderMapPopup(location), getResultsMapPopupOptions());
         marker.on('click', () => setActiveResultsMapItem(location.location_key));
@@ -11816,6 +11912,9 @@
         resultsMapMarkersByKey.set(location.location_key, marker);
         return marker;
       });
+
+      resultsMapClusterGroup.addLayers(resultsMapMarkers);
+      resultsMap.addLayer(resultsMapClusterGroup);
 
       if (mapDistanceReference) {
         ensureUserLocationMarker(mapDistanceReference.latitude, mapDistanceReference.longitude);
