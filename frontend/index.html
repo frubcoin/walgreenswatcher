@@ -10934,7 +10934,7 @@
         parts.push(postcode);
       }
 
-      return parts.join(' • ');
+      return parts.join(' | ');
     }
 
     function getAddressAutocompleteSearchTerms(item = {}, address = {}, primaryLabel = '', secondaryLabel = '') {
@@ -11062,7 +11062,7 @@
             )
             : null;
           const distanceLabel = buildAddressDistanceLabel(distance);
-          const metaLabel = [suggestion.secondaryLabel, distanceLabel].filter(Boolean).join(' • ');
+          const metaLabel = [suggestion.secondaryLabel, distanceLabel].filter(Boolean).join(' | ');
           return {
             ...suggestion,
             distance,
