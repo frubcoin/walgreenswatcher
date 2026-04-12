@@ -1,7 +1,8 @@
-const CACHE_NAME = 'walgreens-watcher-v3';
+const CACHE_NAME = 'walgreens-watcher-v4';
 const APP_SHELL = [
   '/',
   '/index.html',
+  '/maintenance.html',
   '/admin.html',
   '/admin.css',
   '/admin.js',
@@ -56,22 +57,11 @@ async function fetchAndCache(request) {
   return response;
 }
 
-async function resolveNavigationFallback(url) {
-  const pathname = normalizePathname(url.pathname);
-  const fallbackPath = DOCUMENT_FALLBACKS[pathname];
-  if (!fallbackPath) {
-    return new Response('Offline', {
+async function resolveNavigationFallback() {
+  return (await caches.match('/maintenance.html'))
+    || new Response('Service unavailable', {
       status: 503,
-      statusText: 'Offline',
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-    });
-  }
-
-  return (await caches.match(url.pathname))
-    || (await caches.match(fallbackPath))
-    || new Response('Offline', {
-      status: 503,
-      statusText: 'Offline',
+      statusText: 'Service Unavailable',
       headers: { 'Content-Type': 'text/plain; charset=utf-8' }
     });
 }
@@ -118,7 +108,9 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetchAndCache(request).catch(() => resolveNavigationFallback(url))
+      fetchAndCache(request)
+        .then(response => (response && response.status >= 500 ? resolveNavigationFallback() : response))
+        .catch(() => resolveNavigationFallback())
     );
     return;
   }

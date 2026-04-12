@@ -1,6 +1,7 @@
 const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
 const apiBase = String(runtimeConfig.apiBaseUrl || window.location.origin).replace(/\/+$/, '');
 const statusBanner = document.getElementById('status-banner');
+const SERVER_OUTAGE_RETRY_MS = 15000;
 
 const state = {
   session: null,
@@ -20,9 +21,161 @@ let bannerTimer = 0;
 let csrfToken = null;
 let liveOverviewTimer = 0;
 let liveOverviewRefreshInFlight = false;
+let serverOutageRetryTimer = 0;
 
 function apiUrl(path) {
   return path.startsWith('http') ? path : `${apiBase}${path}`;
+}
+
+function shouldTreatAsServerUnavailable(error) {
+  const status = Number(error?.status || 0);
+  if (status >= 500) return true;
+
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    error instanceof TypeError
+    || message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('load failed')
+    || message.includes('network request failed')
+  );
+}
+
+function ensureServerOutageOverlay() {
+  if (document.getElementById('server-outage-overlay')) {
+    return document.getElementById('server-outage-overlay');
+  }
+
+  const style = document.createElement('style');
+  style.id = 'server-outage-overlay-style';
+  style.textContent = `
+    #server-outage-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(17, 20, 23, 0.78);
+      backdrop-filter: blur(12px);
+    }
+    #server-outage-overlay[hidden] {
+      display: none;
+    }
+    #server-outage-overlay .server-outage-card {
+      width: min(540px, 100%);
+      padding: 28px;
+      border-radius: 24px;
+      background: rgba(249, 246, 241, 0.98);
+      color: #17120d;
+      box-shadow: 0 28px 72px rgba(0, 0, 0, 0.32);
+    }
+    #server-outage-overlay .server-outage-kicker {
+      margin: 0 0 12px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #b2462f;
+    }
+    #server-outage-overlay .server-outage-title {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 3rem);
+      line-height: 0.96;
+    }
+    #server-outage-overlay .server-outage-copy {
+      margin: 0;
+      color: #66594e;
+      line-height: 1.6;
+    }
+    #server-outage-overlay .server-outage-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    #server-outage-overlay .server-outage-button {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #server-outage-overlay .server-outage-button-primary {
+      background: #b2462f;
+      color: #fff;
+    }
+    #server-outage-overlay .server-outage-button-secondary {
+      background: rgba(23, 18, 13, 0.08);
+      color: #17120d;
+    }
+  `;
+  document.head.appendChild(style);
+
+  const overlay = document.createElement('section');
+  overlay.id = 'server-outage-overlay';
+  overlay.hidden = true;
+  overlay.setAttribute('aria-live', 'polite');
+  overlay.innerHTML = `
+    <div class="server-outage-card" role="dialog" aria-modal="true" aria-labelledby="server-outage-title">
+      <div class="server-outage-kicker">Connection issue</div>
+      <h2 class="server-outage-title" id="server-outage-title">The admin backend is not responding.</h2>
+      <p class="server-outage-copy" id="server-outage-copy">We'll keep retrying in the background and restore the panel automatically when the server comes back.</p>
+      <div class="server-outage-actions">
+        <button class="server-outage-button server-outage-button-primary" type="button" id="server-outage-retry">Try again</button>
+        <button class="server-outage-button server-outage-button-secondary" type="button" id="server-outage-dismiss">Keep waiting</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#server-outage-retry')?.addEventListener('click', () => {
+    clearTimeout(serverOutageRetryTimer);
+    window.location.reload();
+  });
+  overlay.querySelector('#server-outage-dismiss')?.addEventListener('click', () => {
+    scheduleServerOutageRecoveryCheck();
+  });
+
+  return overlay;
+}
+
+function scheduleServerOutageRecoveryCheck(delay = SERVER_OUTAGE_RETRY_MS) {
+  clearTimeout(serverOutageRetryTimer);
+  serverOutageRetryTimer = window.setTimeout(async () => {
+    try {
+      const response = await fetch(apiUrl('/api/admin/session'), {
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      if (response.ok) {
+        window.location.reload();
+        return;
+      }
+    } catch (error) {
+    }
+    scheduleServerOutageRecoveryCheck(delay);
+  }, delay);
+}
+
+function showServerOutageOverlay(message = '') {
+  const overlay = ensureServerOutageOverlay();
+  const copy = document.getElementById('server-outage-copy');
+  if (copy) {
+    copy.textContent = message || "We'll keep retrying in the background and restore the panel automatically when the server comes back.";
+  }
+  overlay.hidden = false;
+  scheduleServerOutageRecoveryCheck();
+}
+
+function hideServerOutageOverlay() {
+  clearTimeout(serverOutageRetryTimer);
+  const overlay = document.getElementById('server-outage-overlay');
+  if (overlay) {
+    overlay.hidden = true;
+  }
 }
 
 function normalizeLiveOverviewPollMs(value) {
@@ -150,37 +303,48 @@ function scrollToPanel(panelId) {
 }
 
 async function apiRequest(path, method = 'GET', body = null) {
-  const normalizedMethod = String(method || 'GET').toUpperCase();
-  const response = await fetch(apiUrl(path), {
-    method: normalizedMethod,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(
-        ['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod) && csrfToken
-          ? { 'X-CSRF-Token': csrfToken }
-          : {}
-      )
-    },
-    body: body ? JSON.stringify(body) : null
-  });
-
-  let payload = null;
   try {
-    payload = await response.json();
-    updateCsrfTokenFromPayload(payload);
+    const normalizedMethod = String(method || 'GET').toUpperCase();
+    const response = await fetch(apiUrl(path), {
+      method: normalizedMethod,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(
+          ['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod) && csrfToken
+            ? { 'X-CSRF-Token': csrfToken }
+            : {}
+        )
+      },
+      body: body ? JSON.stringify(body) : null
+    });
+
+    let payload = null;
+    try {
+      payload = await response.json();
+      updateCsrfTokenFromPayload(payload);
+    } catch (error) {
+    }
+
+    if (!response.ok) {
+      const message = payload?.error || `Request failed (${response.status})`;
+      const err = new Error(message);
+      err.status = response.status;
+      err.payload = payload;
+      if (response.status >= 500) {
+        showServerOutageOverlay("The admin panel cannot reach the backend right now. We'll keep retrying automatically.");
+      }
+      throw err;
+    }
+
+    hideServerOutageOverlay();
+    return payload;
   } catch (error) {
+    if (shouldTreatAsServerUnavailable(error)) {
+      showServerOutageOverlay("The admin panel cannot reach the backend right now. We'll keep retrying automatically.");
+    }
+    throw error;
   }
-
-  if (!response.ok) {
-    const message = payload?.error || `Request failed (${response.status})`;
-    const err = new Error(message);
-    err.status = response.status;
-    err.payload = payload;
-    throw err;
-  }
-
-  return payload;
 }
 
 function setGoogleStatus(message, tone = 'info') {

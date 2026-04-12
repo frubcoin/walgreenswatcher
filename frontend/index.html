@@ -7243,11 +7243,164 @@
 
     const runtimeConfig = window.WATCHER_RUNTIME_CONFIG || {};
     const API_BASE = normalizeApiBase(runtimeConfig.apiBaseUrl || '');
+    const SERVER_OUTAGE_RETRY_MS = 15000;
+    let serverOutageRetryTimer = 0;
 
     function normalizeApiBase(value) {
       const normalized = String(value || '').trim();
       if (!normalized) return '';
       return normalized.replace(/\/+$/, '');
+    }
+
+    function shouldTreatAsServerUnavailable(error) {
+      const status = Number(error?.status || 0);
+      if (status >= 500) return true;
+
+      const message = String(error?.message || '').toLowerCase();
+      return (
+        error instanceof TypeError
+        || message.includes('failed to fetch')
+        || message.includes('networkerror')
+        || message.includes('load failed')
+        || message.includes('network request failed')
+      );
+    }
+
+    function ensureServerOutageOverlay() {
+      if (document.getElementById('server-outage-overlay')) {
+        return document.getElementById('server-outage-overlay');
+      }
+
+      const style = document.createElement('style');
+      style.id = 'server-outage-overlay-style';
+      style.textContent = `
+        #server-outage-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 99999;
+          display: grid;
+          place-items: center;
+          padding: 24px;
+          background: rgba(20, 15, 11, 0.72);
+          backdrop-filter: blur(12px);
+        }
+        #server-outage-overlay[hidden] {
+          display: none;
+        }
+        #server-outage-overlay .server-outage-card {
+          width: min(560px, 100%);
+          padding: 28px;
+          border-radius: 24px;
+          background: rgba(255, 248, 239, 0.98);
+          color: #24160f;
+          box-shadow: 0 28px 72px rgba(0, 0, 0, 0.28);
+        }
+        #server-outage-overlay .server-outage-kicker {
+          margin: 0 0 12px;
+          font-size: 0.82rem;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: #ad4d32;
+        }
+        #server-outage-overlay .server-outage-title {
+          margin: 0 0 10px;
+          font-size: clamp(2rem, 5vw, 3rem);
+          line-height: 0.96;
+        }
+        #server-outage-overlay .server-outage-copy {
+          margin: 0;
+          color: #6c5a4d;
+          line-height: 1.6;
+        }
+        #server-outage-overlay .server-outage-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-top: 20px;
+        }
+        #server-outage-overlay .server-outage-button {
+          appearance: none;
+          border: 0;
+          border-radius: 14px;
+          padding: 12px 16px;
+          font: inherit;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        #server-outage-overlay .server-outage-button-primary {
+          background: #b2462f;
+          color: #fff;
+        }
+        #server-outage-overlay .server-outage-button-secondary {
+          background: rgba(36, 22, 15, 0.08);
+          color: #24160f;
+        }
+      `;
+      document.head.appendChild(style);
+
+      const overlay = document.createElement('section');
+      overlay.id = 'server-outage-overlay';
+      overlay.hidden = true;
+      overlay.setAttribute('aria-live', 'polite');
+      overlay.innerHTML = `
+        <div class="server-outage-card" role="dialog" aria-modal="true" aria-labelledby="server-outage-title">
+          <div class="server-outage-kicker">Connection issue</div>
+          <h2 class="server-outage-title" id="server-outage-title">The server is not responding.</h2>
+          <p class="server-outage-copy" id="server-outage-copy">We'll keep trying in the background and bring the app back as soon as the backend responds.</p>
+          <div class="server-outage-actions">
+            <button class="server-outage-button server-outage-button-primary" type="button" id="server-outage-retry">Try again</button>
+            <button class="server-outage-button server-outage-button-secondary" type="button" id="server-outage-dismiss">Keep waiting</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      overlay.querySelector('#server-outage-retry')?.addEventListener('click', () => {
+        clearTimeout(serverOutageRetryTimer);
+        window.location.reload();
+      });
+      overlay.querySelector('#server-outage-dismiss')?.addEventListener('click', () => {
+        scheduleServerOutageRecoveryCheck();
+      });
+
+      return overlay;
+    }
+
+    function scheduleServerOutageRecoveryCheck(delay = SERVER_OUTAGE_RETRY_MS) {
+      clearTimeout(serverOutageRetryTimer);
+      serverOutageRetryTimer = window.setTimeout(async () => {
+        try {
+          const response = await fetch(apiUrl('/api/public-stats'), {
+            credentials: 'include',
+            cache: 'no-store'
+          });
+          if (response.ok) {
+            window.location.reload();
+            return;
+          }
+        } catch (error) {
+        }
+        scheduleServerOutageRecoveryCheck(delay);
+      }, delay);
+    }
+
+    function showServerOutageOverlay(message = '') {
+      const overlay = ensureServerOutageOverlay();
+      const copy = document.getElementById('server-outage-copy');
+      if (copy) {
+        copy.textContent = message || "We'll keep trying in the background and bring the app back as soon as the backend responds.";
+      }
+      overlay.hidden = false;
+      scheduleServerOutageRecoveryCheck();
+    }
+
+    function hideServerOutageOverlay() {
+      clearTimeout(serverOutageRetryTimer);
+      const overlay = document.getElementById('server-outage-overlay');
+      if (overlay) {
+        overlay.hidden = true;
+      }
     }
 
     function cookieNoticeRequired() {
@@ -7430,11 +7583,20 @@
     async function loadPublicStats() {
       try {
         const response = await fetch(apiUrl('/api/public-stats'), { credentials: 'include' });
-        if (!response.ok) return null;
+        if (!response.ok) {
+          if (response.status >= 500) {
+            showServerOutageOverlay('Public stats are unavailable because the server is not responding right now.');
+          }
+          return null;
+        }
         const stats = await response.json();
+        hideServerOutageOverlay();
         renderPublicStats(stats);
         return stats;
       } catch (error) {
+        if (shouldTreatAsServerUnavailable(error)) {
+          showServerOutageOverlay('Public stats are unavailable because the server is not responding right now.');
+        }
         return null;
       }
     }
@@ -8975,12 +9137,21 @@
         result = await authResponse.json();
         updateCsrfTokenFromPayload(result);
         const isWaitlisted = result?.access_state === 'waitlisted';
+        if (authResponse.status >= 500) {
+          showServerOutageOverlay('Google sign-in cannot finish because the server is not responding right now.');
+          updateAuthStatus('Google sign-in cannot finish right now because the server is unavailable.');
+          return;
+        }
         if ((!authResponse.ok && !isWaitlisted) || (!result?.authenticated && !isWaitlisted)) {
           const message = result?.error || 'Google sign-in failed. Check your backend Google client ID and allowed origins.';
           updateAuthStatus(message);
           return;
         }
+        hideServerOutageOverlay();
       } catch (error) {
+        if (shouldTreatAsServerUnavailable(error)) {
+          showServerOutageOverlay('Google sign-in cannot finish because the server is not responding right now.');
+        }
         updateAuthStatus('Google sign-in failed. Check your connection and try again.');
         return;
       }
@@ -12762,13 +12933,22 @@
             errorMessage = errorData.error || errorData.message || errorMessage;
           } catch (e) {
           }
-          throw new Error(errorMessage);
+          const error = new Error(errorMessage);
+          error.status = r.status;
+          if (r.status >= 500) {
+            showServerOutageOverlay("The backend is not responding right now. We'll keep trying and restore the dashboard automatically.");
+          }
+          throw error;
         }
         const payload = await r.json();
         updateCsrfTokenFromPayload(payload);
+        hideServerOutageOverlay();
         return payload;
       } catch (e) {
         console.error(`API error (${url}):`, e);
+        if (shouldTreatAsServerUnavailable(e)) {
+          showServerOutageOverlay("The backend is not responding right now. We'll keep trying and restore the dashboard automatically.");
+        }
         if (!options.silent) {
           console.warn(e.message || 'Request failed');
         }
