@@ -6431,7 +6431,7 @@
     function updateMaxRangeValueLabel(value = 20) {
       const rangeValueLabel = document.getElementById('cfg-max-range-value');
       if (rangeValueLabel) {
-        rangeValueLabel.textContent = `${Math.max(1, Math.min(20, Number(value) || 20))} mi`;
+        rangeValueLabel.textContent = `${Math.max(1, Math.min(50, Number(value) || 20))} mi`;
       }
     }
 
@@ -6973,12 +6973,12 @@
             <span class="form-hint" style="text-align: center; display: block;">Time between automatic checks.</span>
           </div>
           <div class="form-group">
-            <label class="form-label" for="cfg-max-range">Max Search Range</label>
-            <input type="range" class="form-input" id="cfg-max-range" min="1" max="20" step="1" value="20">
+            <label class="form-label" for="cfg-max-range">Discord Alert Range</label>
+            <input type="range" class="form-input" id="cfg-max-range" min="1" max="50" step="1" value="20">
             <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;"><span
                 id="cfg-max-range-value">20</span> miles</div>
-            <span class="form-hint" style="text-align: center; display: block;">Stores outside this range are excluded
-              from results and Discord alerts.</span>
+            <span class="form-hint" style="text-align: center; display: block;">Limits Discord alerts only. Dashboard
+              results still show all stores found in the scan.</span>
           </div>
           <div class="form-group">
             <label class="form-label">Install App</label>
@@ -8533,9 +8533,9 @@
                   <span class="form-hint">Time between automatic checks. <span id="onboarding-interval-value">${escapeHtml(draft.interval || 60)} min (1 hr)</span></span>
                 </div>
                 <div class="form-group">
-                  <label class="form-label" for="onboarding-range">Max Search Range</label>
-                  <input type="range" class="form-input" id="onboarding-range" min="1" max="20" step="1" value="${escapeHtml(draft.range || 20)}">
-                  <span class="form-hint">Miles from ZIP to search. <span id="onboarding-range-value">${escapeHtml(draft.range || 20)} mi</span></span>
+                  <label class="form-label" for="onboarding-range">Discord Alert Range</label>
+                  <input type="range" class="form-input" id="onboarding-range" min="1" max="50" step="1" value="${escapeHtml(draft.range || 20)}">
+                  <span class="form-hint">Miles from your ZIP for Discord alerts. <span id="onboarding-range-value">${escapeHtml(draft.range || 20)} mi</span></span>
                 </div>
               </div>
               <div class="onboarding-form-card">
@@ -8646,7 +8646,7 @@
               <div class="onboarding-summary">
                 <div class="onboarding-summary-row"><span>ZIP code</span><strong>${escapeHtml(configuredZip)}</strong></div>
                 <div class="onboarding-summary-row"><span>Check interval</span><strong>${escapeHtml(draft.interval || '60')} min</strong></div>
-                <div class="onboarding-summary-row"><span>Max range</span><strong>${escapeHtml(draft.range || '20')} mi</strong></div>
+                <div class="onboarding-summary-row"><span>Discord alert range</span><strong>${escapeHtml(draft.range || '20')} mi</strong></div>
                 <div class="onboarding-summary-row"><span>Map view address</span><strong>${draft.mapAddress ? 'Saved locally' : 'Add later'}</strong></div>
                 <div class="onboarding-summary-row"><span>Discord</span><strong>${draft.webhookUrl ? 'Configured' : 'Add later'}</strong></div>
                 <div class="onboarding-summary-row"><span>Tracked products</span><strong>${trackedCount}</strong></div>
@@ -8717,7 +8717,7 @@
           rangeInput.addEventListener('input', (e) => {
             const valueLabel = document.getElementById('onboarding-range-value');
             if (valueLabel) {
-              valueLabel.textContent = `${Math.max(1, Math.min(20, Number(e.target.value) || 20))} mi`;
+              valueLabel.textContent = `${Math.max(1, Math.min(50, Number(e.target.value) || 20))} mi`;
             }
           });
         }
@@ -8924,8 +8924,8 @@
         return false;
       }
 
-      if (!Number.isFinite(range) || range < 1 || range > 20) {
-        setOnboardingFeedback('Choose a search range between 1 and 20 miles.', 'error');
+      if (!Number.isFinite(range) || range < 1 || range > 50) {
+        setOnboardingFeedback('Choose a Discord alert range between 1 and 50 miles.', 'error');
         return false;
       }
 
@@ -13211,6 +13211,19 @@
       });
     }
 
+    function getEmbeddedLastCheckSnapshot(status = latestStatusSnapshot?.status || {}, statusLastCheck = undefined) {
+      const embedded = status?.last_check_result;
+      if (!embedded || typeof embedded !== 'object') return null;
+
+      const embeddedTimestamp = embedded.timestamp || embedded.check_result?.timestamp || null;
+      if (!embeddedTimestamp) return null;
+      if (statusLastCheck !== undefined && statusLastCheck !== null && embeddedTimestamp !== statusLastCheck) {
+        return null;
+      }
+
+      return embedded;
+    }
+
     async function loadStatus() {
       if (isStatusRefreshInFlight) return;
       isStatusRefreshInFlight = true;
@@ -13232,7 +13245,12 @@
         const status = data.status || {};
         const trackedProducts = status.tracked_products || [];
         const lastProductsFound = status.last_products_found || {};
+        const embeddedLastCheck = getEmbeddedLastCheckSnapshot(status);
         const intervalMinutes = status.check_interval_minutes || 60;
+
+        if (embeddedLastCheck) {
+          writeUserScopedCache(USER_LAST_CHECK_CACHE_KEY_PREFIX, embeddedLastCheck);
+        }
 
         document.getElementById('stat-status').textContent = status.is_running ? 'Running' : 'Stopped';
         document.getElementById('stat-status-sub').innerHTML = `${status.discord_webhook_count
@@ -13301,7 +13319,11 @@
         return latestRenderedResults;
       }
 
-      const data = await apiCall('/api/last-check', 'GET', null, { silent: true });
+      const status = latestStatusSnapshot?.status || {};
+      let data = getEmbeddedLastCheckSnapshot(status, statusLastCheck);
+      if (!data) {
+        data = await apiCall('/api/last-check', 'GET', null, { silent: true });
+      }
       if (!data) {
         lastResultsSignature = '';
         lastLoadedCheckTimestamp = statusLastCheck ?? null;

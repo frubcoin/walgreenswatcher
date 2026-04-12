@@ -33,7 +33,7 @@ DEFAULT_POKEMON_BACKGROUND_TILE_SIZE = 645
 MIN_POKEMON_BACKGROUND_TILE_SIZE = 200
 MAX_POKEMON_BACKGROUND_TILE_SIZE = 1200
 MIN_NOTIFICATION_DISTANCE_MILES = 1
-MAX_NOTIFICATION_DISTANCE_MILES = 100
+MAX_NOTIFICATION_DISTANCE_MILES = 50
 ALLOWED_POKEMON_BACKGROUND_THEMES = {
     "ancient",
     "bee",
@@ -99,6 +99,7 @@ class StockCheckScheduler:
         self.stores_with_stock_current = 0
         self.progress_completed_units = 0.0
         self.progress_total_units = 0.0
+        self.last_total_stores_checked = 0
 
         self.refresh_from_db()
         self._load_last_check_snapshot()
@@ -121,6 +122,12 @@ class StockCheckScheduler:
             except ValueError:
                 self.last_check_time = None
         self.last_products_with_stock = dict(last_check.get("products_found") or {})
+        check_result = last_check.get("check_result") or {}
+        self.last_total_stores_checked = int(
+            check_result.get("total_stores_checked")
+            or last_check.get("total_stores_checked")
+            or 0
+        )
 
     def refresh_from_db(self) -> None:
         settings = self.db.get_user_settings(self.user_id)
@@ -175,6 +182,24 @@ class StockCheckScheduler:
         self.fivebelow_checker.current_zip_code = self.current_zipcode
         self.ace_checker.current_zip_code = self.current_zipcode
         self.ace_checker.search_radius_miles = self.max_notification_distance_miles
+        self._load_last_check_snapshot()
+
+    def get_last_check_snapshot(self) -> Optional[Dict[str, Any]]:
+        if not self.last_check_time:
+            return None
+
+        timestamp = self.last_check_time.isoformat()
+        products_found = dict(self.last_products_with_stock or {})
+        total_stores_checked = int(self.last_total_stores_checked or 0)
+        return {
+            "timestamp": timestamp,
+            "has_stock": bool(products_found),
+            "products_found": products_found,
+            "check_result": {
+                "timestamp": timestamp,
+                "total_stores_checked": total_stores_checked,
+            },
+        }
 
     @staticmethod
     def _validate_interval_minutes(interval_minutes: Any) -> int:
@@ -426,6 +451,35 @@ class StockCheckScheduler:
             }
 
         return products_with_stock
+
+    def _filter_products_for_discord(
+        self,
+        products_with_stock: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Dict[str, Any]]:
+        filtered_products: Dict[str, Dict[str, Any]] = {}
+
+        for product_id, product_data in (products_with_stock or {}).items():
+            stores = [
+                dict(store)
+                for store in (product_data.get("stores") or [])
+                if self._store_within_notification_range(store)
+            ]
+            if not stores:
+                continue
+
+            filtered_products[product_id] = {
+                **product_data,
+                "store_ids": [
+                    str(store.get("store_id") or "").strip()
+                    for store in stores
+                    if str(store.get("store_id") or "").strip()
+                ],
+                "count": len(stores),
+                "total_inventory": sum(int(store.get("inventory_count", 0) or 0) for store in stores),
+                "stores": stores,
+            }
+
+        return filtered_products
 
     @staticmethod
     def _store_distance_miles(store: Dict[str, Any]) -> Optional[float]:
@@ -771,8 +825,6 @@ class StockCheckScheduler:
                 else:
                     raise ValueError(f"Unsupported retailer: {retailer}")
 
-                product_result = self._filter_product_result_by_notification_range(product_result)
-
                 scanned_store_keys.update(
                     f"{retailer}:{store_id}"
                     for store_id in (product_result.get("location_ids") or [])
@@ -812,6 +864,7 @@ class StockCheckScheduler:
 
             self.last_check_time = datetime.fromisoformat(timestamp)
             self.last_products_with_stock = products_with_stock
+            self.last_total_stores_checked = len(scanned_store_keys)
 
             if products_with_stock:
                 # Filter out products excluded from Discord notifications
@@ -819,6 +872,7 @@ class StockCheckScheduler:
                     k: v for k, v in products_with_stock.items()
                     if not self.tracked_products.get(k, {}).get("exclude_from_discord", False)
                 }
+                discord_products = self._filter_products_for_discord(discord_products)
                 if discord_products:
                     self._set_progress(
                         current_phase="notifying",
@@ -961,6 +1015,7 @@ class StockCheckScheduler:
             "last_check": self.last_check_time.isoformat() if self.last_check_time else None,
             "next_run_time": next_run_time,
             "last_products_found": self.last_products_with_stock,
+            "last_check_result": self.get_last_check_snapshot(),
             "check_interval_minutes": self.check_interval_minutes,
             "discord_configured": self.notifier.is_configured,
             "discord_webhook_count": len(self.notifier.webhook_urls),

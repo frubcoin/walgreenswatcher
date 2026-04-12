@@ -1309,7 +1309,8 @@ def get_history(user: Dict[str, Any]):
 @app.route("/api/last-check", methods=["GET"])
 @require_auth
 def get_last_check(user: Dict[str, Any]):
-    last = db.get_last_check(int(user["id"]))
+    scheduler = _current_scheduler(user)
+    last = db.get_last_check(int(user["id"])) or scheduler.get_last_check_snapshot()
     if last:
         return jsonify(last)
     return jsonify({"message": "No checks performed yet"}), 404
