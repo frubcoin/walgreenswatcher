@@ -914,7 +914,7 @@
       margin-inline: auto;
       justify-self: center;
       align-self: center;
-    left: -10px;
+      left: -10px;
     }
 
     #google-signin-button>* {
@@ -1331,7 +1331,8 @@
       background: linear-gradient(180deg, rgba(26, 29, 33, 0.16), rgba(26, 29, 33, 0.42));
     }
 
-    @media (max-width: 900px), (max-height: 820px) {
+    @media (max-width: 900px),
+    (max-height: 820px) {
       .tech-stack-dialog {
         width: min(100vw - 24px, 860px);
         height: calc(100dvh - 24px);
@@ -6057,7 +6058,6 @@
         text-wrap: pretty;
       }
     }
-
   </style>
 </head>
 
@@ -6485,7 +6485,8 @@
                 <div class="auth-metric-meta" id="auth-service-uptime">Loading uptime...</div>
               </div>
               <div class="auth-metric">
-                <div class="auth-metric-value auth-metric-value-live"><span class="auth-metric-live-dot" aria-hidden="true"></span><span>Live</span></div>
+                <div class="auth-metric-value auth-metric-value-live"><span class="auth-metric-live-dot"
+                    aria-hidden="true"></span><span>Live</span></div>
                 <div class="auth-metric-label">Discord alerts</div>
               </div>
             </div>
@@ -6494,7 +6495,8 @@
             <div class="auth-feature">
               <div class="auth-feature-kicker">Feature Dense</div>
               <div class="auth-feature-title">Advanced configuration</div>
-              <div class="auth-feature-copy">Includes a map view, trending products, history, statistics, mobile support, and more.</div>
+              <div class="auth-feature-copy">Includes a map view, trending products, history, statistics, mobile
+                support, and more.</div>
             </div>
             <div class="auth-feature">
               <div class="auth-feature-kicker">quick setup</div>
@@ -6505,7 +6507,8 @@
             <div class="auth-feature">
               <div class="auth-feature-kicker">Peace of mind</div>
               <div class="auth-feature-title">Reliable monitoring</div>
-              <div class="auth-feature-copy">Keep monitoring active on a server 24/7 so alerts continue even when your computer is off.</div>
+              <div class="auth-feature-copy">Keep monitoring active on a server 24/7 so alerts continue even when your
+                computer is off.</div>
             </div>
             <div class="auth-feature">
               <div class="auth-feature-kicker">Access anywhere</div>
@@ -6693,13 +6696,13 @@
               <article class="tech-stack-card">
                 <div class="tech-stack-card-title">Fonts + Identity</div>
                 <div class="tech-stack-card-copy"><a href="https://fonts.google.com/specimen/Rajdhani" target="_blank"
-                    rel="noopener noreferrer">Rajdhani</a> and <a
-                    href="https://fonts.google.com/specimen/Space+Mono" target="_blank"
-                    rel="noopener noreferrer">Space Mono</a> are loaded through <a
+                    rel="noopener noreferrer">Rajdhani</a> and <a href="https://fonts.google.com/specimen/Space+Mono"
+                    target="_blank" rel="noopener noreferrer">Space Mono</a> are loaded through <a
                     href="https://fonts.google.com/" target="_blank" rel="noopener noreferrer">Google Fonts</a>.
                   Sign-in uses <a href="https://developers.google.com/identity/gsi/web" target="_blank"
                     rel="noopener noreferrer">Google Identity Services</a>, and backend token verification uses
-                  <strong>google-auth</strong>.</div>
+                  <strong>google-auth</strong>.
+                </div>
               </article>
               <article class="tech-stack-card">
                 <div class="tech-stack-card-title">Maps + Search</div>
@@ -6718,7 +6721,8 @@
                     href="https://fonts.google.com/icons" target="_blank" rel="noopener noreferrer">Google Material
                     Symbols</a> icon paths. Project-local raster action icons used in buttons and utility states are
                   attributed here as <a href="https://www.flaticon.com/" target="_blank"
-                    rel="noopener noreferrer">Flaticon</a> exports where applicable.</div>
+                    rel="noopener noreferrer">Flaticon</a> exports where applicable.
+                </div>
               </article>
               <article class="tech-stack-card">
                 <div class="tech-stack-card-title">Backend + Alerts</div>
@@ -6872,7 +6876,8 @@
             style="margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); font-style:italic; line-height:1.45; color:rgba(152, 164, 174, 0.8);">
             <strong
               style="color:var(--orange); font-style:normal; text-transform:uppercase; font-size:10px; letter-spacing:0.5px;">Note:</strong>
-            Ace Hardware and CVS checks can take significantly longer than other stores due to live inventory lookups.
+            Ace Hardware and CVS checks can take significantly longer than other stores due to Simulated browser
+            scraping.
           </div>
         </div>
       </div>
@@ -6910,14 +6915,17 @@
           <div class="form-group">
             <label class="form-label" for="cfg-interval">Check Interval</label>
             <input type="range" class="form-input" id="cfg-interval" min="30" max="1440" step="30" value="60">
-            <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;" id="cfg-interval-value">60 min (1 hr)</div>
+            <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;"
+              id="cfg-interval-value">60 min (1 hr)</div>
             <span class="form-hint" style="text-align: center; display: block;">Time between automatic checks.</span>
           </div>
           <div class="form-group">
             <label class="form-label" for="cfg-max-range">Max Search Range</label>
             <input type="range" class="form-input" id="cfg-max-range" min="1" max="20" step="1" value="20">
-            <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;"><span id="cfg-max-range-value">20</span> miles</div>
-            <span class="form-hint" style="text-align: center; display: block;">Stores outside this range are excluded from results and Discord alerts.</span>
+            <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;"><span
+                id="cfg-max-range-value">20</span> miles</div>
+            <span class="form-hint" style="text-align: center; display: block;">Stores outside this range are excluded
+              from results and Discord alerts.</span>
           </div>
           <div class="form-group">
             <label class="form-label">Install App</label>
@@ -6956,7 +6964,8 @@
               <option value="google">Google Maps</option>
               <option value="apple">Apple Maps</option>
             </select>
-            <span class="form-hint">Choose which map provider to use for store directions in Discord alerts and map/list view links.</span>
+            <span class="form-hint">Choose which map provider to use for store directions in Discord alerts and map/list
+              view links.</span>
           </div>
         </div>
 
@@ -7024,11 +7033,12 @@
           <div id="products-list"></div>
           <div class="tracked-products-controls">
             <div class="form-group">
-              <input type="url" class="form-input" id="new-product-url" placeholder="Paste a product link" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+              <input type="url" class="form-input" id="new-product-url" placeholder="Paste a product link"
+                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             </div>
             <div class="form-group" style="margin-top:10px;">
-              <input type="text" class="form-input" id="new-product-name" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                placeholder="Optional custom name (e.g., Pokemon Booster Bundle)">
+              <input type="text" class="form-input" id="new-product-name" autocomplete="off" autocapitalize="off"
+                autocorrect="off" spellcheck="false" placeholder="Optional custom name (e.g., Pokemon Booster Bundle)">
             </div>
             <div class="form-hint" style="margin-bottom:12px;">Paste a supported product link
               and the app will extract
@@ -7067,10 +7077,12 @@
                       <div class="trending-products-title">Trending Products</div>
                     </div>
                   </div>
-                  <div class="trending-products-copy" id="trending-products-copy">Recently tracked community links. Add any of them straight to your monitor without pasting the URL.</div>
+                  <div class="trending-products-copy" id="trending-products-copy">Recently tracked community links. Add
+                    any of them straight to your monitor without pasting the URL.</div>
                 </div>
                 <div class="trending-products-highlight">
-                  <span class="trending-products-highlight-value" id="trending-products-highlight-value">Last 24 Hours</span>
+                  <span class="trending-products-highlight-value" id="trending-products-highlight-value">Last 24
+                    Hours</span>
                 </div>
               </div>
               <div class="trending-products-list" id="trending-products-list">
@@ -7093,7 +7105,8 @@
     </div>
   </div>
   <footer class="site-footer" aria-label="Site footer">
-    <span class="site-footer-copy">© <span id="footer-year">2026</span> Local Pick-up Monitor by frub • Independent project •
+    <span class="site-footer-copy">© <span id="footer-year">2026</span> Local Pick-up Monitor by frub • Independent
+      project •
       Not affiliated with Walgreens</span>
     <a class="site-footer-link" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>
     <span aria-hidden="true">•</span>
@@ -9361,7 +9374,7 @@
       if (discordContainer) {
         discordContainer.addEventListener('blur', (e) => {
           if (e.target.classList.contains('discord-webhook-url') ||
-              e.target.classList.contains('discord-role-id')) {
+            e.target.classList.contains('discord-role-id')) {
             void saveSettings();
           }
         }, true);
@@ -9715,27 +9728,27 @@
       return `
         <div class="onboarding-trending-list">
           ${suggestions.map(product => {
-            const safeId = escapeHtml(product.id || '');
-            const safeRetailer = escapeHtml(retailerKey(product.retailer));
-            const safeRetailerLabel = escapeHtml(retailerLabel(product.retailer));
-            const safeRetailerIcon = escapeHtml(retailerIconPath(product.retailer));
-            const safeName = escapeHtml(product.name || 'Unnamed product');
-            const safeSourceUrl = sanitizeProductSourceUrl(product.source_url || '');
-            const safeImageUrl = sanitizeProductImageUrl(product.image_url || '');
-            const trackedByCount = Math.max(0, Number(product.tracked_by_count || 0));
-            const watcherLabel = `${trackedByCount} watcher${trackedByCount === 1 ? '' : 's'}`;
-            const firstTrackedDate = parseApiTimestamp(product.first_tracked_at || product.last_tracked_at);
-            const firstTrackedLabel = firstTrackedDate ? formatRelativeDuration(firstTrackedDate) : 'Recently tracked';
-            const isTracked = Boolean(product.is_tracked_by_user);
-            const isSelected = draft.productUrl.trim() === safeSourceUrl;
+        const safeId = escapeHtml(product.id || '');
+        const safeRetailer = escapeHtml(retailerKey(product.retailer));
+        const safeRetailerLabel = escapeHtml(retailerLabel(product.retailer));
+        const safeRetailerIcon = escapeHtml(retailerIconPath(product.retailer));
+        const safeName = escapeHtml(product.name || 'Unnamed product');
+        const safeSourceUrl = sanitizeProductSourceUrl(product.source_url || '');
+        const safeImageUrl = sanitizeProductImageUrl(product.image_url || '');
+        const trackedByCount = Math.max(0, Number(product.tracked_by_count || 0));
+        const watcherLabel = `${trackedByCount} watcher${trackedByCount === 1 ? '' : 's'}`;
+        const firstTrackedDate = parseApiTimestamp(product.first_tracked_at || product.last_tracked_at);
+        const firstTrackedLabel = firstTrackedDate ? formatRelativeDuration(firstTrackedDate) : 'Recently tracked';
+        const isTracked = Boolean(product.is_tracked_by_user);
+        const isSelected = draft.productUrl.trim() === safeSourceUrl;
 
-            return `
+        return `
               <div class="onboarding-trending-item ${isSelected ? 'is-selected' : ''} trending-product-item" data-product-id="${safeId}" data-retailer="${safeRetailer}">
                 <div class="onboarding-trending-thumb">
                   ${safeImageUrl
-                ? `<img src="${escapeHtml(safeImageUrl)}" alt="${safeName}" loading="lazy" decoding="async">`
-                : `<img class="trending-product-thumb-fallback" src="${safeRetailerIcon}" alt="${safeRetailerLabel}" loading="lazy" decoding="async">`
-              }
+            ? `<img src="${escapeHtml(safeImageUrl)}" alt="${safeName}" loading="lazy" decoding="async">`
+            : `<img class="trending-product-thumb-fallback" src="${safeRetailerIcon}" alt="${safeRetailerLabel}" loading="lazy" decoding="async">`
+          }
                 </div>
                 <div class="onboarding-trending-body">
                   <div class="onboarding-trending-meta">
@@ -9754,7 +9767,7 @@
                 </div>
               </div>
             `;
-          }).join('')}
+      }).join('')}
         </div>
       `;
     }
@@ -10366,9 +10379,9 @@
           <div class="map-popup-product">
             <div class="map-popup-product-copy">
               <span class="map-popup-product-name">${product.source_url
-                ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
-                : escapeHtml(product.name)
-              }</span>
+          ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
+          : escapeHtml(product.name)
+        }</span>
               <span class="map-popup-product-availability">${escapeHtml(getStoreAvailabilitySummary(product, product.retailer))}</span>
             </div>
           </div>
@@ -11830,14 +11843,14 @@
       function syncMarkerScale() {
         if (!resultsMap || !mapElement) return;
         const currentZoom = resultsMap.getZoom();
-        
+
         let scale = 1.0;
         if (currentZoom <= 13) {
           scale = Math.max(0.35, Math.min(1.0, 0.35 + (currentZoom - 8) * 0.13));
         }
         mapElement.style.setProperty('--map-marker-scale', scale.toFixed(2));
       }
-      
+
       resultsMap.on('zoom', syncMarkerScale);
       syncMarkerScale();
 
@@ -12592,9 +12605,9 @@
         <div class="result-stat">
           <div class="result-stat-label">${productUsesFulfillmentAvailability(product) ? 'Fulfillment' : 'Units'}</div>
           ${productUsesFulfillmentAvailability(product)
-            ? `<div class="result-stat-text">${escapeHtml(getProductFulfillmentSummary(product))}</div>`
-            : `<div class="result-stat-value">${Number(product.total_inventory || 0)}</div>`
-          }
+          ? `<div class="result-stat-text">${escapeHtml(getProductFulfillmentSummary(product))}</div>`
+          : `<div class="result-stat-value">${Number(product.total_inventory || 0)}</div>`
+        }
         </div>
         <div class="result-stat">
           <div class="result-stat-label">Nearest</div>
@@ -13119,11 +13132,10 @@
         const intervalMinutes = status.check_interval_minutes || 60;
 
         document.getElementById('stat-status').textContent = status.is_running ? 'Running' : 'Stopped';
-        document.getElementById('stat-status-sub').innerHTML = `${
-          status.discord_webhook_count
+        document.getElementById('stat-status-sub').innerHTML = `${status.discord_webhook_count
             ? `${status.discord_webhook_count} Discord webhook${status.discord_webhook_count === 1 ? '' : 's'} configured`
             : 'No Discord webhooks configured'
-        }<span class="stat-sub-detail">${escapeHtml(formatIntervalLabel(intervalMinutes))}</span>`;
+          }<span class="stat-sub-detail">${escapeHtml(formatIntervalLabel(intervalMinutes))}</span>`;
         document.getElementById('stat-products').textContent = trackedProducts.length;
         document.getElementById('stat-products-sub').textContent = `${Object.keys(lastProductsFound).length} in stock last check`;
         renderTrackedProducts(trackedProducts);

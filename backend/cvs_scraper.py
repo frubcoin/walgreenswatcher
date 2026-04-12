@@ -1147,10 +1147,13 @@ class CvsStockChecker:
         if not api_key:
             return None
 
-        proxy_candidates = self._proxy_candidates() or [""]
-        shuffled = random.sample(proxy_candidates, len(proxy_candidates))
+        proxy_candidates = self._proxy_candidates() or []
+        # Always try the direct server IP first — proxy IPs may be blocked at the
+        # API level even when the server's own IP is not.
+        shuffled_proxies = random.sample([p for p in proxy_candidates if p], len([p for p in proxy_candidates if p]))
+        candidates = [""] + shuffled_proxies
 
-        for proxy_url in shuffled:
+        for proxy_url in candidates:
             proxy_label = self._proxy_label(proxy_url) if proxy_url else "direct server IP"
             try:
                 session = curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
