@@ -6927,7 +6927,8 @@
           <div id="progress-store" style="margin-bottom:4px;">Activity: -</div>
           <div id="progress-count">Store processing: - / -</div>
           <div
-            style="margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); font-style:italic; line-height:1.45; color:rgba(152, 164, 174, 0.8);">
+            id="progress-delay-disclaimer"
+            style="display:none; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); font-style:italic; line-height:1.45; color:rgba(152, 164, 174, 0.8);">
             <strong
               style="color:var(--orange); font-style:normal; text-transform:uppercase; font-size:10px; letter-spacing:0.5px;">Note:</strong>
             Ace Hardware and CVS checks can take significantly longer than other stores due to Simulated browser
@@ -7217,6 +7218,8 @@
     let manualLocationQuery = loadStoredMapAddress();
     let manualLocationSuggestions = [];
     let manualLocationHighlightedIndex = -1;
+    let progressLastProductIndex = -1;
+    let progressProductStartTime = 0;
     let manualLocationAutocompleteBusy = false;
     let manualLocationAutocompleteTimer = 0;
     let manualLocationAutocompleteController = null;
@@ -13503,6 +13506,10 @@
       if (resultsContainer) resultsContainer.innerHTML = '';
       if (resultsMap) renderResultsMap({ locations: [], missingCoordinates: 0 });
 
+      // Reset product timing for conditional disclaimer
+      progressLastProductIndex = -1;
+      progressProductStartTime = Date.now();
+
       try {
         console.log('Calling /api/check');
         const result = await apiCall('/api/check', 'POST', {});
@@ -13597,6 +13604,19 @@
       }
 
       document.getElementById('progress-count').textContent = `Store processing: ${checked} / ${total} | Current product hits: ${storesWithStock}`;
+
+      // Show delay disclaimer only if we've been on the same product for > 15 seconds
+      const currentIdx = progress.current_product_index || 0;
+      if (currentIdx !== progressLastProductIndex) {
+        progressLastProductIndex = currentIdx;
+        progressProductStartTime = Date.now();
+        document.getElementById('progress-delay-disclaimer').style.display = 'none';
+      } else if (progressProductStartTime > 0) {
+        const elapsed = Date.now() - progressProductStartTime;
+        if (elapsed > 15000) {
+          document.getElementById('progress-delay-disclaimer').style.display = 'block';
+        }
+      }
     }
 
     async function addProduct() {
