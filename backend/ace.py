@@ -52,8 +52,17 @@ ACE_HTML_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/134.0.0.0 Safari/537.36"
+        "Chrome/141.0.0.0 Safari/537.36"
     ),
+}
+
+ACE_SEC_HEADERS = {
+    "sec-ch-ua": '"Chromium";v="141", "Not?A_Brand";v="8"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
 }
 
 _zip_geocode_cache: Dict[str, Dict[str, float]] = {}
@@ -213,6 +222,7 @@ class AceBrowserClient:
         }
         headers = {
             **ACE_DEFAULT_HEADERS,
+            **ACE_SEC_HEADERS,
             "User-Agent": ACE_HTML_HEADERS["User-Agent"],
             "Cookie": "ak_bmsc=1;",
             "Referer": "https://www.acehardware.com/store-locator"
@@ -247,13 +257,15 @@ class AceBrowserClient:
             "quantity": 1
         }
         
-        # This API is more sensitive, so we use common headers
+        # This API is more sensitive, so we use exact matching headers
         headers = {
             **ACE_DEFAULT_HEADERS,
+            **ACE_SEC_HEADERS,
             "User-Agent": ACE_HTML_HEADERS["User-Agent"],
             "Content-Type": "application/json",
             "Origin": "https://www.acehardware.com",
-            "Referer": "https://www.acehardware.com/"
+            "Referer": f"https://www.acehardware.com/p/{product_id}",
+            "Cookie": "ak_bmsc=1;"
         }
         
         try:
@@ -830,6 +842,37 @@ class AceBrowserClient:
         }
 
     @staticmethod
+    def _browser_fetch_store_inventory(page: Any, product_id: str, store_codes: List[str]) -> List[Dict[str, Any]]:
+        payload = page.evaluate(
+            """
+async ({ product_id, store_codes, headers }) => {
+  const url = '/getProductDetailInventory';
+  const results = await Promise.all(store_codes.map(async (storeCode) => {
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productCode: product_id, storeCode, quantity: 1 })
+      });
+      const data = await resp.json();
+      return { storeCode, data, ok: true };
+    } catch (e) {
+      return { storeCode, error: e.message, ok: false };
+    }
+  }));
+  return results;
+}
+            """,
+            {
+                "product_id": product_id,
+                "store_codes": store_codes,
+                "headers": ACE_DEFAULT_HEADERS,
+            },
+        )
+        return payload if isinstance(payload, list) else []
+
+    @staticmethod
     def _browser_fetch_store_candidates(page: Any, lat: float, lng: float) -> List[Dict[str, Any]]:
         payload = page.evaluate(
             """
@@ -928,7 +971,12 @@ async ({ lat, lng, radius, headers }) => {
                         if not store_lookup:
                             raise AceBrowserError("Ace did not return any store candidates for that ZIP")
 
-                        # Summarize availability based on fulfillmentTypes
+                        # Fetch real inventory counts from within the browser context
+                        store_codes = list(store_lookup.keys())
+                        inventory_results = cls._browser_fetch_store_inventory(page, context["product"].get("product_id"), store_codes)
+                        inventory_lookup = { r["storeCode"]: (r.get("data") or {}).get("storeInventory") or {} for r in inventory_results if r.get("ok") }
+
+                        # Summarize availability based on inventory and fulfillmentTypes
                         # SP = In Store Pickup, DL = Delivery
                         for candidate in context["store_candidates"]:
                             loc_code = str(candidate.get("code") or "").strip()
@@ -938,8 +986,13 @@ async ({ lat, lng, radius, headers }) => {
                             if not candidate.get("supportsInventory"):
                                 continue
                             
+                            # Use exact inventory if extracted from browser fetch, otherwise fallback to binary
+                            store_inv = inventory_lookup.get(loc_code) or {}
+                            stock_count = int(store_inv.get("stockAvailable") or 0)
+                            is_exact = stock_count > 0 or loc_code in inventory_lookup
+
                             fulfillment_types = candidate.get("fulfillmentTypes") or []
-                            has_pickup = any(
+                            has_pickup = stock_count > 0 or any(
                                 str(ft.get("code") or "").upper() == "SP" 
                                 for ft in fulfillment_types 
                                 if isinstance(ft, dict)
@@ -953,9 +1006,9 @@ async ({ lat, lng, radius, headers }) => {
                             if has_pickup or has_delivery:
                                 context["stores"][loc_code] = {
                                     **candidate,
-                                    "inventory_count": 1,  # Binary availability marker for internal sorting only
-                                    "inventory_count_known": False,
-                                    "availability_mode": "fulfillment",
+                                    "inventory_count": stock_count if is_exact else 1,
+                                    "inventory_count_known": is_exact,
+                                    "availability_mode": "exact" if is_exact else "fulfillment",
                                     "pickup_available": has_pickup,
                                     "delivery_available": has_delivery,
                                     "supports_inventory": bool(candidate.get("supportsInventory")),
@@ -967,14 +1020,15 @@ async ({ lat, lng, radius, headers }) => {
                                         for ft in fulfillment_types
                                         if isinstance(ft, dict)
                                     ],
-                                    "availability_text": "Available"
+                                    "availability_text": f"{stock_count} In Stock" if is_exact else "Available"
                                 }
-                                if has_pickup and has_delivery:
-                                    context["stores"][loc_code]["availability_text"] = "Pickup & Delivery Available"
-                                elif has_pickup:
-                                    context["stores"][loc_code]["availability_text"] = "Available for Pickup"
-                                elif has_delivery:
-                                    context["stores"][loc_code]["availability_text"] = "Available for Delivery"
+                                if not is_exact:
+                                    if has_pickup and has_delivery:
+                                        context["stores"][loc_code]["availability_text"] = "Pickup & Delivery Available"
+                                    elif has_pickup:
+                                        context["stores"][loc_code]["availability_text"] = "Available for Pickup"
+                                    elif has_delivery:
+                                        context["stores"][loc_code]["availability_text"] = "Available for Delivery"
                             else:
                                 logger.debug("Ace store %s lacks both SP and DL fulfillment", loc_code)
 
