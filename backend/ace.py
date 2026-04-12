@@ -59,6 +59,22 @@ ACE_HTML_HEADERS = {
 _zip_geocode_cache: Dict[str, Dict[str, float]] = {}
 
 
+def _convert_proxy_format(proxy_url: str) -> str:
+    """Handle both ip:port and ip:port:user:pass formats."""
+    if not proxy_url:
+        return proxy_url
+    if "://" in proxy_url:
+        return proxy_url
+    parts = proxy_url.split(":")
+    if len(parts) >= 4:
+        host = parts[0]
+        port = parts[1]
+        username = parts[2]
+        password = ":".join(parts[3:])
+        return f"http://{username}:{password}@{host}:{port}"
+    return f"http://{proxy_url}"
+
+
 class AceBrowserError(ValueError):
     """Raised when the Ace browser flow fails."""
 
@@ -148,7 +164,6 @@ class AceBrowserClient:
                     return None
 
                 # Fetch exact inventory counts from all candidate stores concurrently
-                # Max 5 workers to be respectful and avoid rate limiting
                 with ThreadPoolExecutor(max_workers=5) as executor:
                     futures = [
                         executor.submit(cls._direct_api_fetch_inventory_for_store, product_id, store, proxy_url)
@@ -198,19 +213,23 @@ class AceBrowserClient:
         }
         headers = {
             **ACE_DEFAULT_HEADERS,
-            "User-Agent": ACE_HTML_HEADERS["User-Agent"]
+            "User-Agent": ACE_HTML_HEADERS["User-Agent"],
+            "Cookie": "ak_bmsc=1;",
+            "Referer": "https://www.acehardware.com/store-locator"
         }
         
         # Use curl_cffi for impersonation to avoid 403s
         if curl_requests:
             session = curl_requests.Session(impersonate="chrome")
             if proxy:
-                session.proxies = {"http": proxy, "https": proxy}
-            response = session.get(ACE_STORES_API_URL, params=params, headers=headers, timeout=10)
+                p_url = _convert_proxy_format(proxy)
+                session.proxies = {"http": p_url, "https": p_url}
+            response = session.get(ACE_STORES_API_URL, params=params, headers=headers, timeout=12)
             session.close()
         else:
-            proxies = {"http": proxy, "https": proxy} if proxy else None
-            response = requests.get(ACE_STORES_API_URL, params=params, headers=headers, proxies=proxies, timeout=10)
+            p_url = _convert_proxy_format(proxy) if proxy else None
+            proxies = {"http": p_url, "https": p_url} if p_url else None
+            response = requests.get(ACE_STORES_API_URL, params=params, headers=headers, proxies=proxies, timeout=12)
             
         response.raise_for_status()
         data = response.json()
@@ -242,12 +261,14 @@ class AceBrowserClient:
             if curl_requests:
                 session = curl_requests.Session(impersonate="chrome")
                 if proxy:
-                    session.proxies = {"http": proxy, "https": proxy}
-                response = session.post(ACE_INVENTORY_API_URL, json=payload, headers=headers, timeout=8)
+                    p_url = _convert_proxy_format(proxy)
+                    session.proxies = {"http": p_url, "https": p_url}
+                response = session.post(ACE_INVENTORY_API_URL, json=payload, headers=headers, timeout=10)
                 session.close()
             else:
-                proxies = {"http": proxy, "https": proxy} if proxy else None
-                response = requests.post(ACE_INVENTORY_API_URL, json=payload, headers=headers, proxies=proxies, timeout=8)
+                p_url = _convert_proxy_format(proxy) if proxy else None
+                proxies = {"http": p_url, "https": p_url} if p_url else None
+                response = requests.post(ACE_INVENTORY_API_URL, json=payload, headers=headers, proxies=proxies, timeout=10)
                 
             response.raise_for_status()
             data = response.json()
