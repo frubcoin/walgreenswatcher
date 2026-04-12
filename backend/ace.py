@@ -180,18 +180,35 @@ class AceBrowserClient:
                 if not stores:
                     logger.warning("Ace direct-API: No stores nearby for %s", zip_code)
                     return None
+                    
                 if not cached_stores:
                     cls._set_cached_store_candidates(zip_code, stores)
                     cached_stores = cls._clone_store_candidates(stores)
-
                 # Fetch exact inventory counts from all candidate stores concurrently
-                with ThreadPoolExecutor(max_workers=5) as executor:
+                # We use a lower worker count and add jitter to avoid bot detection
+                stores_checked = 0
+                stores_failed = 0
+                
+                with ThreadPoolExecutor(max_workers=3) as executor:
                     futures = [
                         executor.submit(cls._direct_api_fetch_inventory_for_store, product_id, store, proxy_url)
                         for store in stores
                     ]
                     for future in futures:
-                        future.result()
+                        try:
+                            if not future.result():
+                                stores_failed += 1
+                            stores_checked += 1
+                        except Exception:
+                            stores_failed += 1
+                            stores_checked += 1
+
+                # If more than 50% of the stores failed (e.g. 403 Forbidden), 
+                # we consider the whole direct-API attempt a failure to trigger fallback.
+                if stores_checked > 0 and (stores_failed / stores_checked) > 0.5:
+                    logger.warning("Ace direct-API: High failure rate (%d/%d), triggering fallback", stores_failed, stores_checked)
+                    return None
+
 
                 # Only count stores that have confirmed positive stock from the inventory API
                 in_stock_stores = {
@@ -253,28 +270,35 @@ class AceBrowserClient:
             "Referer": "https://www.acehardware.com/store-locator"
         }
         
-        # Use curl_cffi for impersonation to avoid 403s
-        if curl_requests:
-            session = curl_requests.Session(impersonate="chrome")
-            if proxy:
-                p_url = _convert_proxy_format(proxy)
-                session.proxies = {"http": p_url, "https": p_url}
-            response = session.get(ACE_STORES_API_URL, params=params, headers=headers, timeout=12)
-            session.close()
-        else:
-            p_url = _convert_proxy_format(proxy) if proxy else None
-            proxies = {"http": p_url, "https": p_url} if p_url else None
-            response = requests.get(ACE_STORES_API_URL, params=params, headers=headers, proxies=proxies, timeout=12)
-            
-        response.raise_for_status()
-        data = response.json()
-        return data.get("items") or []
+        try:
+            # Use curl_cffi for impersonation to avoid 403s
+            if curl_requests:
+                session = curl_requests.Session(impersonate="chrome")
+                if proxy:
+                    p_url = _convert_proxy_format(proxy)
+                    session.proxies = {"http": p_url, "https": p_url}
+                response = session.get(ACE_STORES_API_URL, params=params, headers=headers, timeout=12)
+                session.close()
+            else:
+                p_url = _convert_proxy_format(proxy) if proxy else None
+                proxies = {"http": p_url, "https": p_url} if p_url else None
+                response = requests.get(ACE_STORES_API_URL, params=params, headers=headers, proxies=proxies, timeout=12)
+                
+            response.raise_for_status()
+            data = response.json()
+            return data.get("items") or []
+        except Exception as e:
+            logger.debug("Ace direct-API store fetch failed: %s", e)
+            raise
 
     @classmethod
-    def _direct_api_fetch_inventory_for_store(cls, product_id: str, store: Dict[str, Any], proxy: Optional[str]) -> None:
+    def _direct_api_fetch_inventory_for_store(cls, product_id: str, store: Dict[str, Any], proxy: Optional[str]) -> bool:
         store_code = store.get("code")
         if not store_code:
-            return
+            return True
+
+        # Add jitter to avoid rapid-fire bot detection
+        time.sleep(random.uniform(0.12, 0.38))
 
         payload = {
             "productCode": product_id,
@@ -313,9 +337,15 @@ class AceBrowserClient:
             # structure: {"storeInventory": {"stockAvailable": 12, ...}, ...}
             store_inv = data.get("storeInventory") or {}
             store["stock_count"] = int(store_inv.get("stockAvailable") or 0)
+            return True
         except Exception as e:
             logger.debug("Failed to fetch Ace inventory for store %s: %s", store_code, e)
             store["stock_count"] = 0
+            # If we explicitly got Forbidden, it's a failure of the method, not a "0 stock" result
+            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 403:
+                return False
+            # For other unexpected errors, we also mark as failure to be safe
+            return False
 
     @classmethod
     def fetch_product_metadata_instant(cls, product_link: str) -> Dict[str, Any]:
