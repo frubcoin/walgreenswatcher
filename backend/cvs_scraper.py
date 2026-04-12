@@ -1132,6 +1132,73 @@ class CvsStockChecker:
             )
         )
 
+    def _try_direct_api(self, product_id: str, zip_code: str, referer: str) -> Dict[str, Any] | None:
+        """Attempt a direct curl_cffi POST to the CVS inventory API without any page load.
+
+        Uses the known public API key and Chrome TLS impersonation.  Returns the
+        parsed inventory payload on success, or None if the attempt fails so the
+        caller can fall back to Playwright.
+        """
+        if curl_requests is None:
+            logger.debug("CVS direct-API path skipped: curl_cffi not installed")
+            return None
+
+        api_key = CVS_INVENTORY_PUBLIC_API_KEY
+        if not api_key:
+            return None
+
+        proxy_candidates = self._proxy_candidates() or [""]
+        shuffled = random.sample(proxy_candidates, len(proxy_candidates))
+
+        for proxy_url in shuffled:
+            proxy_label = self._proxy_label(proxy_url) if proxy_url else "direct server IP"
+            try:
+                session = curl_requests.Session(impersonate=CURL_IMPERSONATION_TARGET)
+                if proxy_url:
+                    converted = self._convert_proxy_format(proxy_url)
+                    session.proxies = {"http": converted, "https": converted}
+
+                payload = {
+                    "getStoreDetailsAndInventoryRequest": {
+                        "header": self._request_body_header(api_key, secrets.token_hex(8)),
+                        "productId": product_id,
+                        "geolatitude": "",
+                        "geolongitude": "",
+                        "addressLine": zip_code,
+                    }
+                }
+                headers = self._request_headers(
+                    referer=referer,
+                    purpose="inventory",
+                    api_key=api_key,
+                    include_api_header=True,
+                )
+
+                logger.info("CVS direct-API attempt via %s", proxy_label)
+                response = session.post(
+                    self.INVENTORY_URLS[0],
+                    json=payload,
+                    headers=headers,
+                    timeout=25,
+                )
+                session.close()
+
+                if response.status_code == 403:
+                    logger.warning("CVS direct-API blocked (403) via %s", proxy_label)
+                    continue
+
+                data = response.json()
+                if self._looks_like_inventory_response(data):
+                    logger.info("CVS direct-API success via %s", proxy_label)
+                    return data
+
+                logger.debug("CVS direct-API unexpected payload via %s: HTTP %s", proxy_label, response.status_code)
+            except Exception as exc:
+                logger.debug("CVS direct-API attempt failed via %s: %s", proxy_label, exc)
+                continue
+
+        return None
+
     def _fetch_inventory_payload(self, product: Dict[str, Any], zip_code: str) -> Dict[str, Any]:
         if self._env_bool("CVS_DISABLED", False):
             raise CvsDisabledError("CVS checks are disabled by CVS_DISABLED")
@@ -1158,6 +1225,17 @@ class CvsStockChecker:
         browser_only_mode = self._env_bool("CVS_BROWSER_ONLY_MODE", False)
         playwright_enabled = self._playwright_enabled() or self._playwright_only_mode()
         playwright_first = self._playwright_first() or self._playwright_only_mode()
+
+        # ── Direct API fast-path ─────────────────────────────────────────────
+        # Try a raw curl_cffi POST first — no browser, no page load, no Cloudflare
+        # challenge page.  This succeeds whenever the API key + TLS fingerprint are
+        # accepted by CVS's edge, which is most of the time during normal operation.
+        if not playwright_first and not browser_only_mode:
+            result = self._try_direct_api(product_id, zip_code, referer)
+            if result is not None:
+                return result
+            logger.info("CVS direct-API fast-path did not succeed; falling back to browser automation")
+        # ────────────────────────────────────────────────────────────────────
 
         if playwright_enabled and playwright_first and api_key_candidates:
             try:
