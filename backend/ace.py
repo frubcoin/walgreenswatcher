@@ -851,7 +851,7 @@ class AceBrowserClient:
 async ({ product_id, store_codes, headers }) => {
   const url = '/getProductDetailInventory';
   const results = [];
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 5;
   
   for (let i = 0; i < store_codes.length; i += BATCH_SIZE) {
     const batch = store_codes.slice(i, i + BATCH_SIZE);
@@ -876,9 +876,9 @@ async ({ product_id, store_codes, headers }) => {
       }
     }));
     results.push(...batchResults);
-    // Tiny pause between batches
+    // Pause between batches to be stealthy
     if (i + BATCH_SIZE < store_codes.length) {
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 200));
     }
   }
   return results;
