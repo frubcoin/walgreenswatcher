@@ -845,24 +845,42 @@ class AceBrowserClient:
 
     @staticmethod
     def _browser_fetch_store_inventory(page: Any, product_id: str, store_codes: List[str]) -> List[Dict[str, Any]]:
+        # Batch the requests to avoid triggering rate-limits or bot detection (e.g. 10 at a time)
         payload = page.evaluate(
             """
 async ({ product_id, store_codes, headers }) => {
   const url = '/getProductDetailInventory';
-  const results = await Promise.all(store_codes.map(async (storeCode) => {
-    try {
-      const resp = await fetch(url, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productCode: product_id, storeCode, quantity: 1 })
-      });
-      const data = await resp.json();
-      return { storeCode, data, ok: true };
-    } catch (e) {
-      return { storeCode, error: e.message, ok: false };
+  const results = [];
+  const BATCH_SIZE = 10;
+  
+  for (let i = 0; i < store_codes.length; i += BATCH_SIZE) {
+    const batch = store_codes.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(async (storeCode) => {
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Vol-Catalog': headers['X-Vol-Catalog'],
+            'X-Vol-Currency': headers['X-Vol-Currency'],
+            'X-Vol-Site': headers['X-Vol-Site'],
+            'X-Vol-Tenant': headers['X-Vol-Tenant']
+          },
+          body: JSON.stringify({ productCode: product_id, storeCode, quantity: 1 })
+        });
+        const data = await resp.json();
+        return { storeCode, data, ok: resp.ok };
+      } catch (e) {
+        return { storeCode, error: e.message, ok: false };
+      }
+    }));
+    results.push(...batchResults);
+    // Tiny pause between batches
+    if (i + BATCH_SIZE < store_codes.length) {
+      await new Promise(r => setTimeout(r, 100));
     }
-  }));
+  }
   return results;
 }
             """,
@@ -993,15 +1011,11 @@ async ({ lat, lng, radius, headers }) => {
                             stock_count = int(store_inv.get("stockAvailable") or 0)
                             is_exact = loc_code in inventory_lookup
 
-                            # Only show as available if the inventory count is actually > 0
-                            # We no longer fall back to 'fulfillmentTypes' if the inventory API returned a confirmed 0
+                            # Strictly only show if inventory API returned a positive stock count
                             has_pickup = stock_count > 0
-                            
-                            # Delivery is typically warehouse-based but we only show it if the product is actually findable
-                            fulfillment_types = candidate.get("fulfillmentTypes") or []
                             has_delivery = stock_count > 0 and any(
                                 str(ft.get("code") or "").upper() == "DL" 
-                                for ft in fulfillment_types 
+                                for ft in (candidate.get("fulfillmentTypes") or [])
                                 if isinstance(ft, dict)
                             )
                             
