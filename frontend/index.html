@@ -13500,12 +13500,6 @@
 
       showToast('Starting stock check...', 'info');
       
-      // Clear previous results to ensure a fresh UI state
-      latestRenderedResults = null;
-      const resultsContainer = document.getElementById('results-container');
-      if (resultsContainer) resultsContainer.innerHTML = '';
-      if (resultsMap) renderResultsMap({ locations: [], missingCoordinates: 0 });
-
       // Reset product timing for conditional disclaimer
       progressLastProductIndex = -1;
       progressProductStartTime = Date.now();
