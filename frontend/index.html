@@ -10749,7 +10749,7 @@
       const {
         animate = true,
         scrollIntoView = true,
-        duration = 2.0
+        duration = 1.5
       } = options;
 
       if (scrollIntoView) {
@@ -10761,23 +10761,23 @@
         if (focusRequestId !== resultsMapFocusRequestId) return;
         if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
 
+        resultsMap.invalidateSize();
         window.requestAnimationFrame(() => {
           if (focusRequestId !== resultsMapFocusRequestId) return;
           if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
 
+          resultsMap.invalidateSize();
           const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
-          const targetZoom = Math.max(currentZoom, 15);
+          const targetZoom = Math.max(currentZoom, 14);
           const targetLatLng = marker.getLatLng();
           const focusLatLng = getMobilePopupFramedLatLng(targetLatLng, targetZoom);
 
           const performZoomAndPopup = () => {
-            if (focusRequestId !== resultsMapFocusRequestId) return;
-            if (!resultsMap) return;
-
             resultsMap.once('moveend', () => {
               window.requestAnimationFrame(() => {
                 if (focusRequestId !== resultsMapFocusRequestId) return;
                 if (!resultsMap) return;
+                resultsMap.invalidateSize();
                 openMarkerPopupWithoutAutoPan(marker);
               });
             });
@@ -10786,14 +10786,22 @@
               resultsMap.flyTo(focusLatLng, targetZoom, {
                 animate,
                 duration,
-                easeLinearity: 0.1
+                easeLinearity: 0.15
               });
             } else {
               resultsMap.setView(focusLatLng, targetZoom, { animate });
             }
           };
 
-          performZoomAndPopup();
+          if (resultsMapClusterGroup) {
+            resultsMapClusterGroup.zoomToShowLayer(marker, () => {
+              if (focusRequestId === resultsMapFocusRequestId) {
+                performZoomAndPopup();
+              }
+            });
+          } else {
+            performZoomAndPopup();
+          }
         });
       };
 
