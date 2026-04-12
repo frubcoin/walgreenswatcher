@@ -9687,7 +9687,6 @@
 
     function isFulfillmentOnlyStore(store, retailer = '') {
       const normalizedRetailer = retailerKey(retailer || store?.retailer || '');
-      if (normalizedRetailer === 'ace') return true;
       if (String(store?.availability_mode || '').trim().toLowerCase() === 'fulfillment') return true;
       if (store?.inventory_count_known === false) return true;
       return false;
@@ -9695,14 +9694,12 @@
 
     function locationUsesFulfillmentAvailability(location) {
       const retailer = retailerKey(location?.retailer || '');
-      if (retailer === 'ace') return true;
       const products = Array.isArray(location?.products) ? location.products : [];
       return products.length > 0 && products.every(product => isFulfillmentOnlyStore(product, product?.retailer || retailer));
     }
 
     function productUsesFulfillmentAvailability(product) {
       const retailer = retailerKey(product?.retailer || '');
-      if (retailer === 'ace') return true;
       const stores = Array.isArray(product?.stores) ? product.stores : [];
       return stores.length > 0 && stores.every(store => isFulfillmentOnlyStore(store, retailer));
     }
