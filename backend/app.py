@@ -43,7 +43,7 @@ from config import (  # noqa: E402
 from admin_notifications import AdminAlertService  # noqa: E402
 from ace import AceBrowserClient  # noqa: E402
 from cvs_scraper import CvsStockChecker  # noqa: E402
-from database import StockDatabase, TRENDING_PRODUCTS_RETENTION_HOURS  # noqa: E402
+from database import StockDatabase  # noqa: E402
 from product_resolver import resolve_product_link, CvsProductResolver  # noqa: E402
 from scheduler import SchedulerManager  # noqa: E402
 
