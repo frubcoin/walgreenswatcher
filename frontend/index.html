@@ -3382,6 +3382,25 @@
     .map-popup-product-copy {
       min-width: 0;
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-start;
+    }
+
+    .map-popup-product-availability {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      line-height: normal;
     }
 
     .map-popup-address a,
@@ -10343,10 +10362,13 @@
     function renderMapPopup(location) {
       const productsHtml = location.products.map(product => `
           <div class="map-popup-product">
-            <span class="map-popup-product-copy">${product.source_url
-              ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
-              : escapeHtml(product.name)
-            } <strong>${escapeHtml(getStoreAvailabilitySummary(product, product.retailer))}</strong></span>
+            <div class="map-popup-product-copy">
+              <span class="map-popup-product-name">${product.source_url
+                ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
+                : escapeHtml(product.name)
+              }</span>
+              <span class="map-popup-product-availability">${escapeHtml(getStoreAvailabilitySummary(product, product.retailer))}</span>
+            </div>
           </div>
         `).join('');
 
