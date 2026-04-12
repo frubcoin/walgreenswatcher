@@ -775,9 +775,20 @@ async ({ lat, lng, radius, headers }) => {
                             if has_pickup or has_delivery:
                                 context["stores"][loc_code] = {
                                     **candidate,
-                                    "inventory_count": 1,  # Binary status
+                                    "inventory_count": 1,  # Binary availability marker for internal sorting only
+                                    "inventory_count_known": False,
+                                    "availability_mode": "fulfillment",
                                     "pickup_available": has_pickup,
                                     "delivery_available": has_delivery,
+                                    "supports_inventory": bool(candidate.get("supportsInventory")),
+                                    "fulfillment_types": [
+                                        {
+                                            "code": str(ft.get("code") or "").upper(),
+                                            "name": str(ft.get("name") or "").strip(),
+                                        }
+                                        for ft in fulfillment_types
+                                        if isinstance(ft, dict)
+                                    ],
                                     "availability_text": "Available"
                                 }
                                 if has_pickup and has_delivery:

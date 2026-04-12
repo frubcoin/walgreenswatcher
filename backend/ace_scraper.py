@@ -80,8 +80,12 @@ class AceStockChecker:
             store_details[normalized_store_id] = {
                 **lookup_detail,
                 "inventory_count": store.get("inventory_count", 1),
+                "inventory_count_known": bool(store.get("inventory_count_known", False)),
+                "availability_mode": str(store.get("availability_mode") or "fulfillment").strip() or "fulfillment",
                 "pickup_available": store.get("pickup_available", False),
                 "delivery_available": store.get("delivery_available", False),
+                "supports_inventory": bool(store.get("supports_inventory", False)),
+                "fulfillment_types": list(store.get("fulfillment_types") or []),
                 "availability_text": store.get("availability_text", "In Stock"),
             }
 

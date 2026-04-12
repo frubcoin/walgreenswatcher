@@ -9578,6 +9578,72 @@
       return `<span class="fulfillment-badges">${badges.join('')}</span>`;
     }
 
+    function getFulfillmentSummary(pickupAvailable, deliveryAvailable, fallback = 'Available') {
+      if (pickupAvailable && deliveryAvailable) return 'Pickup & Delivery';
+      if (pickupAvailable) return 'Pickup';
+      if (deliveryAvailable) return 'Delivery';
+      return fallback;
+    }
+
+    function isFulfillmentOnlyStore(store, retailer = '') {
+      const normalizedRetailer = retailerKey(retailer || store?.retailer || '');
+      if (normalizedRetailer === 'ace') return true;
+      if (String(store?.availability_mode || '').trim().toLowerCase() === 'fulfillment') return true;
+      if (store?.inventory_count_known === false) return true;
+      return false;
+    }
+
+    function locationUsesFulfillmentAvailability(location) {
+      const retailer = retailerKey(location?.retailer || '');
+      if (retailer === 'ace') return true;
+      const products = Array.isArray(location?.products) ? location.products : [];
+      return products.length > 0 && products.every(product => isFulfillmentOnlyStore(product, product?.retailer || retailer));
+    }
+
+    function productUsesFulfillmentAvailability(product) {
+      const retailer = retailerKey(product?.retailer || '');
+      if (retailer === 'ace') return true;
+      const stores = Array.isArray(product?.stores) ? product.stores : [];
+      return stores.length > 0 && stores.every(store => isFulfillmentOnlyStore(store, retailer));
+    }
+
+    function getStoreAvailabilitySummary(store, retailer = '') {
+      if (isFulfillmentOnlyStore(store, retailer)) {
+        return String(store?.availability_text || '').trim()
+          || getFulfillmentSummary(store?.pickup_available, store?.delivery_available);
+      }
+      return `${Number(store?.inventory_count || 0)} in stock`;
+    }
+
+    function getProductFulfillmentSummary(product) {
+      const stores = Array.isArray(product?.stores) ? product.stores : [];
+      const pickupAvailable = stores.some(store => Boolean(store?.pickup_available));
+      const deliveryAvailable = stores.some(store => Boolean(store?.delivery_available));
+      return getFulfillmentSummary(pickupAvailable, deliveryAvailable, 'Availability confirmed');
+    }
+
+    function getLocationFulfillmentSummary(location) {
+      return getFulfillmentSummary(
+        Boolean(location?.pickup_available),
+        Boolean(location?.delivery_available),
+        'Availability confirmed'
+      );
+    }
+
+    function getProductSecondarySummary(product) {
+      if (productUsesFulfillmentAvailability(product)) {
+        return `${Number(product?.count || 0)} stores available | ${getProductFulfillmentSummary(product)}`;
+      }
+      return `${Number(product?.count || 0)} stores in stock | ${Number(product?.total_inventory || 0)} total units`;
+    }
+
+    function getLocationSecondarySummary(location) {
+      if (locationUsesFulfillmentAvailability(location)) {
+        return `${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${getLocationFulfillmentSummary(location)}`;
+      }
+      return `${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} units`;
+    }
+
     function productIdentityKey(productId, retailer = 'walgreens') {
       return `${retailerKey(retailer)}:${String(productId || '').trim()}`;
     }
@@ -10106,18 +10172,30 @@
               latitude,
               longitude,
               total_inventory: 0,
+              pickup_available: false,
+              delivery_available: false,
               products: []
             });
           }
 
           const location = storeMap.get(storeKey);
           const inventoryCount = Number(store.inventory_count || 0);
-          location.total_inventory += Number.isFinite(inventoryCount) ? inventoryCount : 0;
+          const fulfillmentOnly = isFulfillmentOnlyStore(store, productRetailer);
+          if (!fulfillmentOnly) {
+            location.total_inventory += Number.isFinite(inventoryCount) ? inventoryCount : 0;
+          }
+          location.pickup_available = location.pickup_available || Boolean(store.pickup_available);
+          location.delivery_available = location.delivery_available || Boolean(store.delivery_available);
           location.products.push({
             name: productName,
             retailer: productRetailer,
             source_url: productSourceUrl,
-            inventory_count: Number.isFinite(inventoryCount) ? inventoryCount : 0
+            inventory_count: Number.isFinite(inventoryCount) ? inventoryCount : 0,
+            inventory_count_known: store.inventory_count_known !== false,
+            availability_mode: String(store.availability_mode || '').trim(),
+            availability_text: String(store.availability_text || '').trim(),
+            pickup_available: Boolean(store.pickup_available),
+            delivery_available: Boolean(store.delivery_available),
           });
         });
       });
@@ -10268,14 +10346,14 @@
             <span class="map-popup-product-copy">${product.source_url
               ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
               : escapeHtml(product.name)
-            } <strong>${Number(product.inventory_count || 0)}</strong></span>
+            } <strong>${escapeHtml(getStoreAvailabilitySummary(product, product.retailer))}</strong></span>
           </div>
         `).join('');
 
       return `
           <div class="map-popup-title">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(location.name)} ${renderFulfillmentBadges(location)}</div>
           <div class="map-popup-address">${renderAddressLink(location.address)}</div>
-          <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} total units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
+          <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${locationUsesFulfillmentAvailability(location) ? escapeHtml(getLocationFulfillmentSummary(location)) : `${location.total_inventory} total units`} | ${location.product_count} product${location.product_count === 1 ? '' : 's'}${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
           <div class="map-popup-products">${productsHtml}</div>
         `;
     }
@@ -12003,7 +12081,7 @@
                   </div>
                 </div>
                 <div class="results-map-item-address">${escapeHtml(location.address)}</div>
-                <div class="results-map-item-meta">${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} units${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
+                <div class="results-map-item-meta">${getLocationSecondarySummary(location)}${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
                 <div class="results-map-item-products">${escapeHtml(location.products_label)}</div>
               </button>
             `).join('')}
@@ -12425,7 +12503,7 @@
       <div class="result-store-index">${index + 1}.</div>
       <div class="result-store-copy">
         ${renderAddressLink(store.address)}
-        <div class="result-store-meta">Qty: <strong>${Number(store.inventory_count || 0)}</strong> | Distance: ${escapeHtml(formatDistance(getEffectiveStoreDistance(store)))}${renderFulfillmentBadges(store)}</div>
+        <div class="result-store-meta">${isFulfillmentOnlyStore(store) ? `Availability: <strong>${escapeHtml(getStoreAvailabilitySummary(store))}</strong>` : `Qty: <strong>${Number(store.inventory_count || 0)}</strong>`} | Distance: ${escapeHtml(formatDistance(getEffectiveStoreDistance(store)))}${renderFulfillmentBadges(store)}</div>
       </div>
     </div>
   `).join('');
@@ -12459,7 +12537,7 @@
             <div class="result-card-title">${productName}</div>
             ${sourceUrl ? `<a class="result-card-link" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Product Page</a>` : ''}
           </div>
-          <div class="result-card-subtitle">${Number(product.count || 0)} stores in stock | ${Number(product.total_inventory || 0)} total units</div>
+          <div class="result-card-subtitle">${getProductSecondarySummary(product)}</div>
         </div>
         ${imageUrl ? `
           <div class="result-card-thumb">
@@ -12474,8 +12552,11 @@
           <div class="result-stat-value">${Number(product.count || 0)}</div>
         </div>
         <div class="result-stat">
-          <div class="result-stat-label">Units</div>
-          <div class="result-stat-value">${Number(product.total_inventory || 0)}</div>
+          <div class="result-stat-label">${productUsesFulfillmentAvailability(product) ? 'Fulfillment' : 'Units'}</div>
+          ${productUsesFulfillmentAvailability(product)
+            ? `<div class="result-stat-text">${escapeHtml(getProductFulfillmentSummary(product))}</div>`
+            : `<div class="result-stat-value">${Number(product.total_inventory || 0)}</div>`
+          }
         </div>
         <div class="result-stat">
           <div class="result-stat-label">Nearest</div>
@@ -12855,7 +12936,7 @@
             expandedHtml += `
                 <div class="history-product-detail">
                   <span class="hpd-name">${escapeHtml(p.product_name)}</span>
-                  <span class="hpd-stats">${p.count} stores | ${p.total_inventory} units</span>
+                  <span class="hpd-stats">${getProductSecondarySummary(p)}</span>
                 </div>
               `;
           });
