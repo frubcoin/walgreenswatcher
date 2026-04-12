@@ -290,6 +290,60 @@ function findLinuxChromiumExecutable() {
     return '';
 }
 
+async function clickPickupTab(page) {
+    // CVS fulfillment tabs (Pickup / Same Day Delivery / Shipping) must be selected
+    // before the 'Check more stores' link is rendered in the DOM.
+    const pickupSelectors = [
+        'button:has-text("Pickup")',
+        '[role="tab"]:has-text("Pickup")',
+        '[role="button"]:has-text("Pickup")',
+        'a:has-text("Pickup")',
+        'label:has-text("Pickup")',
+    ];
+
+    for (const selector of pickupSelectors) {
+        try {
+            const locator = page.locator(selector).first();
+            if (!(await locator.isVisible({ timeout: 1500 }).catch(() => false))) continue;
+            await locator.scrollIntoViewIfNeeded().catch(() => {});
+            await page.waitForTimeout(randomInt(100, 220));
+            await locator.click({ timeout: 4000 });
+            await page.waitForTimeout(randomInt(600, 1200));
+            console.log(`[pickup] clicked pickup tab via selector: ${selector}`);
+            return true;
+        } catch {
+            continue;
+        }
+    }
+
+    // Fallback: evaluate-based text match for dynamically rendered tabs
+    const clicked = await page.evaluate(() => {
+        const matchesPickup = (text) => {
+            const t = String(text || '').trim().toLowerCase();
+            return t === 'pickup' || t === 'in-store pickup' || t === 'store pickup' || t === 'pick up';
+        };
+        for (const selector of ['button', '[role="tab"]', '[role="button"]', 'label', 'a', 'span', 'div']) {
+            for (const el of document.querySelectorAll(selector)) {
+                if (matchesPickup(el.textContent)) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.click();
+                    return true;
+                }
+            }
+        }
+        return false;
+    });
+
+    if (clicked) {
+        await page.waitForTimeout(randomInt(600, 1200));
+        console.log('[pickup] clicked pickup tab via evaluate fallback');
+        return true;
+    }
+
+    console.log('[pickup] pickup tab not found; continuing without click');
+    return false;
+}
+
 async function clickCheckMoreStores(page) {
     const selectors = [
         'button:has-text("Check more stores")',
@@ -608,6 +662,12 @@ async function runAttempt(proxyConfig) {
         await humanizePage(page);
         await page.evaluate(() => window.scrollTo(0, 600));
         await page.waitForTimeout(randomInt(1200, 2200));
+
+        // CVS requires the Pickup fulfillment tab to be selected first before
+        // the 'Check more stores' trigger link becomes visible in the DOM.
+        await clickPickupTab(page);
+        await page.evaluate(() => window.scrollTo(0, 600));
+        await page.waitForTimeout(randomInt(600, 1000));
 
         let dialogVisible = await waitForDialogInput(page, 1200);
         if (dialogVisible) {
