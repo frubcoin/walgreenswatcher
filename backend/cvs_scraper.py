@@ -7,6 +7,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import random
 import re
 import secrets
 import shutil
@@ -723,6 +724,8 @@ class CvsStockChecker:
         inventory_wait_ms = cls._playwright_inventory_wait_ms()
         executable_path = cls._playwright_browser_executable_path()
         proxy_candidates = cls._playwright_proxy_candidates()
+        if proxy_candidates:
+            proxy_candidates = random.sample(proxy_candidates, len(proxy_candidates))
         failures: List[str] = []
         blocked_routes: List[str] = []
 
@@ -958,8 +961,9 @@ class CvsStockChecker:
         env["CVS_XVFB_RANGE_MILES"] = str(self.search_radius_miles)
         configured_proxy_urls = self._configured_proxy_urls()
         if configured_proxy_urls:
-            env["CVS_PROXY_URLS"] = ",".join(configured_proxy_urls)
-            env["CVS_XVFB_PROXY_URLS"] = ",".join(configured_proxy_urls)
+            shuffled_proxies = random.sample(configured_proxy_urls, len(configured_proxy_urls))
+            env["CVS_PROXY_URLS"] = ",".join(shuffled_proxies)
+            env["CVS_XVFB_PROXY_URLS"] = ",".join(shuffled_proxies)
 
         logger.info("CVS inventory attempting Node/Playwright browser-context fetch via %s", script_path)
         completed = subprocess.run(
