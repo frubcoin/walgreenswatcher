@@ -66,6 +66,7 @@ ACE_SEC_HEADERS = {
 }
 
 _zip_geocode_cache: Dict[str, Dict[str, float]] = {}
+_store_candidates_cache: Dict[str, List[Dict[str, Any]]] = {}
 
 
 def _convert_proxy_format(proxy_url: str) -> str:
@@ -152,9 +153,15 @@ class AceBrowserClient:
         cls,
         product_url: str,
         zip_code: str,
+        *,
+        product_hints: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """High-speed inventory check using Ace's direct commerce APIs."""
-        product_id = cls.extract_product_id(product_url)
+        base_product = cls._product_metadata_from_hints(product_url, product_hints)
+        product_id = cls._first_non_empty(
+            base_product.get("product_id"),
+            cls.extract_product_id(product_url),
+        )
         geocoded = cls.geocode_zip(zip_code)
         lat, lng = geocoded["lat"], geocoded["lng"]
 
@@ -162,15 +169,19 @@ class AceBrowserClient:
         random.shuffle(proxies)
         # Prioritize direct server path, then proxies
         candidates = [None] + proxies
+        cached_stores = cls._get_cached_store_candidates(zip_code)
 
         for proxy_url in candidates:
             proxy_label = cls.proxy_label(proxy_url)
             try:
                 logger.info("Ace direct-API attempt via %s", proxy_label)
-                stores = cls._direct_api_fetch_stores(lat, lng, proxy_url)
+                stores = cls._clone_store_candidates(cached_stores) if cached_stores else cls._direct_api_fetch_stores(lat, lng, proxy_url)
                 if not stores:
                     logger.warning("Ace direct-API: No stores nearby for %s", zip_code)
                     return None
+                if not cached_stores:
+                    cls._set_cached_store_candidates(zip_code, stores)
+                    cached_stores = cls._clone_store_candidates(stores)
 
                 # Fetch exact inventory counts from all candidate stores concurrently
                 with ThreadPoolExecutor(max_workers=5) as executor:
@@ -201,8 +212,19 @@ class AceBrowserClient:
                 }
 
                 logger.info("Ace direct-API success via %s: found %d stores with stock", proxy_label, len(in_stock_stores))
+                product_metadata = dict(base_product)
+                try:
+                    fetched_metadata = cls._fetch_product_metadata_via_api(product_url, proxy_url)
+                    product_metadata.update({key: value for key, value in fetched_metadata.items() if value})
+                except Exception as exc:
+                    logger.info(
+                        "Ace direct-API metadata enrichment failed via %s for %s: %s",
+                        proxy_label,
+                        product_id,
+                        exc,
+                    )
                 return {
-                    "product": cls._fetch_product_metadata_via_api(product_url, proxy_url),
+                    "product": product_metadata,
                     "store_candidates": stores,
                     "stores": in_stock_stores,
                     "proxy": proxy_label
@@ -604,6 +626,60 @@ class AceBrowserClient:
         return location
 
     @staticmethod
+    def _normalized_zip_cache_key(zip_code: Any) -> str:
+        return str(zip_code or "").strip()
+
+    @staticmethod
+    def _clone_store_candidates(store_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return [dict(item) for item in (store_items or [])]
+
+    @classmethod
+    def _get_cached_store_candidates(cls, zip_code: Any) -> List[Dict[str, Any]]:
+        cache_key = cls._normalized_zip_cache_key(zip_code)
+        if not cache_key:
+            return []
+        return cls._clone_store_candidates(_store_candidates_cache.get(cache_key) or [])
+
+    @classmethod
+    def _set_cached_store_candidates(cls, zip_code: Any, store_items: List[Dict[str, Any]]) -> None:
+        cache_key = cls._normalized_zip_cache_key(zip_code)
+        if not cache_key or not store_items:
+            return
+        _store_candidates_cache[cache_key] = cls._clone_store_candidates(store_items)
+
+    @classmethod
+    def _product_metadata_from_hints(
+        cls,
+        product_link: str,
+        product_hints: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, str]:
+        hints = dict(product_hints or {})
+        canonical_url = cls._first_non_empty(
+            cls.normalize_url(hints.get("canonical_url")),
+            cls.normalize_url(hints.get("source_url")),
+            cls.canonical_product_url(product_link),
+        )
+        product_id = cls._first_non_empty(
+            hints.get("product_id"),
+            hints.get("article_id"),
+        )
+        if not product_id:
+            try:
+                product_id = cls.extract_product_id(product_link)
+            except Exception:
+                product_id = ""
+
+        return {
+            "retailer": "ace",
+            "product_id": product_id,
+            "article_id": product_id,
+            "planogram": product_id,
+            "name": cls._first_non_empty(hints.get("name")),
+            "image_url": cls._normalize_asset_url(hints.get("image_url")),
+            "canonical_url": canonical_url,
+        }
+
+    @staticmethod
     def build_store_lookup(store_items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         lookup: Dict[str, Dict[str, Any]] = {}
         for item in store_items:
@@ -939,6 +1015,7 @@ async ({ lat, lng, radius, headers }) => {
         product_url: str,
         *,
         zip_code: Optional[str] = None,
+        product_hints: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         product_url = cls.canonical_product_url(product_url)
         if not product_url:
@@ -946,13 +1023,15 @@ async ({ lat, lng, radius, headers }) => {
 
         geocoded_location = cls.geocode_zip(zip_code) if zip_code else None
         last_error: Optional[Exception] = None
+        base_product = cls._product_metadata_from_hints(product_url, product_hints)
+        needs_page_metadata = not base_product.get("name")
 
         for proxy in cls.proxy_candidates():
             debug_screenshot = ""
             proxy_label = cls.proxy_label(proxy)
             try:
                 context: Dict[str, Any] = {
-                    "product": {},
+                    "product": dict(base_product),
                     "store_candidates": [],
                     "store_cards": [],
                     "stores": {},
@@ -973,27 +1052,37 @@ async ({ lat, lng, radius, headers }) => {
 
                     def action(page: Any) -> None:
                         nonlocal debug_screenshot
-                        cls._maybe_dismiss_cookie_banner(page)
-                        cls._humanize_page(page)
-
-                        context["product"] = cls.extract_product_metadata(page, product_url)
+                        if needs_page_metadata:
+                            cls._maybe_dismiss_cookie_banner(page)
+                            cls._humanize_page(page)
+                            fetched_product = cls.extract_product_metadata(page, product_url)
+                            context["product"].update({key: value for key, value in fetched_product.items() if value})
                         context["cookies"] = [dict(cookie) for cookie in page.context.cookies()]
 
                         if not geocoded_location:
                             return
 
-                        context["store_candidates"] = cls._browser_fetch_store_candidates(
-                            page,
-                            geocoded_location["lat"],
-                            geocoded_location["lng"],
-                        )
+                        cached_stores = cls._get_cached_store_candidates(zip_code)
+                        if cached_stores:
+                            context["store_candidates"] = cached_stores
+                        else:
+                            context["store_candidates"] = cls._browser_fetch_store_candidates(
+                                page,
+                                geocoded_location["lat"],
+                                geocoded_location["lng"],
+                            )
+                            cls._set_cached_store_candidates(zip_code, context["store_candidates"])
                         store_lookup = cls.build_store_lookup(context["store_candidates"])
                         if not store_lookup:
                             raise AceBrowserError("Ace did not return any store candidates for that ZIP")
 
                         # Fetch real inventory counts from within the browser context
                         store_codes = list(store_lookup.keys())
-                        inventory_results = cls._browser_fetch_store_inventory(page, context["product"].get("product_id"), store_codes)
+                        product_id = cls._first_non_empty(
+                            context["product"].get("product_id"),
+                            cls.extract_product_id(product_url),
+                        )
+                        inventory_results = cls._browser_fetch_store_inventory(page, product_id, store_codes)
                         inventory_lookup = { r["storeCode"]: (r.get("data") or {}).get("storeInventory") or {} for r in inventory_results if r.get("ok") }
 
                         # Summarize availability based on inventory and fulfillmentTypes
