@@ -13488,6 +13488,10 @@
       }
     }
 
+    let progressProductStartTime = 0;
+    let progressLastProductIndex = -1;
+    let progressHeartbeatInterval = null;
+
     async function triggerManualCheck() {
       console.log('Check button clicked');
       document.getElementById('check-btn').disabled = true;
@@ -13500,6 +13504,23 @@
       
       // Reset product timing for conditional disclaimer
       progressLastProductIndex = -1;
+      progressProductStartTime = 0;
+      if (progressHeartbeatInterval) {
+        clearInterval(progressHeartbeatInterval);
+      }
+      document.getElementById('progress-delay-disclaimer').style.display = 'none';
+
+      // Start a heartbeat timer to monitor for long-running checks
+      progressHeartbeatInterval = setInterval(() => {
+        if (progressProductStartTime > 0) {
+          const elapsed = Date.now() - progressProductStartTime;
+          if (elapsed > 15000) {
+            document.getElementById('progress-delay-disclaimer').style.display = 'block';
+          }
+        }
+      }, 1000);
+      
+      // Start timing from now as the check is technically starting
       progressProductStartTime = Date.now();
 
       try {
@@ -13561,6 +13582,9 @@
         showToast('Check failed: ' + error.message, 'error');
         progressSection.style.display = 'none';
       } finally {
+        if (progressHeartbeatInterval) {
+          clearInterval(progressHeartbeatInterval);
+        }
         document.getElementById('check-btn').disabled = false;
         document.getElementById('check-btn-text').textContent = 'Check Now';
       }
@@ -13597,17 +13621,12 @@
 
       document.getElementById('progress-count').textContent = `Store processing: ${checked} / ${total} | Current product hits: ${storesWithStock}`;
 
-      // Show delay disclaimer only if we've been on the same product for > 15 seconds
+      // Reset timing when a new product starts
       const currentIdx = progress.current_product_index || 0;
       if (currentIdx !== progressLastProductIndex) {
         progressLastProductIndex = currentIdx;
         progressProductStartTime = Date.now();
         document.getElementById('progress-delay-disclaimer').style.display = 'none';
-      } else if (progressProductStartTime > 0) {
-        const elapsed = Date.now() - progressProductStartTime;
-        if (elapsed > 15000) {
-          document.getElementById('progress-delay-disclaimer').style.display = 'block';
-        }
       }
     }
 

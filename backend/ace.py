@@ -1003,19 +1003,18 @@ async ({ lat, lng, radius, headers }) => {
                             if not loc_code:
                                 continue
                             
-                            if not candidate.get("supportsInventory"):
-                                continue
-                            
-                            # Use exact inventory if extracted from browser fetch, otherwise fallback to binary
+                            # Use exact inventory if extracted from browser fetch
                             store_inv = inventory_lookup.get(loc_code) or {}
                             stock_count = int(store_inv.get("stockAvailable") or 0)
                             is_exact = loc_code in inventory_lookup
+                            
+                            f_types = candidate.get("fulfillmentTypes") or []
 
                             # Strictly only show if inventory API returned a positive stock count
                             has_pickup = stock_count > 0
                             has_delivery = stock_count > 0 and any(
                                 str(ft.get("code") or "").upper() == "DL" 
-                                for ft in (candidate.get("fulfillmentTypes") or [])
+                                for ft in f_types
                                 if isinstance(ft, dict)
                             )
                             
@@ -1033,7 +1032,7 @@ async ({ lat, lng, radius, headers }) => {
                                             "code": str(ft.get("code") or "").upper(),
                                             "name": str(ft.get("name") or "").strip(),
                                         }
-                                        for ft in fulfillment_types
+                                        for ft in f_types
                                         if isinstance(ft, dict)
                                     ],
                                     "availability_text": f"{stock_count} In Stock" if is_exact else "Available"

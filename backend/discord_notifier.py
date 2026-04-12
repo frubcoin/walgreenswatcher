@@ -432,6 +432,13 @@ class DiscordNotifier:
         )
         address = nearest.get("address", "Address unavailable")
         distance_text = self._distance_text(nearest.get("distance"))
+        
+        inventory_count = nearest.get("inventory_count", 0)
+        inventory_known = nearest.get("inventory_count_known", True)
+        
+        if inventory_known and inventory_count > 0:
+            return f"{self._address_link(address)} ({distance_text}) - **{inventory_count} units**"
+            
         return f"{self._address_link(address)} ({distance_text})"
 
     def notify_stock_found(self, products_with_stock: Dict, configured_zip: str) -> bool:
