@@ -760,6 +760,9 @@ async ({ lat, lng, radius, headers }) => {
                             if not loc_code:
                                 continue
                             
+                            if not candidate.get("supportsInventory"):
+                                continue
+                            
                             fulfillment_types = candidate.get("fulfillmentTypes") or []
                             has_pickup = any(
                                 str(ft.get("code") or "").upper() == "SP" 
