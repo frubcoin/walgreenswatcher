@@ -334,11 +334,11 @@ class CvsStockChecker:
     def _playwright_inventory_wait_ms() -> int:
         raw = os.getenv("CVS_PLAYWRIGHT_INVENTORY_WAIT_MS", "").strip()
         if not raw:
-            return 12000
+            return 25000
         try:
             timeout_ms = int(raw)
         except ValueError:
-            return 12000
+            return 25000
         return max(5000, min(timeout_ms, 120000))
 
     @staticmethod

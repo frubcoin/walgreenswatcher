@@ -9,7 +9,7 @@ const DEFAULT_ZIP = '85208';
 const DEFAULT_API_KEY = 'a2ff75c6-2da7-4299-929d-d670d827ab4a';
 const DEFAULT_HEADLESS = false;
 const DEFAULT_TIMEOUT_MS = 30000;
-const DEFAULT_INVENTORY_WAIT_MS = 12000;
+const DEFAULT_INVENTORY_WAIT_MS = 25000;
 const OUTPUT_DIR = path.resolve(process.cwd(), 'output');
 const WINDOWS_USER_AGENT =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
@@ -296,6 +296,9 @@ async function clickCheckMoreStores(page) {
         'a:has-text("Check more stores")',
         '[role="button"]:has-text("Check more stores")',
         'text=Check more stores',
+        'button:has-text("Change store")',
+        'a:has-text("Change store")',
+        '[role="button"]:has-text("Change store")',
     ];
 
     for (const selector of selectors) {
@@ -315,10 +318,21 @@ async function clickCheckMoreStores(page) {
     }
 
     const clicked = await page.evaluate(() => {
+        const matchesTrigger = (value) => {
+            const text = String(value || '').trim().toLowerCase();
+            if (!text) return false;
+            return (
+                text === 'check more stores' ||
+                text.includes('check more store') ||
+                text === 'change store' ||
+                /^get it at \d+ nearby stores?$/.test(text) ||
+                text.includes('nearby stores')
+            );
+        };
+
         for (const selector of ['a', 'button', 'span', '[role="button"]', 'div']) {
             for (const element of document.querySelectorAll(selector)) {
-                const text = element.textContent?.trim().toLowerCase();
-                if (text === 'check more stores' || text?.includes('check more store')) {
+                if (matchesTrigger(element.textContent)) {
                     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     element.click();
                     return true;
@@ -328,6 +342,17 @@ async function clickCheckMoreStores(page) {
         return false;
     });
     return Boolean(clicked);
+}
+
+async function waitForDialogInput(page, timeoutMs = 8000) {
+    const selector = '[role="dialog"] input[type="text"]';
+    const locator = page.locator(selector).first();
+    try {
+        await locator.waitFor({ state: 'visible', timeout: timeoutMs });
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 async function submitDialogSearch(page) {
@@ -501,6 +526,12 @@ async function runAttempt(proxyConfig) {
     let extractedImageUrl = '';
     let buttonClicked = false;
     let pageChallenge = '';
+    let inventoryRequestCount = 0;
+
+    let resolveInventoryRequestSeen = () => {};
+    const inventoryRequestSeen = new Promise((resolve) => {
+        resolveInventoryRequestSeen = resolve;
+    });
 
     const inventoryPromise = new Promise((resolve) => {
         page.on('response', async (res) => {
@@ -521,6 +552,8 @@ async function runAttempt(proxyConfig) {
 
     page.on('request', (req) => {
         if (!req.url().includes('getStoreDetailsAndInventory')) return;
+        inventoryRequestCount += 1;
+        resolveInventoryRequestSeen();
         console.log('\n[request] outgoing inventory request');
         console.log(`[request] url=${req.url()}`);
         if (req.postData()) {
@@ -576,48 +609,81 @@ async function runAttempt(proxyConfig) {
         await page.evaluate(() => window.scrollTo(0, 600));
         await page.waitForTimeout(randomInt(1200, 2200));
 
-        buttonClicked = await clickCheckMoreStores(page);
-        if (!buttonClicked) {
+        let dialogVisible = await waitForDialogInput(page, 1200);
+        if (dialogVisible) {
+            console.log('[dialog] inventory modal already open');
+        } else {
+            buttonClicked = await clickCheckMoreStores(page);
+            if (buttonClicked) {
+                console.log('[page] clicked store availability trigger');
+                await page.waitForTimeout(randomInt(350, 900));
+                dialogVisible = await waitForDialogInput(page, 8000);
+                if (!dialogVisible) {
+                    await Promise.race([
+                        waitForDialogInput(page, 6000).then((visible) => {
+                            dialogVisible = visible;
+                        }),
+                        inventoryRequestSeen,
+                        page.waitForTimeout(6000),
+                    ]);
+                    dialogVisible = dialogVisible || (await waitForDialogInput(page, 800).catch(() => false));
+                }
+            } else {
+                await Promise.race([
+                    waitForDialogInput(page, 2500).then((visible) => {
+                        dialogVisible = visible;
+                    }),
+                    inventoryRequestSeen,
+                    page.waitForTimeout(2500),
+                ]);
+                dialogVisible = dialogVisible || (await waitForDialogInput(page, 800).catch(() => false));
+            }
+        }
+
+        if (dialogVisible) {
+            const inputSel = '[role="dialog"] input[type="text"]';
+            const inputId = await page.$eval(inputSel, (el) => el.id || '');
+            console.log(`[dialog] input id="${inputId}"`);
+
+            await page.click(inputSel);
+            await page.waitForTimeout(randomInt(120, 260));
+            await page.keyboard.press('Control+A');
+            await page.waitForTimeout(randomInt(60, 140));
+            await page.keyboard.press('Backspace');
+            await page.waitForTimeout(randomInt(80, 180));
+            await page.type(inputSel, targetZip, { delay: 80 });
+            console.log(`[dialog] typed zip=${targetZip}`);
+
+            await page.waitForTimeout(randomInt(350, 700));
+
+            const searchClicked = await submitDialogSearch(page);
+            if (searchClicked) {
+                console.log(`[dialog] clicked button="${searchClicked}"`);
+            } else {
+                console.log('[dialog] no button found, pressing Enter');
+                await page.keyboard.press('Enter');
+            }
+        } else {
             const refreshedChallenge = detectChallenge(await page.content().catch(() => ''));
             if (refreshedChallenge) {
                 pageChallenge = refreshedChallenge;
             }
-            const screenshotPath = path.join(OUTPUT_DIR, `debug_nobutton_${Date.now()}.png`);
-            await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
-            const reason = pageChallenge ? `; page challenge detected: ${pageChallenge}` : '';
-            throw new Error(`'Check more stores' button not found; screenshot=${screenshotPath}${reason}`);
-        }
-
-        console.log('[page] clicked "Check more stores"');
-        await page.waitForSelector('[role="dialog"] input[type="text"]', { timeout: 8000 });
-        const inputSel = '[role="dialog"] input[type="text"]';
-        const inputId = await page.$eval(inputSel, (el) => el.id || '');
-        console.log(`[dialog] input id="${inputId}"`);
-
-        await page.click(inputSel);
-        await page.waitForTimeout(randomInt(120, 260));
-        await page.keyboard.press('Control+A');
-        await page.waitForTimeout(randomInt(60, 140));
-        await page.keyboard.press('Backspace');
-        await page.waitForTimeout(randomInt(80, 180));
-        await page.type(inputSel, targetZip, { delay: 80 });
-        console.log(`[dialog] typed zip=${targetZip}`);
-
-        await page.waitForTimeout(randomInt(350, 700));
-
-        const searchClicked = await submitDialogSearch(page);
-        if (searchClicked) {
-            console.log(`[dialog] clicked button="${searchClicked}"`);
-        } else {
-            console.log('[dialog] no button found, pressing Enter');
-            await page.keyboard.press('Enter');
+            if (!buttonClicked && inventoryRequestCount === 0) {
+                const screenshotPath = path.join(OUTPUT_DIR, `debug_nobutton_${Date.now()}.png`);
+                await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
+                const reason = pageChallenge ? `; page challenge detected: ${pageChallenge}` : '';
+                throw new Error(`'Check more stores' button not found; screenshot=${screenshotPath}${reason}`);
+            }
+            console.log('[dialog] modal not visible; waiting for rewritten inventory request already in flight');
         }
 
         console.log('[wait] waiting for inventory response');
         await Promise.race([
             inventoryPromise,
             page.waitForTimeout(inventoryWaitMs).then(() => {
-                throw new Error(`timed out waiting for inventory response after ${inventoryWaitMs}ms`);
+                throw new Error(
+                    `timed out waiting for inventory response after ${inventoryWaitMs}ms (requests=${inventoryRequestCount}, responses=${responseCount})`,
+                );
             }),
         ]);
 
