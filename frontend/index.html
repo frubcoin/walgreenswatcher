@@ -10597,6 +10597,52 @@
       }
     }
 
+    function frameResultsMapPopup(popup, { animate = true } = {}) {
+      if (!resultsMap || typeof popup?.getElement !== 'function') return;
+
+      window.requestAnimationFrame(() => {
+        if (!resultsMap) return;
+
+        const mapElement = resultsMap.getContainer?.();
+        const popupElement = popup.getElement?.();
+        if (!mapElement || !popupElement) return;
+
+        const popupCard = popupElement.querySelector('.leaflet-popup-content-wrapper') || popupElement;
+        const mapRect = mapElement.getBoundingClientRect();
+        const popupRect = popupCard.getBoundingClientRect();
+        if (!mapRect.width || !mapRect.height || !popupRect.width || !popupRect.height) return;
+
+        const currentPopupCenterX = (popupRect.left - mapRect.left) + (popupRect.width / 2);
+        const currentPopupCenterY = (popupRect.top - mapRect.top) + (popupRect.height / 2);
+        const targetPopupCenterX = mapRect.width / 2;
+        const targetPopupCenterY = mapRect.height / 2;
+
+        const adjustmentX = targetPopupCenterX - currentPopupCenterX;
+        const adjustmentY = targetPopupCenterY - currentPopupCenterY;
+
+        if (Math.abs(adjustmentX) < 8 && Math.abs(adjustmentY) < 8) {
+          return;
+        }
+
+        if (typeof resultsMap.project !== 'function' || typeof resultsMap.unproject !== 'function' || typeof resultsMap.getCenter !== 'function') {
+          return;
+        }
+
+        const zoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
+        const currentCenter = resultsMap.getCenter();
+        const nextCenter = resultsMap.unproject(
+          resultsMap.project(currentCenter, zoom).subtract([adjustmentX, adjustmentY]),
+          zoom
+        );
+
+        if (typeof resultsMap.panTo === 'function') {
+          resultsMap.panTo(nextCenter, { animate });
+        } else if (typeof resultsMap.setView === 'function') {
+          resultsMap.setView(nextCenter, zoom, { animate });
+        }
+      });
+    }
+
     function getMobilePopupFramedLatLng(targetLatLng, zoom) {
       if (!resultsMap || !targetLatLng || !isMobileSignedInDashboard()) {
         return targetLatLng;
@@ -11911,7 +11957,12 @@
 
         marker.bindPopup(renderMapPopup(location), getResultsMapPopupOptions());
         marker.on('click', () => setActiveResultsMapItem(location.location_key));
-        marker.on('popupopen', () => setActiveResultsMapItem(location.location_key));
+        marker.on('popupopen', event => {
+          setActiveResultsMapItem(location.location_key);
+          frameResultsMapPopup(event?.popup || marker.getPopup?.(), {
+            animate: Boolean(resultsMap?.options?.zoomAnimation),
+          });
+        });
         bounds.push([location.latitude, location.longitude]);
         resultsMapMarkersByKey.set(location.location_key, marker);
         return marker;
