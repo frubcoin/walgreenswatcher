@@ -10,7 +10,7 @@ import re
 import time
 from html import unescape
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import requests
@@ -1066,7 +1066,203 @@ async ({ lat, lng, radius, headers }) => {
             raise AceBrowserError("Ace browser store lookup did not return any nearby stores")
         return items
 
+    @classmethod
+    def _fetch_product_context_with_session(
+        cls,
+        session: Any,
+        product_url: str,
+        *,
+        zip_code: Optional[str] = None,
+        geocoded_location: Optional[Dict[str, float]] = None,
+        product_hints: Optional[Dict[str, Any]] = None,
+        proxy_label: str = "direct",
+    ) -> Dict[str, Any]:
+        product_url = cls.canonical_product_url(product_url)
+        if not product_url:
+            raise AceBrowserError("Ace product URL required")
 
+        debug_screenshot = ""
+        base_product = cls._product_metadata_from_hints(product_url, product_hints)
+        needs_page_metadata = not base_product.get("name")
+        context: Dict[str, Any] = {
+            "product": dict(base_product),
+            "store_candidates": [],
+            "store_cards": [],
+            "stores": {},
+            "proxy": proxy_label,
+            "debug_screenshot": "",
+        }
+
+        def action(page: Any) -> None:
+            nonlocal debug_screenshot
+            if needs_page_metadata:
+                cls._maybe_dismiss_cookie_banner(page)
+                cls._humanize_page(page)
+                fetched_product = cls.extract_product_metadata(page, product_url)
+                context["product"].update({key: value for key, value in fetched_product.items() if value})
+            context["cookies"] = [dict(cookie) for cookie in page.context.cookies()]
+
+            if not geocoded_location:
+                return
+
+            cached_stores = cls._get_cached_store_candidates(zip_code)
+            if cached_stores:
+                context["store_candidates"] = cached_stores
+            else:
+                context["store_candidates"] = cls._browser_fetch_store_candidates(
+                    page,
+                    geocoded_location["lat"],
+                    geocoded_location["lng"],
+                )
+                cls._set_cached_store_candidates(zip_code, context["store_candidates"])
+            store_lookup = cls.build_store_lookup(context["store_candidates"])
+            if not store_lookup:
+                raise AceBrowserError("Ace did not return any store candidates for that ZIP")
+
+            store_codes = list(store_lookup.keys())
+            product_id = cls._first_non_empty(
+                context["product"].get("product_id"),
+                cls.extract_product_id(product_url),
+            )
+            inventory_results = cls._browser_fetch_store_inventory(page, product_id, store_codes)
+            inventory_lookup = {
+                result["storeCode"]: (result.get("data") or {}).get("storeInventory") or {}
+                for result in inventory_results
+                if result.get("ok")
+            }
+
+            for candidate in context["store_candidates"]:
+                loc_code = str(candidate.get("code") or "").strip()
+                if not loc_code:
+                    continue
+
+                store_inv = inventory_lookup.get(loc_code) or {}
+                stock_count = int(store_inv.get("stockAvailable") or 0)
+                is_exact = loc_code in inventory_lookup
+                f_types = candidate.get("fulfillmentTypes") or []
+
+                has_pickup = stock_count > 0
+                has_delivery = stock_count > 0 and any(
+                    str(ft.get("code") or "").upper() == "DL"
+                    for ft in f_types
+                    if isinstance(ft, dict)
+                )
+
+                if has_pickup or has_delivery:
+                    context["stores"][loc_code] = {
+                        **candidate,
+                        "inventory_count": stock_count if is_exact else 1,
+                        "inventory_count_known": is_exact,
+                        "availability_mode": "exact" if is_exact else "fulfillment",
+                        "pickup_available": has_pickup,
+                        "delivery_available": has_delivery,
+                        "supports_inventory": bool(candidate.get("supportsInventory")),
+                        "fulfillment_types": [
+                            {
+                                "code": str(ft.get("code") or "").upper(),
+                                "name": str(ft.get("name") or "").strip(),
+                            }
+                            for ft in f_types
+                            if isinstance(ft, dict)
+                        ],
+                        "availability_text": f"{stock_count} In Stock" if is_exact else "Available",
+                    }
+                    if not is_exact:
+                        if has_pickup and has_delivery:
+                            context["stores"][loc_code]["availability_text"] = "Pickup & Delivery Available"
+                        elif has_pickup:
+                            context["stores"][loc_code]["availability_text"] = "Available for Pickup"
+                        elif has_delivery:
+                            context["stores"][loc_code]["availability_text"] = "Available for Delivery"
+                else:
+                    logger.debug("Ace store %s lacks both SP and DL fulfillment", loc_code)
+
+            logger.info(
+                "Ace check complete: found %d stores with stock for pid=%s",
+                len(context["stores"]),
+                context["product"].get("product_id"),
+            )
+
+        response = session.fetch(product_url, page_action=action)
+        if response.status >= 400:
+            raise AceBrowserError(f"Ace returned HTTP {response.status} for the product page")
+
+        if context.get("product"):
+            if debug_screenshot and not context.get("debug_screenshot"):
+                context["debug_screenshot"] = debug_screenshot
+            return context
+        raise AceBrowserError("Ace product flow completed without product metadata")
+
+    @classmethod
+    def fetch_product_contexts(
+        cls,
+        product_requests: List[Dict[str, Any]],
+        *,
+        zip_code: Optional[str] = None,
+    ) -> Tuple[List[Optional[Dict[str, Any]]], Dict[int, Exception]]:
+        results: List[Optional[Dict[str, Any]]] = [None] * len(product_requests)
+        errors: Dict[int, Exception] = {}
+        if not product_requests:
+            return results, errors
+
+        geocoded_location = cls.geocode_zip(zip_code) if zip_code else None
+        pending = [
+            {
+                "index": index,
+                "product_url": str(request.get("source_url") or request.get("product_url") or "").strip(),
+                "product_hints": request,
+            }
+            for index, request in enumerate(product_requests)
+        ]
+
+        for proxy in cls.proxy_candidates():
+            if not pending:
+                break
+
+            proxy_label = cls.proxy_label(proxy)
+            next_pending: List[Dict[str, Any]] = []
+            try:
+                with StealthySession(
+                    proxy=proxy,
+                    headless=False,
+                    real_chrome=True,
+                    solve_cloudflare=True,
+                    disable_resources=False,
+                    network_idle=True,
+                    timeout=ACE_BROWSER_TIMEOUT_MS,
+                    wait=ACE_BROWSER_WAIT_MS,
+                ) as session:
+                    for item in pending:
+                        index = int(item["index"])
+                        product_url = str(item["product_url"] or "").strip()
+                        try:
+                            results[index] = cls._fetch_product_context_with_session(
+                                session,
+                                product_url,
+                                zip_code=zip_code,
+                                geocoded_location=geocoded_location,
+                                product_hints=item.get("product_hints"),
+                                proxy_label=proxy_label,
+                            )
+                            errors.pop(index, None)
+                        except Exception as exc:
+                            errors[index] = exc
+                            next_pending.append(item)
+                            logger.warning(
+                                "Ace batched browser flow failed via %s for product index %s: %s",
+                                proxy_label,
+                                index,
+                                exc,
+                            )
+            except Exception as exc:
+                for item in pending:
+                    errors[int(item["index"])] = exc
+                logger.warning("Ace batched browser session failed via %s: %s", proxy_label, exc)
+                continue
+
+            pending = next_pending
+
+        return results, errors
 
     @classmethod
     def fetch_product_context(
@@ -1082,22 +1278,10 @@ async ({ lat, lng, radius, headers }) => {
 
         geocoded_location = cls.geocode_zip(zip_code) if zip_code else None
         last_error: Optional[Exception] = None
-        base_product = cls._product_metadata_from_hints(product_url, product_hints)
-        needs_page_metadata = not base_product.get("name")
 
         for proxy in cls.proxy_candidates():
-            debug_screenshot = ""
             proxy_label = cls.proxy_label(proxy)
             try:
-                context: Dict[str, Any] = {
-                    "product": dict(base_product),
-                    "store_candidates": [],
-                    "store_cards": [],
-                    "stores": {},
-                    "proxy": proxy_label,
-                    "debug_screenshot": "",
-                }
-
                 with StealthySession(
                     proxy=proxy,
                     headless=False,
@@ -1108,108 +1292,14 @@ async ({ lat, lng, radius, headers }) => {
                     timeout=ACE_BROWSER_TIMEOUT_MS,
                     wait=ACE_BROWSER_WAIT_MS,
                 ) as session:
-
-                    def action(page: Any) -> None:
-                        nonlocal debug_screenshot
-                        if needs_page_metadata:
-                            cls._maybe_dismiss_cookie_banner(page)
-                            cls._humanize_page(page)
-                            fetched_product = cls.extract_product_metadata(page, product_url)
-                            context["product"].update({key: value for key, value in fetched_product.items() if value})
-                        context["cookies"] = [dict(cookie) for cookie in page.context.cookies()]
-
-                        if not geocoded_location:
-                            return
-
-                        cached_stores = cls._get_cached_store_candidates(zip_code)
-                        if cached_stores:
-                            context["store_candidates"] = cached_stores
-                        else:
-                            context["store_candidates"] = cls._browser_fetch_store_candidates(
-                                page,
-                                geocoded_location["lat"],
-                                geocoded_location["lng"],
-                            )
-                            cls._set_cached_store_candidates(zip_code, context["store_candidates"])
-                        store_lookup = cls.build_store_lookup(context["store_candidates"])
-                        if not store_lookup:
-                            raise AceBrowserError("Ace did not return any store candidates for that ZIP")
-
-                        # Fetch real inventory counts from within the browser context
-                        store_codes = list(store_lookup.keys())
-                        product_id = cls._first_non_empty(
-                            context["product"].get("product_id"),
-                            cls.extract_product_id(product_url),
-                        )
-                        inventory_results = cls._browser_fetch_store_inventory(page, product_id, store_codes)
-                        inventory_lookup = { r["storeCode"]: (r.get("data") or {}).get("storeInventory") or {} for r in inventory_results if r.get("ok") }
-
-                        # Summarize availability based on inventory and fulfillmentTypes
-                        # SP = In Store Pickup, DL = Delivery
-                        for candidate in context["store_candidates"]:
-                            loc_code = str(candidate.get("code") or "").strip()
-                            if not loc_code:
-                                continue
-                            
-                            # Use exact inventory if extracted from browser fetch
-                            store_inv = inventory_lookup.get(loc_code) or {}
-                            stock_count = int(store_inv.get("stockAvailable") or 0)
-                            is_exact = loc_code in inventory_lookup
-                            
-                            f_types = candidate.get("fulfillmentTypes") or []
-
-                            # Strictly only show if inventory API returned a positive stock count
-                            has_pickup = stock_count > 0
-                            has_delivery = stock_count > 0 and any(
-                                str(ft.get("code") or "").upper() == "DL" 
-                                for ft in f_types
-                                if isinstance(ft, dict)
-                            )
-                            
-                            if has_pickup or has_delivery:
-                                context["stores"][loc_code] = {
-                                    **candidate,
-                                    "inventory_count": stock_count if is_exact else 1,
-                                    "inventory_count_known": is_exact,
-                                    "availability_mode": "exact" if is_exact else "fulfillment",
-                                    "pickup_available": has_pickup,
-                                    "delivery_available": has_delivery,
-                                    "supports_inventory": bool(candidate.get("supportsInventory")),
-                                    "fulfillment_types": [
-                                        {
-                                            "code": str(ft.get("code") or "").upper(),
-                                            "name": str(ft.get("name") or "").strip(),
-                                        }
-                                        for ft in f_types
-                                        if isinstance(ft, dict)
-                                    ],
-                                    "availability_text": f"{stock_count} In Stock" if is_exact else "Available"
-                                }
-                                if not is_exact:
-                                    if has_pickup and has_delivery:
-                                        context["stores"][loc_code]["availability_text"] = "Pickup & Delivery Available"
-                                    elif has_pickup:
-                                        context["stores"][loc_code]["availability_text"] = "Available for Pickup"
-                                    elif has_delivery:
-                                        context["stores"][loc_code]["availability_text"] = "Available for Delivery"
-                            else:
-                                logger.debug("Ace store %s lacks both SP and DL fulfillment", loc_code)
-
-                        logger.info(
-                            "Ace check complete: found %d stores with stock for pid=%s",
-                            len(context["stores"]),
-                            context["product"].get("product_id")
-                        )
-
-                    response = session.fetch(product_url, page_action=action)
-                    if response.status >= 400:
-                        raise AceBrowserError(f"Ace returned HTTP {response.status} for the product page")
-
-                if context.get("product"):
-                    if debug_screenshot and not context.get("debug_screenshot"):
-                        context["debug_screenshot"] = debug_screenshot
-                    return context
-                raise AceBrowserError("Ace product flow completed without product metadata")
+                    return cls._fetch_product_context_with_session(
+                        session,
+                        product_url,
+                        zip_code=zip_code,
+                        geocoded_location=geocoded_location,
+                        product_hints=product_hints,
+                        proxy_label=proxy_label,
+                    )
             except Exception as exc:
                 last_error = exc
                 logger.warning("Ace browser flow failed via %s: %s", proxy_label, exc)
