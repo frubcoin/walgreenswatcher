@@ -40,62 +40,6 @@ class AceStockChecker:
         if self.progress_callback:
             self.progress_callback(progress_info)
 
-    def _emit_step_progress(
-        self,
-        *,
-        product_name: str,
-        product_index: int,
-        product_total: int,
-        phase: str,
-        message: str,
-        store_name: str,
-        step_progress: float = 0.0,
-        stores_processed: int = 0,
-        total_stores: int = 0,
-        stores_with_stock_current: int = 0,
-    ) -> None:
-        total_units = max(2, (product_total * 2) + 2)
-        base_units = 1 + ((product_index - 1) * 2)
-        bounded_step_progress = max(0.0, min(float(step_progress or 0.0), 0.95))
-        self._emit_progress(
-            {
-                "phase": phase,
-                "message": message,
-                "product": product_name,
-                "product_index": product_index,
-                "product_total": product_total,
-                "store_name": store_name,
-                "stores_processed": stores_processed,
-                "total_stores": total_stores,
-                "stores_with_stock_current": stores_with_stock_current,
-                "completed_units": float(base_units + bounded_step_progress),
-                "total_units": float(total_units),
-            }
-        )
-
-    def _make_detail_progress_callback(
-        self,
-        *,
-        product_name: str,
-        product_index: int,
-        product_total: int,
-    ):
-        def callback(progress_info: Dict[str, Any]) -> None:
-            self._emit_step_progress(
-                product_name=product_name,
-                product_index=product_index,
-                product_total=product_total,
-                phase=str(progress_info.get("phase") or "fetching_inventory"),
-                message=str(progress_info.get("message") or f"Checking Ace inventory for {product_name}"),
-                store_name=str(progress_info.get("store_name") or "Ace inventory"),
-                step_progress=float(progress_info.get("step_progress") or 0.0),
-                stores_processed=int(progress_info.get("stores_processed") or 0),
-                total_stores=int(progress_info.get("total_stores") or 0),
-                stores_with_stock_current=int(progress_info.get("stores_with_stock_current") or 0),
-            )
-
-        return callback
-
     @staticmethod
     def _empty_result() -> Dict[str, Any]:
         return {
@@ -215,14 +159,22 @@ class AceStockChecker:
         product_index: int,
         product_total: int,
     ) -> None:
-        self._emit_step_progress(
-            product_name=product_name,
-            product_index=product_index,
-            product_total=product_total,
-            phase="ace_preparing",
-            message=f"Preparing Ace scan for {product_name}",
-            store_name="Ace scan queued",
-            step_progress=0.0,
+        total_units = max(2, (product_total * 2) + 2)
+        base_units = 1 + ((product_index - 1) * 2)
+        self._emit_progress(
+            {
+                "phase": "fetching_inventory",
+                "message": f"Requesting Ace local inventory for {product_name}",
+                "product": product_name,
+                "product_index": product_index,
+                "product_total": product_total,
+                "store_name": "Ace direct-API start",
+                "stores_processed": 0,
+                "total_stores": 0,
+                "stores_with_stock_current": 0,
+                "completed_units": float(base_units),
+                "total_units": float(total_units),
+            }
         )
 
     def check_product_availability(
@@ -243,11 +195,6 @@ class AceStockChecker:
             product_index=product_index,
             product_total=product_total,
         )
-        detail_progress = self._make_detail_progress_callback(
-            product_name=product_name,
-            product_index=product_index,
-            product_total=product_total,
-        )
 
         context = None
         try:
@@ -255,27 +202,16 @@ class AceStockChecker:
                 source_url,
                 zip_code=active_zip,
                 product_hints=product,
-                progress_callback=detail_progress,
             )
         except Exception as e:
             logger.warning("Ace direct-API fast-path failed for %s, falling back to browser: %s", product_name, e)
 
         if not context:
-            self._emit_step_progress(
-                product_name=product_name,
-                product_index=product_index,
-                product_total=product_total,
-                phase="ace_browser_queue",
-                message=f"Direct Ace API was inconclusive for {product_name}. Switching to browser fallback...",
-                store_name="Ace browser fallback queued",
-                step_progress=0.6,
-            )
             logger.info("Ace direct-API failed or returned no stock, attempting browser fallback for %s", product_name)
             context = AceBrowserClient.fetch_product_context(
                 source_url,
                 zip_code=active_zip,
                 product_hints=product,
-                progress_callback=detail_progress,
             )
         return self._build_result_from_context(
             context,
@@ -316,11 +252,6 @@ class AceStockChecker:
                 product_index=product_index,
                 product_total=resolved_total,
             )
-            detail_progress = self._make_detail_progress_callback(
-                product_name=product_name,
-                product_index=product_index,
-                product_total=resolved_total,
-            )
 
             context = None
             try:
@@ -328,7 +259,6 @@ class AceStockChecker:
                     source_url,
                     zip_code=active_zip,
                     product_hints=product,
-                    progress_callback=detail_progress,
                 )
             except Exception as exc:
                 logger.warning("Ace direct-API fast-path failed for %s, falling back to browser: %s", product_name, exc)
@@ -344,22 +274,12 @@ class AceStockChecker:
                 continue
 
             logger.info("Ace direct-API failed or returned no stock, queueing shared browser fallback for %s", product_name)
-            self._emit_step_progress(
-                product_name=product_name,
-                product_index=product_index,
-                product_total=resolved_total,
-                phase="ace_browser_queue",
-                message=f"Direct Ace API was inconclusive for {product_name}. Queueing shared browser fallback...",
-                store_name="Ace browser fallback queued",
-                step_progress=0.6,
-            )
             pending_browser_products.append(
                 {
                     "offset": offset,
                     "product": product,
                     "product_name": product_name,
                     "product_index": product_index,
-                    "progress_callback": detail_progress,
                 }
             )
 
@@ -368,7 +288,7 @@ class AceStockChecker:
 
         self._emit_progress(
             {
-                "phase": "ace_browser_session",
+                "phase": "fetching_inventory",
                 "message": f"Reusing one Ace browser session for {len(pending_browser_products)} product(s)",
                 "product": pending_browser_products[0]["product_name"],
                 "product_index": pending_browser_products[0]["product_index"],
@@ -377,15 +297,12 @@ class AceStockChecker:
                 "stores_processed": 0,
                 "total_stores": 0,
                 "stores_with_stock_current": 0,
-                "completed_units": float(1 + ((pending_browser_products[0]['product_index'] - 1) * 2) + 0.64),
-                "total_units": float(max(2, (resolved_total * 2) + 2)),
             }
         )
 
         browser_contexts, browser_errors = AceBrowserClient.fetch_product_contexts(
             [entry["product"] for entry in pending_browser_products],
             zip_code=active_zip,
-            progress_callbacks=[entry["progress_callback"] for entry in pending_browser_products],
         )
 
         for batch_index, pending_entry in enumerate(pending_browser_products):

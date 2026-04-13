@@ -14109,7 +14109,6 @@
     function updateProgressDisplay(progress) {
       const pct = progress.progress_percent || 0;
       const phase = progress.phase || '';
-      const isAcePhase = String(phase).startsWith('ace_');
       const stage = progress.message || 'Working...';
       const store = progress.current_store || 'Working...';
       const product = progress.current_product || 'Waiting for first product...';
@@ -14126,17 +14125,6 @@
         ? `Product: ${productIndex} / ${totalProducts} - ${product}`
         : `Product: ${product}`;
       document.getElementById('progress-store').textContent = `Activity: ${store}`;
-      if (isAcePhase && !total) {
-        document.getElementById('progress-count').textContent = `Ace step: ${store} | Current product hits: ${storesWithStock}`;
-        return;
-      }
-      if (isAcePhase) {
-        const aceStoreText = checked
-          ? `${checked} / ${total}`
-          : `${total} nearby stores ready`;
-        document.getElementById('progress-count').textContent = `Ace step: ${store} | Store processing: ${aceStoreText} | Current product hits: ${storesWithStock}`;
-        return;
-      }
       if (!total) {
         document.getElementById('progress-count').textContent = `Store processing: waiting for store list | Current product hits: ${storesWithStock}`;
         return;

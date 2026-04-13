@@ -156,7 +156,6 @@ class AceBrowserClient:
         zip_code: str,
         *,
         product_hints: Optional[Dict[str, Any]] = None,
-        progress_callback: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
         """High-speed inventory check using Ace's direct commerce APIs."""
         base_product = cls._product_metadata_from_hints(product_url, product_hints)
@@ -177,48 +176,19 @@ class AceBrowserClient:
             proxy_label = cls.proxy_label(proxy_url)
             try:
                 logger.info("Ace direct-API attempt via %s", proxy_label)
-                if progress_callback:
-                    progress_callback(
-                        {
-                            "phase": "ace_direct_api",
-                            "step_progress": 0.15,
-                            "message": f"Looking up nearby Ace stores via {proxy_label}...",
-                            "store_name": "Ace direct API store search",
-                        }
-                    )
                 stores = cls._clone_store_candidates(cached_stores) if cached_stores else cls._direct_api_fetch_stores(lat, lng, proxy_url)
                 if not stores:
                     logger.warning("Ace direct-API: No stores nearby for %s", zip_code)
                     return None
-
+                    
                 if not cached_stores:
                     cls._set_cached_store_candidates(zip_code, stores)
                     cached_stores = cls._clone_store_candidates(stores)
-                if progress_callback:
-                    progress_callback(
-                        {
-                            "phase": "ace_direct_api",
-                            "step_progress": 0.32,
-                            "message": f"Found {len(stores)} nearby Ace stores. Checking live inventory...",
-                            "store_name": "Ace direct API store list ready",
-                            "total_stores": len(stores),
-                        }
-                    )
                 # Fetch exact inventory counts from all candidate stores concurrently
                 # We use a lower worker count and add jitter to avoid bot detection
                 stores_checked = 0
                 stores_failed = 0
-
-                if progress_callback:
-                    progress_callback(
-                        {
-                            "phase": "ace_direct_api",
-                            "step_progress": 0.52,
-                            "message": f"Checking live Ace inventory across {len(stores)} nearby stores...",
-                            "store_name": "Ace direct API inventory",
-                            "total_stores": len(stores),
-                        }
-                    )
+                
                 with ThreadPoolExecutor(max_workers=3) as executor:
                     futures = [
                         executor.submit(cls._direct_api_fetch_inventory_for_store, product_id, store, proxy_url)
@@ -1106,7 +1076,6 @@ async ({ lat, lng, radius, headers }) => {
         geocoded_location: Optional[Dict[str, float]] = None,
         product_hints: Optional[Dict[str, Any]] = None,
         proxy_label: str = "direct",
-        progress_callback: Optional[Any] = None,
     ) -> Dict[str, Any]:
         product_url = cls.canonical_product_url(product_url)
         if not product_url:
@@ -1124,28 +1093,9 @@ async ({ lat, lng, radius, headers }) => {
             "debug_screenshot": "",
         }
 
-        if progress_callback:
-            progress_callback(
-                {
-                    "phase": "ace_browser_page",
-                    "step_progress": 0.68,
-                    "message": f"Opening the Ace product page in the shared browser via {proxy_label}...",
-                    "store_name": "Ace product page",
-                }
-            )
-
         def action(page: Any) -> None:
             nonlocal debug_screenshot
             if needs_page_metadata:
-                if progress_callback:
-                    progress_callback(
-                        {
-                            "phase": "ace_browser_page",
-                            "step_progress": 0.76,
-                            "message": "Reading Ace product details from the page...",
-                            "store_name": "Ace product metadata",
-                        }
-                    )
                 cls._maybe_dismiss_cookie_banner(page)
                 cls._humanize_page(page)
                 fetched_product = cls.extract_product_metadata(page, product_url)
@@ -1158,26 +1108,7 @@ async ({ lat, lng, radius, headers }) => {
             cached_stores = cls._get_cached_store_candidates(zip_code)
             if cached_stores:
                 context["store_candidates"] = cached_stores
-                if progress_callback:
-                    progress_callback(
-                        {
-                            "phase": "ace_browser_stores",
-                            "step_progress": 0.84,
-                            "message": f"Using the cached Ace store list for ZIP {zip_code}...",
-                            "store_name": "Ace nearby stores",
-                            "total_stores": len(context["store_candidates"]),
-                        }
-                    )
             else:
-                if progress_callback:
-                    progress_callback(
-                        {
-                            "phase": "ace_browser_stores",
-                            "step_progress": 0.84,
-                            "message": f"Loading nearby Ace stores for ZIP {zip_code}...",
-                            "store_name": "Ace nearby stores",
-                        }
-                    )
                 context["store_candidates"] = cls._browser_fetch_store_candidates(
                     page,
                     geocoded_location["lat"],
@@ -1189,16 +1120,6 @@ async ({ lat, lng, radius, headers }) => {
                 raise AceBrowserError("Ace did not return any store candidates for that ZIP")
 
             store_codes = list(store_lookup.keys())
-            if progress_callback:
-                progress_callback(
-                    {
-                        "phase": "ace_browser_inventory",
-                        "step_progress": 0.93,
-                        "message": f"Checking live Ace tray inventory across {len(store_codes)} nearby stores...",
-                        "store_name": "Ace nearby-store tray inventory",
-                        "total_stores": len(store_codes),
-                    }
-                )
             product_id = cls._first_non_empty(
                 context["product"].get("product_id"),
                 cls.extract_product_id(product_url),
@@ -1278,7 +1199,6 @@ async ({ lat, lng, radius, headers }) => {
         product_requests: List[Dict[str, Any]],
         *,
         zip_code: Optional[str] = None,
-        progress_callbacks: Optional[List[Optional[Any]]] = None,
     ) -> Tuple[List[Optional[Dict[str, Any]]], Dict[int, Exception]]:
         results: List[Optional[Dict[str, Any]]] = [None] * len(product_requests)
         errors: Dict[int, Exception] = {}
@@ -1323,11 +1243,6 @@ async ({ lat, lng, radius, headers }) => {
                                 geocoded_location=geocoded_location,
                                 product_hints=item.get("product_hints"),
                                 proxy_label=proxy_label,
-                                progress_callback=(
-                                    progress_callbacks[index]
-                                    if progress_callbacks and index < len(progress_callbacks)
-                                    else None
-                                ),
                             )
                             errors.pop(index, None)
                         except Exception as exc:
@@ -1356,7 +1271,6 @@ async ({ lat, lng, radius, headers }) => {
         *,
         zip_code: Optional[str] = None,
         product_hints: Optional[Dict[str, Any]] = None,
-        progress_callback: Optional[Any] = None,
     ) -> Dict[str, Any]:
         product_url = cls.canonical_product_url(product_url)
         if not product_url:
@@ -1385,7 +1299,6 @@ async ({ lat, lng, radius, headers }) => {
                         geocoded_location=geocoded_location,
                         product_hints=product_hints,
                         proxy_label=proxy_label,
-                        progress_callback=progress_callback,
                     )
             except Exception as exc:
                 last_error = exc
