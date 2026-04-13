@@ -3395,6 +3395,17 @@
       align-items: flex-start;
     }
 
+    .map-popup-product-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .map-popup-product-meta .fulfillment-badges {
+      margin-left: 0;
+    }
+
     .map-popup-product-availability {
       display: inline-block;
       padding: 2px 6px;
@@ -9685,15 +9696,16 @@
       return `<img class="${escapeHtml(className)}" src="${escapeHtml(iconPath)}" alt="${escapeHtml(label)}" title="${escapeHtml(label)}" loading="lazy" decoding="async">`;
     }
 
-    function renderFulfillmentBadges(store, retailer = '') {
+    function renderFulfillmentBadges(store, retailer = '', options = {}) {
       if (!store) return '';
+      const { compactPickupLabel = false } = options;
       const normalizedRetailer = retailerKey(store?.retailer || retailer || '');
       if (normalizedRetailer === 'ace' && (store.pickup_available || store.delivery_available)) {
         return '<span class="fulfillment-badges"><span class="fulfillment-badge type-instore">Available in-store</span></span>';
       }
       const badges = [];
       if (store.pickup_available) {
-        if (normalizedRetailer === 'walgreens' || normalizedRetailer === 'cvs') {
+        if (!compactPickupLabel && (normalizedRetailer === 'walgreens' || normalizedRetailer === 'cvs')) {
           badges.push('<span class="fulfillment-badge type-instore">Available for pickup</span>');
         } else {
           badges.push('<span class="fulfillment-badge type-pickup">Pickup</span>');
@@ -10470,6 +10482,9 @@
     }
 
     function renderMapPopup(location) {
+      const locationBadgeOptions = {
+        compactPickupLabel: ['walgreens', 'fivebelow'].includes(retailerKey(location?.retailer || ''))
+      };
       const productsHtml = location.products.map(product => `
           <div class="map-popup-product">
             <div class="map-popup-product-copy">
@@ -10477,13 +10492,18 @@
           ? `<a href="${escapeHtml(product.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(product.name)}</a>`
           : escapeHtml(product.name)
         }</span>
-              <span class="map-popup-product-availability">${escapeHtml(getStoreAvailabilitySummary(product, product.retailer))}</span>
+              <div class="map-popup-product-meta">
+                <span class="map-popup-product-availability">${escapeHtml(getStoreAvailabilitySummary(product, product.retailer))}</span>
+                ${renderFulfillmentBadges(product, product.retailer, {
+          compactPickupLabel: ['walgreens', 'fivebelow'].includes(retailerKey(product?.retailer || ''))
+        })}
+              </div>
             </div>
           </div>
         `).join('');
 
       return `
-          <div class="map-popup-title">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(location.name)} ${renderFulfillmentBadges(location)}</div>
+          <div class="map-popup-title">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(location.name)} ${renderFulfillmentBadges(location, location.retailer, locationBadgeOptions)}</div>
           <div class="map-popup-address">${renderAddressLink(location.address)}</div>
           <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${locationUsesFulfillmentAvailability(location) ? escapeHtml(getLocationFulfillmentSummary(location)) : `${location.total_inventory} total units`} | ${location.product_count} product${location.product_count === 1 ? '' : 's'}${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
           <div class="map-popup-products">${productsHtml}</div>
@@ -10772,35 +10792,42 @@
           const targetLatLng = marker.getLatLng();
           const focusLatLng = getMobilePopupFramedLatLng(targetLatLng, targetZoom);
 
-          const performZoomAndPopup = () => {
-            resultsMap.once('moveend', () => {
-              window.requestAnimationFrame(() => {
+          const openPopupAfterFocus = () => {
+            window.requestAnimationFrame(() => {
+              if (focusRequestId !== resultsMapFocusRequestId) return;
+              if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
+              resultsMap.invalidateSize();
+
+              const revealVisibleMarker = () => {
                 if (focusRequestId !== resultsMapFocusRequestId) return;
                 if (!resultsMap) return;
                 resultsMap.invalidateSize();
                 openMarkerPopupWithoutAutoPan(marker);
-              });
-            });
+              };
 
-            if (typeof resultsMap.flyTo === 'function') {
-              resultsMap.flyTo(focusLatLng, targetZoom, {
-                animate,
-                duration,
-                easeLinearity: 0.15
-              });
-            } else {
-              resultsMap.setView(focusLatLng, targetZoom, { animate });
-            }
+              const visibleParent = typeof resultsMapClusterGroup?.getVisibleParent === 'function'
+                ? resultsMapClusterGroup.getVisibleParent(marker)
+                : marker;
+
+              if (resultsMapClusterGroup && visibleParent && visibleParent !== marker) {
+                resultsMapClusterGroup.zoomToShowLayer(marker, revealVisibleMarker);
+                return;
+              }
+
+              revealVisibleMarker();
+            });
           };
 
-          if (resultsMapClusterGroup) {
-            resultsMapClusterGroup.zoomToShowLayer(marker, () => {
-              if (focusRequestId === resultsMapFocusRequestId) {
-                performZoomAndPopup();
-              }
+          if (animate && typeof resultsMap.flyTo === 'function') {
+            resultsMap.once('moveend', openPopupAfterFocus);
+            resultsMap.flyTo(focusLatLng, targetZoom, {
+              animate: true,
+              duration,
+              easeLinearity: 0.1
             });
           } else {
-            performZoomAndPopup();
+            resultsMap.setView(focusLatLng, targetZoom, { animate });
+            openPopupAfterFocus();
           }
         });
       };
