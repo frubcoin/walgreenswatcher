@@ -13696,6 +13696,7 @@
             { statusLastCheck: status.last_check || null }
           );
         }
+        await resumeManualCheckProgress({ showCompletionToast: true });
         return data;
       } finally {
         isStatusRefreshInFlight = false;
@@ -13897,26 +13898,36 @@
     }
 
     let progressHeartbeatInterval = null;
+    let progressPollInterval = null;
+    let progressPollRequestInFlight = false;
+    let progressCompletionInFlight = false;
+    let progressPendingStartUntil = 0;
 
-    async function triggerManualCheck() {
-      console.log('Check button clicked');
-      document.getElementById('check-btn').disabled = true;
-      document.getElementById('check-btn-text').textContent = 'Checking...';
-
+    function setManualCheckUiState(isChecking) {
+      const checkButton = document.getElementById('check-btn');
+      const checkButtonText = document.getElementById('check-btn-text');
       const progressSection = document.getElementById('progress-section');
-      progressSection.style.display = 'block';
+      if (checkButton) {
+        checkButton.disabled = Boolean(isChecking);
+      }
+      if (checkButtonText) {
+        checkButtonText.textContent = isChecking ? 'Checking...' : 'Check Now';
+      }
+      if (progressSection) {
+        progressSection.style.display = isChecking ? 'block' : 'none';
+      }
+    }
 
-      showToast('Starting stock check...', 'info');
-      
-      // Reset product timing for conditional disclaimer
-      progressLastProductIndex = -1;
-      progressProductStartTime = 0;
+    function stopProgressHeartbeat() {
       if (progressHeartbeatInterval) {
         clearInterval(progressHeartbeatInterval);
+        progressHeartbeatInterval = null;
       }
-      document.getElementById('progress-delay-disclaimer').style.display = 'none';
+    }
 
-      // Start a heartbeat timer to monitor for long-running checks
+    function startProgressHeartbeat() {
+      stopProgressHeartbeat();
+      document.getElementById('progress-delay-disclaimer').style.display = 'none';
       progressHeartbeatInterval = setInterval(() => {
         if (progressProductStartTime > 0) {
           const elapsed = Date.now() - progressProductStartTime;
@@ -13925,6 +13936,139 @@
           }
         }
       }, 1000);
+    }
+
+    function stopManualCheckProgressPolling() {
+      if (progressPollInterval) {
+        clearInterval(progressPollInterval);
+        progressPollInterval = null;
+      }
+      progressPollRequestInFlight = false;
+      progressPendingStartUntil = 0;
+    }
+
+    function setPendingManualCheckProgress(message = 'Starting stock check...') {
+      document.getElementById('progress-bar').style.width = '0%';
+      document.getElementById('progress-percent').textContent = '0%';
+      document.getElementById('progress-stage').textContent = `Stage: ${message}`;
+      document.getElementById('progress-product').textContent = 'Product: Waiting for first product...';
+      document.getElementById('progress-store').textContent = 'Activity: Waiting for server progress...';
+      document.getElementById('progress-count').textContent = 'Store processing: waiting for server progress...';
+      document.getElementById('progress-delay-disclaimer').style.display = 'none';
+    }
+
+    async function completeManualCheckProgress(finalProgress = null, { showCompletionToast = true } = {}) {
+      if (progressCompletionInFlight) return;
+      progressCompletionInFlight = true;
+      stopManualCheckProgressPolling();
+      stopProgressHeartbeat();
+      const checkButton = document.getElementById('check-btn');
+      const checkButtonText = document.getElementById('check-btn-text');
+      const progressSection = document.getElementById('progress-section');
+      if (checkButton) {
+        checkButton.disabled = false;
+      }
+      if (checkButtonText) {
+        checkButtonText.textContent = 'Check Now';
+      }
+      if (progressSection) {
+        progressSection.style.display = 'block';
+      }
+
+      try {
+        await new Promise(r => setTimeout(r, 500));
+        await loadStatus();
+
+        if (showCompletionToast) {
+          const finalMessage = finalProgress?.message || '';
+          const finalPhase = finalProgress?.phase || '';
+          const noStoresFound = /^No .+ stores found near /.test(finalMessage);
+          if (finalPhase === 'error' || noStoresFound) {
+            showToast(finalMessage || 'Check failed', 'error');
+          } else {
+            showToast('Check complete', 'success');
+          }
+        }
+
+        await new Promise(r => setTimeout(r, 2000));
+        if (progressSection) {
+          progressSection.style.display = 'none';
+        }
+      } finally {
+        progressCompletionInFlight = false;
+      }
+    }
+
+    async function pollManualCheckProgressOnce({ showCompletionToast = true } = {}) {
+      if (progressPollRequestInFlight || progressCompletionInFlight) return null;
+      progressPollRequestInFlight = true;
+      try {
+        const progress = await apiCall('/api/progress', 'GET', null, { silent: true });
+        if (!progress) return null;
+
+        if (!progress.in_progress) {
+          if (progressPendingStartUntil && Date.now() < progressPendingStartUntil) {
+            return progress;
+          }
+          document.getElementById('progress-bar').style.width = '100%';
+          document.getElementById('progress-percent').textContent = '100%';
+          await completeManualCheckProgress(progress, { showCompletionToast });
+          return progress;
+        }
+
+        progressPendingStartUntil = 0;
+        setManualCheckUiState(true);
+        updateProgressDisplay(progress);
+        return progress;
+      } finally {
+        progressPollRequestInFlight = false;
+      }
+    }
+
+    async function resumeManualCheckProgress(options = {}) {
+      const { showCompletionToast = true, immediateProgress = null, allowPendingStart = false } = options;
+      const progress = immediateProgress || await apiCall('/api/progress', 'GET', null, { silent: true });
+      if (!progress?.in_progress) {
+        if (allowPendingStart) {
+          setManualCheckUiState(true);
+          setPendingManualCheckProgress();
+          startProgressHeartbeat();
+          progressPendingStartUntil = Date.now() + 5000;
+          if (!progressPollInterval) {
+            progressPollInterval = setInterval(() => {
+              void pollManualCheckProgressOnce({ showCompletionToast });
+            }, 500);
+          }
+          return progress;
+        }
+        stopManualCheckProgressPolling();
+        stopProgressHeartbeat();
+        setManualCheckUiState(false);
+        return progress;
+      }
+
+      setManualCheckUiState(true);
+      updateProgressDisplay(progress);
+      startProgressHeartbeat();
+
+      if (!progressPollInterval) {
+        progressPollInterval = setInterval(() => {
+          void pollManualCheckProgressOnce({ showCompletionToast });
+        }, 500);
+      }
+      return progress;
+    }
+
+    async function triggerManualCheck() {
+      console.log('Check button clicked');
+      setManualCheckUiState(true);
+
+      showToast('Starting stock check...', 'info');
+      
+      // Reset product timing for conditional disclaimer
+      progressLastProductIndex = -1;
+      progressProductStartTime = 0;
+      startProgressHeartbeat();
       
       // Start timing from now as the check is technically starting
       progressProductStartTime = Date.now();
@@ -13936,69 +14080,36 @@
 
         if (!result) {
           showToast('Check failed - see console for details', 'error');
-          document.getElementById('check-btn').disabled = false;
-          document.getElementById('check-btn-text').textContent = 'Check Now';
-          progressSection.style.display = 'none';
+          stopManualCheckProgressPolling();
+          stopProgressHeartbeat();
+          setManualCheckUiState(false);
           return;
         }
 
-        // Poll for progress updates while checking
-        let isComplete = false;
-        let progressLoops = 0;
-        const maxLoops = 1800; // ~4.5 minutes at 150ms per poll
-        let finalProgress = null;
-
-        while (!isComplete && progressLoops < maxLoops) {
-          await new Promise(r => setTimeout(r, 500));
-          progressLoops++;
-
-          const progress = await apiCall('/api/progress');
-          if (progress && !progress.in_progress) {
-            isComplete = true;
-            finalProgress = progress;
-            // Final update
-            document.getElementById('progress-bar').style.width = '100%';
-            document.getElementById('progress-percent').textContent = '100%';
-            break;
-          }
-
-          if (progress && progress.in_progress) {
-            updateProgressDisplay(progress);
-          }
-        }
-
-        await new Promise(r => setTimeout(r, 500));
-        await loadStatus();
-
-        const finalMessage = finalProgress?.message || '';
-        const finalPhase = finalProgress?.phase || '';
-        const noStoresFound = /^No .+ stores found near /.test(finalMessage);
-
-        if (finalPhase === 'error' || noStoresFound) {
-          showToast(finalMessage || 'Check failed', 'error');
-        } else {
-          showToast('Check complete', 'success');
-        }
-
-        // Hide progress section after 2 seconds
-        await new Promise(r => setTimeout(r, 2000));
-        progressSection.style.display = 'none';
+        const initialProgress = await apiCall('/api/progress', 'GET', null, { silent: true });
+        await resumeManualCheckProgress({
+          showCompletionToast: true,
+          immediateProgress: initialProgress,
+          allowPendingStart: true
+        });
       } catch (error) {
         console.error('Check error:', error);
         showToast('Check failed: ' + error.message, 'error');
-        progressSection.style.display = 'none';
+        stopManualCheckProgressPolling();
+        stopProgressHeartbeat();
+        setManualCheckUiState(false);
       } finally {
-        if (progressHeartbeatInterval) {
-          clearInterval(progressHeartbeatInterval);
+        if (!progressPollInterval && !progressCompletionInFlight) {
+          stopProgressHeartbeat();
+          setManualCheckUiState(false);
         }
-        document.getElementById('check-btn').disabled = false;
-        document.getElementById('check-btn-text').textContent = 'Check Now';
       }
     }
 
     function updateProgressDisplay(progress) {
       const pct = progress.progress_percent || 0;
       const phase = progress.phase || '';
+      const isAcePhase = String(phase).startsWith('ace_');
       const stage = progress.message || 'Working...';
       const store = progress.current_store || 'Working...';
       const product = progress.current_product || 'Waiting for first product...';
@@ -14015,6 +14126,17 @@
         ? `Product: ${productIndex} / ${totalProducts} - ${product}`
         : `Product: ${product}`;
       document.getElementById('progress-store').textContent = `Activity: ${store}`;
+      if (isAcePhase && !total) {
+        document.getElementById('progress-count').textContent = `Ace step: ${store} | Current product hits: ${storesWithStock}`;
+        return;
+      }
+      if (isAcePhase) {
+        const aceStoreText = checked
+          ? `${checked} / ${total}`
+          : `${total} nearby stores ready`;
+        document.getElementById('progress-count').textContent = `Ace step: ${store} | Store processing: ${aceStoreText} | Current product hits: ${storesWithStock}`;
+        return;
+      }
       if (!total) {
         document.getElementById('progress-count').textContent = `Store processing: waiting for store list | Current product hits: ${storesWithStock}`;
         return;
