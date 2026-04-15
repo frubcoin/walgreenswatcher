@@ -124,8 +124,6 @@ class AceStockChecker:
                 "total_units": float(total_units),
             }
         )
-        if self.progress_callback and total_stores > 1:
-            time.sleep(PROGRESS_UI_YIELD_SECONDS)
 
         self._emit_progress(
             {

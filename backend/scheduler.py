@@ -788,40 +788,8 @@ class StockCheckScheduler:
                         product_total=len(product_specs),
                     )
                 elif retailer == "ace":
-                    try:
-                        product_result = self.ace_checker.check_product_availability(
-                            product,
-                            self.current_zipcode,
-                            product_index=index,
-                            product_total=len(product_specs),
-                        )
-                        extracted_image = product_result.get("_extracted_image_url", "")
-                        if extracted_image and product.get("article_id"):
-                            try:
-                                self.db.update_product_image(
-                                    self.user_id,
-                                    product["article_id"],
-                                    image_url=extracted_image,
-                                    retailer="ace",
-                                )
-                            except Exception as img_exc:
-                                logger.warning(
-                                    "Failed to update Ace product image for %s: %s",
-                                    product_display_name,
-                                    img_exc,
-                                )
-                    except AceBrowserError as exc:
-                        logger.warning(
-                            "Ace inventory blocked or failed for user %s product %s: %s",
-                            self.user_id,
-                            product_display_name,
-                            exc,
-                        )
-                        product_result = {
-                            "availability": {},
-                            "stores": {},
-                            "location_ids": [],
-                        }
+                    # Ace products are processed in batch after the loop to reuse browser session
+                    continue
                 else:
                     raise ValueError(f"Unsupported retailer: {retailer}")
 
@@ -842,6 +810,80 @@ class StockCheckScheduler:
                     "availability": product_result["availability"],
                     "stores": product_result["stores"],
                 }
+
+            # Process Ace products in batch with shared browser session for performance
+            if ace_products:
+                try:
+                    ace_positions = [
+                        index for index, product in enumerate(product_specs, start=1)
+                        if product.get("retailer", "walgreens") == "ace"
+                    ]
+                    ace_results = self.ace_checker.check_products_availability(
+                        ace_products,
+                        self.current_zipcode,
+                        product_positions=ace_positions,
+                        product_total=len(product_specs),
+                    )
+                    for ace_index, ace_product in enumerate(ace_products):
+                        article_id = str(ace_product["article_id"])
+                        product_key = str(ace_product.get("key") or self._tracked_product_key(article_id, "ace"))
+                        product_display_name = ace_product.get("name") or article_id
+                        product_result = ace_results[ace_index] if ace_index < len(ace_results) else {"availability": {}, "stores": {}, "location_ids": []}
+
+                        # Update product image if extracted from browser
+                        extracted_image = product_result.get("_extracted_image_url", "")
+                        if extracted_image and ace_product.get("article_id"):
+                            try:
+                                self.db.update_product_image(
+                                    self.user_id,
+                                    ace_product["article_id"],
+                                    image_url=extracted_image,
+                                    retailer="ace",
+                                )
+                            except Exception as img_exc:
+                                logger.warning(
+                                    "Failed to update Ace product image for %s: %s",
+                                    product_display_name,
+                                    img_exc,
+                                )
+
+                        scanned_store_keys.update(
+                            f"ace:{store_id}"
+                            for store_id in (product_result.get("location_ids") or [])
+                            if store_id
+                        )
+                        self.total_stores = max(self.total_stores, len(product_result.get("location_ids") or []))
+
+                        check_results[product_key] = {
+                            "id": article_id,
+                            "key": product_key,
+                            "retailer": "ace",
+                            "name": product_display_name,
+                            "image_url": ace_product.get("image_url", ""),
+                            "source_url": ace_product.get("source_url", ""),
+                            "availability": product_result["availability"],
+                            "stores": product_result["stores"],
+                        }
+                except AceBrowserError as exc:
+                    logger.warning(
+                        "Ace inventory blocked or failed for user %s: %s",
+                        self.user_id,
+                        exc,
+                    )
+                    # Add empty results for all Ace products on total failure
+                    for ace_product in ace_products:
+                        article_id = str(ace_product["article_id"])
+                        product_key = str(ace_product.get("key") or self._tracked_product_key(article_id, "ace"))
+                        check_results[product_key] = {
+                            "id": article_id,
+                            "key": product_key,
+                            "retailer": "ace",
+                            "name": ace_product.get("name") or article_id,
+                            "image_url": ace_product.get("image_url", ""),
+                            "source_url": ace_product.get("source_url", ""),
+                            "availability": {},
+                            "stores": {},
+                        }
 
             products_with_stock = self._extract_products_with_stock(check_results, self.tracked_products)
 
