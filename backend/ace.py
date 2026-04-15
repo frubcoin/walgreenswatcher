@@ -1076,7 +1076,8 @@ async ({ lat, lng, radius, headers }) => {
         product_hints: Optional[Dict[str, Any]] = None,
         proxy_label: str = "direct",
         skip_humanization: bool = False,
-    ) -> Dict[str, Any]:
+        page: Optional[Any] = None,
+    ) -> Tuple[Dict[str, Any], Optional[Any]]:
         product_url = cls.canonical_product_url(product_url)
         if not product_url:
             raise AceBrowserError("Ace product URL required")
@@ -1092,8 +1093,11 @@ async ({ lat, lng, radius, headers }) => {
             "proxy": proxy_label,
             "debug_screenshot": "",
         }
+        captured_page: List[Any] = [None]  # Use list to allow mutation in nested function
 
         def action(page: Any) -> None:
+            nonlocal captured_page
+            captured_page[0] = page
             nonlocal debug_screenshot
             if needs_page_metadata:
                 if not skip_humanization:
@@ -1184,14 +1188,28 @@ async ({ lat, lng, radius, headers }) => {
                 context["product"].get("product_id"),
             )
 
+        if page is not None:
+            # Reuse existing page - fast path for subsequent products
+            # Quick navigation to keep cookies fresh (fast timeout since we don't need full load)
+            try:
+                page.goto(product_url, timeout=5000, wait_until="domcontentloaded")
+            except Exception:
+                pass  # Continue even if navigation fails - cookies are still valid
+            action(page)
+            return context, page
+
+        # Fresh page fetch for first product
         response = session.fetch(product_url, page_action=action)
         if response.status >= 400:
             raise AceBrowserError(f"Ace returned HTTP {response.status} for the product page")
 
+        # Get captured page for reuse with subsequent products
+        result_page = captured_page[0]
+
         if context.get("product"):
             if debug_screenshot and not context.get("debug_screenshot"):
                 context["debug_screenshot"] = debug_screenshot
-            return context
+            return context, result_page
         raise AceBrowserError("Ace product flow completed without product metadata")
 
     @classmethod
@@ -1233,13 +1251,18 @@ async ({ lat, lng, radius, headers }) => {
                     timeout=ACE_BROWSER_TIMEOUT_MS,
                     wait=ACE_BROWSER_WAIT_MS,
                 ) as session:
+                    shared_page = None
+                    batch_start_time = time.time()
                     for item_index, item in enumerate(pending):
+                        product_start_time = time.time()
                         index = int(item["index"])
                         product_url = str(item["product_url"] or "").strip()
                         # Skip humanization for all products after the first in batch
                         skip_humanization = item_index > 0
+                        # Reuse page from first product for subsequent ones (massive speedup)
+                        page_to_use = shared_page if skip_humanization else None
                         try:
-                            results[index] = cls._fetch_product_context_with_session(
+                            result, returned_page = cls._fetch_product_context_with_session(
                                 session,
                                 product_url,
                                 zip_code=zip_code,
@@ -1247,8 +1270,21 @@ async ({ lat, lng, radius, headers }) => {
                                 product_hints=item.get("product_hints"),
                                 proxy_label=proxy_label,
                                 skip_humanization=skip_humanization,
+                                page=page_to_use,
                             )
+                            results[index] = result
+                            # Capture page from first successful fetch for reuse
+                            if shared_page is None and returned_page is not None:
+                                shared_page = returned_page
                             errors.pop(index, None)
+                            product_elapsed = time.time() - product_start_time
+                            logger.info(
+                                "Ace product %d/%d processed in %.2fs (mode=%s)",
+                                item_index + 1,
+                                len(pending),
+                                product_elapsed,
+                                "fast" if skip_humanization else "full"
+                            )
                         except Exception as exc:
                             errors[index] = exc
                             next_pending.append(item)
@@ -1258,6 +1294,13 @@ async ({ lat, lng, radius, headers }) => {
                                 index,
                                 exc,
                             )
+                    batch_elapsed = time.time() - batch_start_time
+                    logger.info(
+                        "Ace batch processed %d product(s) in %.2fs (%.2fs per product)",
+                        len(pending),
+                        batch_elapsed,
+                        batch_elapsed / len(pending) if pending else 0
+                    )
             except Exception as exc:
                 for item in pending:
                     errors[int(item["index"])] = exc

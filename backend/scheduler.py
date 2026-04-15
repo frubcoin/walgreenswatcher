@@ -829,15 +829,6 @@ class StockCheckScheduler:
                         product_key = str(ace_product.get("key") or self._tracked_product_key(article_id, "ace"))
                         product_display_name = ace_product.get("name") or article_id
                         product_result = ace_results[ace_index] if ace_index < len(ace_results) else {"availability": {}, "stores": {}, "location_ids": []}
-                        
-                        # Debug logging
-                        logger.info(
-                            "[DEBUG] Ace batch result for %s: location_ids=%s, stores_count=%d, availability_count=%d",
-                            product_display_name,
-                            product_result.get("location_ids"),
-                            len(product_result.get("stores", {})),
-                            len(product_result.get("availability", {}))
-                        )
 
                         # Update product image if extracted from browser
                         extracted_image = product_result.get("_extracted_image_url", "")
@@ -894,29 +885,7 @@ class StockCheckScheduler:
                             "stores": {},
                         }
 
-            # Debug logging for check_results
-            for pid, pdata in check_results.items():
-                if pdata.get("retailer") == "ace":
-                    availability = pdata.get("availability", {})
-                    in_stock = [sid for sid, in_stock in availability.items() if in_stock]
-                    logger.info(
-                        "[DEBUG] Ace check_result: %s, availability_count=%d, in_stock=%s",
-                        pid,
-                        len(availability),
-                        in_stock
-                    )
-            
             products_with_stock = self._extract_products_with_stock(check_results, self.tracked_products)
-            
-            # Debug logging for Ace products
-            for pid, pdata in products_with_stock.items():
-                if pdata.get("retailer") == "ace":
-                    logger.info(
-                        "[DEBUG] Ace product in products_with_stock: %s, stores=%s, store_count=%d",
-                        pid,
-                        pdata.get("store_ids"),
-                        len(pdata.get("stores", []))
-                    )
 
             timestamp = datetime.utcnow().isoformat()
             self._set_progress(
@@ -946,32 +915,7 @@ class StockCheckScheduler:
                     if not self.tracked_products.get(k, {}).get("exclude_from_discord", False)
                 }
                 
-                # Debug logging before distance filter
-                for pid, pdata in discord_products.items():
-                    if pdata.get("retailer") == "ace":
-                        logger.info(
-                            "[DEBUG] Ace product before distance filter: %s, stores=%d",
-                            pid,
-                            len(pdata.get("stores", []))
-                        )
-                        for store in pdata.get("stores", [])[:3]:
-                            logger.info(
-                                "[DEBUG]   Store %s distance=%s, within_range=%s",
-                                store.get("store_id"),
-                                store.get("distance"),
-                                self._store_within_notification_range(store)
-                            )
-                
                 discord_products = self._filter_products_for_discord(discord_products)
-                
-                # Debug logging after distance filter
-                for pid, pdata in discord_products.items():
-                    if pdata.get("retailer") == "ace":
-                        logger.info(
-                            "[DEBUG] Ace product after distance filter: %s, stores=%d",
-                            pid,
-                            len(pdata.get("stores", []))
-                        )
                 
                 if discord_products:
                     self._set_progress(

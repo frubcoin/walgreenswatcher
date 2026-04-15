@@ -71,15 +71,6 @@ class AceStockChecker:
         store_candidates = list(context.get("store_candidates") or [])
         store_lookup = AceBrowserClient.build_store_lookup(store_candidates)
         in_stock_stores = dict(context.get("stores") or {})
-        
-        # Debug logging
-        logger.info(
-            "[DEBUG] _build_result_from_context: product=%s, candidates=%d, in_stock_stores=%d, store_lookup=%s",
-            product_name,
-            len(store_candidates),
-            len(in_stock_stores),
-            list(store_lookup.keys())[:5]
-        )
 
         target_location = AceBrowserClient.geocode_zip(active_zip)
         target_lat = target_location.get("lat")
@@ -113,16 +104,6 @@ class AceStockChecker:
                 "fulfillment_types": list(store.get("fulfillment_types") or []),
                 "availability_text": store.get("availability_text", "In Stock"),
             }
-        
-        # Debug logging
-        in_stock_count = sum(1 for v in availability.values() if v)
-        logger.info(
-            "[DEBUG] _build_result_from_context result: product=%s, total_stores=%d, in_stock=%d, availability=%s",
-            product_name,
-            len(all_store_ids),
-            in_stock_count,
-            {k: v for k, v in availability.items() if v}
-        )
 
         total_stores = len(all_store_ids)
         total_units = max(2, (product_total * 2) + 2)
