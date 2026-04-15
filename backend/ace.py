@@ -33,7 +33,7 @@ ACE_RADIUS_METERS = 48280.3  # 30 miles
 ACE_PRODUCT_ID_PATTERN = re.compile(r"/(?P<product_id>[A-Z]*\d+)(?:[/?#]|$)", re.IGNORECASE)
 ACE_DEBUG_DIR = Path(__file__).resolve().parent / "output" / "ace-debug"
 ACE_BROWSER_TIMEOUT_MS = 30_000
-ACE_BROWSER_WAIT_MS = 2_000
+ACE_BROWSER_WAIT_MS = 1_000
 ACE_DEFAULT_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "X-Vol-Catalog": "1",
@@ -185,11 +185,10 @@ class AceBrowserClient:
                     cls._set_cached_store_candidates(zip_code, stores)
                     cached_stores = cls._clone_store_candidates(stores)
                 # Fetch exact inventory counts from all candidate stores concurrently
-                # We use a lower worker count and add jitter to avoid bot detection
                 stores_checked = 0
                 stores_failed = 0
                 
-                with ThreadPoolExecutor(max_workers=3) as executor:
+                with ThreadPoolExecutor(max_workers=8) as executor:
                     futures = [
                         executor.submit(cls._direct_api_fetch_inventory_for_store, product_id, store, proxy_url)
                         for store in stores
@@ -297,8 +296,8 @@ class AceBrowserClient:
         if not store_code:
             return True
 
-        # Add jitter to avoid rapid-fire bot detection
-        time.sleep(random.uniform(0.12, 0.38))
+        # Minimal jitter for speed
+        time.sleep(random.uniform(0.05, 0.15))
 
         payload = {
             "productCode": product_id,
@@ -986,8 +985,8 @@ class AceBrowserClient:
 async ({ product_id, store_codes, headers }) => {
   const url = '/getProductDetailInventory';
   const results = [];
-  const BATCH_SIZE = 5;
-  
+  const BATCH_SIZE = 15;
+
   for (let i = 0; i < store_codes.length; i += BATCH_SIZE) {
     const batch = store_codes.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(batch.map(async (storeCode) => {
@@ -1011,9 +1010,9 @@ async ({ product_id, store_codes, headers }) => {
       }
     }));
     results.push(...batchResults);
-    // Pause between batches to be stealthy
+    // Minimal pause between batches for speed
     if (i + BATCH_SIZE < store_codes.length) {
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 50));
     }
   }
   return results;
@@ -1076,6 +1075,7 @@ async ({ lat, lng, radius, headers }) => {
         geocoded_location: Optional[Dict[str, float]] = None,
         product_hints: Optional[Dict[str, Any]] = None,
         proxy_label: str = "direct",
+        skip_humanization: bool = False,
     ) -> Dict[str, Any]:
         product_url = cls.canonical_product_url(product_url)
         if not product_url:
@@ -1096,8 +1096,9 @@ async ({ lat, lng, radius, headers }) => {
         def action(page: Any) -> None:
             nonlocal debug_screenshot
             if needs_page_metadata:
-                cls._maybe_dismiss_cookie_banner(page)
-                cls._humanize_page(page)
+                if not skip_humanization:
+                    cls._maybe_dismiss_cookie_banner(page)
+                    cls._humanize_page(page)
                 fetched_product = cls.extract_product_metadata(page, product_url)
                 context["product"].update({key: value for key, value in fetched_product.items() if value})
             context["cookies"] = [dict(cookie) for cookie in page.context.cookies()]
@@ -1232,9 +1233,11 @@ async ({ lat, lng, radius, headers }) => {
                     timeout=ACE_BROWSER_TIMEOUT_MS,
                     wait=ACE_BROWSER_WAIT_MS,
                 ) as session:
-                    for item in pending:
+                    for item_index, item in enumerate(pending):
                         index = int(item["index"])
                         product_url = str(item["product_url"] or "").strip()
+                        # Skip humanization for all products after the first in batch
+                        skip_humanization = item_index > 0
                         try:
                             results[index] = cls._fetch_product_context_with_session(
                                 session,
@@ -1243,6 +1246,7 @@ async ({ lat, lng, radius, headers }) => {
                                 geocoded_location=geocoded_location,
                                 product_hints=item.get("product_hints"),
                                 proxy_label=proxy_label,
+                                skip_humanization=skip_humanization,
                             )
                             errors.pop(index, None)
                         except Exception as exc:
