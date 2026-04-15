@@ -12488,7 +12488,7 @@
       const retailerFilteredLocations = getRetailerFilteredResultsMapLocations(locations);
       const productOptions = getResultsMapProductOptions(retailerFilteredLocations);
       const filteredLocations = getFilteredResultsMapLocations(locations);
-      const hasFilterControl = retailerOptions.length > 1 || productOptions.length > 1;
+      const hasFilterControl = locations.length > 0;
 
       if (retailerOptions.length <= 1) {
         currentResultsMapRetailerFilter = '';
