@@ -1351,7 +1351,7 @@ class StockDatabase:
             cursor = conn.execute(
                 """
                 UPDATE trending_products
-                SET name = ?
+                SET name = ?, last_tracked_at = CURRENT_TIMESTAMP
                 WHERE article_id = ? AND retailer = ?
                 """,
                 (normalized_name, normalized_article_id, normalized_retailer),

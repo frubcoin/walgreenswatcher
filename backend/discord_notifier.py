@@ -375,11 +375,11 @@ class DiscordNotifier:
                 down_count = sum(1 for v in product_change_map.values() if v == "down")
                 indicators = []
                 if new_count:
-                    indicators.append(f"🆕 {new_count} new")
+                    indicators.append(f"🆕")
                 if up_count:
-                    indicators.append(f"📈 {up_count} up")
+                    indicators.append(f"🔺")
                 if down_count:
-                    indicators.append(f"📉 {down_count} down")
+                    indicators.append(f"🔻")
                 if indicators:
                     change_summary = f" ({', '.join(indicators)})"
 
