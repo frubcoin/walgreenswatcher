@@ -397,12 +397,12 @@ class StockDatabase:
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, retailer, article_id) DO UPDATE
-            SET name = excluded.name,
-                planogram = excluded.planogram,
+            SET planogram = excluded.planogram,
                 image_url = excluded.image_url,
                 source_url = excluded.source_url,
                 product_id = excluded.product_id,
                 last_tracked_at = excluded.last_tracked_at
+            -- name is intentionally NOT updated to preserve admin renames
             -- first_tracked_at is intentionally NOT updated so the original add date is preserved
             """,
             (
@@ -506,6 +506,9 @@ class StockDatabase:
         StockDatabase._add_column_if_not_exists(
             conn, "tracked_products", "sort_order", "INTEGER NOT NULL DEFAULT 0"
         )
+        StockDatabase._add_column_if_not_exists(
+            conn, "user_settings", "last_notified_products", "TEXT NOT NULL DEFAULT ''"
+        )
         conn.execute(
             """
             INSERT INTO user_settings (
@@ -519,9 +522,10 @@ class StockDatabase:
                 pokemon_background_tile_size,
                 scheduler_enabled,
                 map_provider,
-                discord_ping_on_change_only
+                discord_ping_on_change_only,
+                last_notified_products
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'google', 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'google', 0, '')
             ON CONFLICT(user_id) DO NOTHING
             """,
             (
@@ -613,6 +617,7 @@ class StockDatabase:
                 "scheduler_enabled": False,
                 "map_provider": "google",
                 "discord_ping_on_change_only": False,
+                "last_notified_products": {},
             }
 
         data = dict(row)
@@ -629,6 +634,7 @@ class StockDatabase:
             "scheduler_enabled": bool(data["scheduler_enabled"]),
             "map_provider": data.get("map_provider") or "google",
             "discord_ping_on_change_only": bool(data.get("discord_ping_on_change_only", 0)),
+            "last_notified_products": self._decode_json(data.get("last_notified_products"), {}),
         }
 
     def update_user_settings(self, user_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -652,7 +658,8 @@ class StockDatabase:
                     pokemon_background_tile_size = ?,
                     scheduler_enabled = ?,
                     map_provider = ?,
-                    discord_ping_on_change_only = ?
+                    discord_ping_on_change_only = ?,
+                    last_notified_products = ?
                 WHERE user_id = ?
                 """,
                 (
@@ -666,6 +673,7 @@ class StockDatabase:
                     int(bool(merged.get("scheduler_enabled"))),
                     merged.get("map_provider", "google"),
                     int(bool(merged.get("discord_ping_on_change_only", False))),
+                    json.dumps(merged.get("last_notified_products") or {}),
                     user_id,
                 ),
             )

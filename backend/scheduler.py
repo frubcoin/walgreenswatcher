@@ -162,6 +162,7 @@ class StockCheckScheduler:
         self.pokemon_background_tile_size = settings["pokemon_background_tile_size"]
         self.map_provider = settings.get("map_provider", "google")
         self.discord_ping_on_change_only = settings.get("discord_ping_on_change_only", False)
+        self.last_notified_products = settings.get("last_notified_products") or {}
         self.notifier = DiscordNotifier(self.discord_destinations or None, map_provider=self.map_provider)
         self.tracked_products = {
             self._tracked_product_key(product["id"], product.get("retailer", "walgreens")): {
@@ -1055,6 +1056,8 @@ class StockCheckScheduler:
                     # Track products that triggered a mention for future comparison
                     if should_mention:
                         self.last_notified_products = dict(discord_products)
+                        # Persist to database for restart survival
+                        self.db.update_user_settings(self.user_id, {"last_notified_products": self.last_notified_products})
 
             self._set_progress(
                 current_phase="complete",
