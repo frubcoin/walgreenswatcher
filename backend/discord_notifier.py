@@ -245,11 +245,11 @@ class DiscordNotifier:
         inventory_known = store.get("inventory_count_known", True)
         if not inventory_known:
             availability_text = store.get("availability_text") or "In Stock"
-            prefix = f"{change_indicator} " if change_indicator else ""
-            return f"{prefix}{self._address_link(address)}\n{availability_text} | Distance: {distance_text}"
+            change_suffix = f" {change_indicator}" if change_indicator else ""
+            return f"{self._address_link(address)}\n{availability_text}{change_suffix} | Distance: {distance_text}"
 
-        prefix = f"{change_indicator} " if change_indicator else ""
-        return f"{prefix}{self._address_link(address)}\nQty: **{inventory_count}** | Distance: {distance_text}"
+        change_suffix = f" {change_indicator}" if change_indicator else ""
+        return f"{self._address_link(address)}\nQty: **{inventory_count}**{change_suffix} | Distance: {distance_text}"
 
     def _chunk_store_lines(self, stores: List[Dict], limit: int = 3000) -> List[str]:
         """Chunk formatted store lines so each embed fits Discord limits."""
