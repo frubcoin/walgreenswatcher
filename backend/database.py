@@ -945,6 +945,100 @@ class StockDatabase:
             for row in rows
         ]
 
+    def list_hidden_trending_products_for_admin(self, limit: int = 48) -> List[Dict[str, Any]]:
+        capped_limit = max(1, min(int(limit or 48), 200))
+
+        with self._connect() as conn:
+            self._backfill_recent_trending_products(conn)
+            rows = conn.execute(
+                """
+                SELECT
+                    h.article_id,
+                    h.retailer,
+                    h.hidden_at,
+                    h.hidden_by_user_id,
+                    u.email AS hidden_by_email,
+                    u.name AS hidden_by_name,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.name), ''), tp.article_id)
+                        FROM trending_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS name,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.planogram), ''), '')
+                        FROM trending_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS planogram,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.image_url), ''), '')
+                        FROM trending_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS image_url,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.source_url), ''), '')
+                        FROM trending_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS source_url,
+                    (
+                        SELECT COALESCE(NULLIF(TRIM(tp.product_id), ''), '')
+                        FROM trending_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                        ORDER BY tp.last_tracked_at DESC, tp.user_id DESC
+                        LIMIT 1
+                    ) AS product_id,
+                    (
+                        SELECT COUNT(DISTINCT tp.user_id)
+                        FROM trending_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                          AND COALESCE(NULLIF(TRIM(tp.source_url), ''), '') <> ''
+                    ) AS tracked_by_count,
+                    (
+                        SELECT MAX(tp.last_tracked_at)
+                        FROM trending_products tp
+                        WHERE tp.article_id = h.article_id
+                          AND tp.retailer = h.retailer
+                          AND COALESCE(NULLIF(TRIM(tp.source_url), ''), '') <> ''
+                    ) AS last_tracked_at
+                FROM hidden_trending_products h
+                LEFT JOIN users u ON u.id = h.hidden_by_user_id
+                ORDER BY h.hidden_at DESC, lower(COALESCE(name, h.article_id)) ASC, h.article_id ASC
+                LIMIT ?
+                """,
+                (capped_limit,),
+            ).fetchall()
+
+        return [
+            {
+                "key": self._product_key(row["article_id"], row["retailer"]),
+                "id": row["article_id"],
+                "retailer": row["retailer"] or "walgreens",
+                "name": row["name"] or row["article_id"],
+                "planogram": row["planogram"] or "",
+                "image_url": row["image_url"] or "",
+                "source_url": row["source_url"] or "",
+                "product_id": row["product_id"] or "",
+                "tracked_by_count": int(row["tracked_by_count"] or 0),
+                "last_tracked_at": row["last_tracked_at"] or "",
+                "hidden_at": row["hidden_at"] or "",
+                "hidden_by_email": row["hidden_by_email"] or "",
+            }
+            for row in rows
+        ]
+
     def hide_trending_product(
         self,
         article_id: str,
