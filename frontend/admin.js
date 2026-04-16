@@ -903,6 +903,7 @@ function renderTrendingProductsAdmin(trendingPayload) {
     container.innerHTML = products.map(product => `
       <article class="trending-admin-item">
         <div class="trending-admin-item-head">
+          ${product.image_url ? `<img class="trending-admin-thumb" src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.name || 'Product')}" loading="lazy" onerror="this.style.display='none'">` : ''}
           <div class="trending-admin-copy">
             <strong>${escapeHtml(product.name || product.id || 'Product')}</strong>
             <div class="trending-admin-meta">

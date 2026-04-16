@@ -977,6 +977,15 @@ textarea {
   gap: 12px;
 }
 
+.trending-admin-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
 .trending-admin-copy {
   display: grid;
   gap: 6px;
