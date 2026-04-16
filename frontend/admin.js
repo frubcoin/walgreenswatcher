@@ -1554,9 +1554,11 @@ async function restoreTrendingProduct(actionElement) {
 }
 
 async function renameTrendingProduct(actionElement) {
+  console.log('renameTrendingProduct called', actionElement, actionElement?.dataset);
   const productId = String(actionElement?.dataset.productId || '').trim();
   const retailer = String(actionElement?.dataset.retailer || 'walgreens').trim();
   const currentName = String(actionElement?.dataset.name || productId).trim() || productId;
+  console.log('rename data:', { productId, retailer, currentName });
 
   if (!productId) {
     showBanner('Trending product ID missing', 'error');
@@ -1585,8 +1587,11 @@ async function renameTrendingProduct(actionElement) {
   } catch (error) {
     showBanner(error.message, 'error');
   } finally {
-    actionElement.disabled = false;
-    actionElement.textContent = originalLabel;
+    // Element may have been re-rendered by loadAdminOverview, only restore if still connected
+    if (actionElement.isConnected) {
+      actionElement.disabled = false;
+      actionElement.textContent = originalLabel;
+    }
   }
 }
 
@@ -1657,9 +1662,13 @@ document.addEventListener('visibilitychange', () => {
 
 document.addEventListener('click', event => {
   const actionElement = event.target instanceof Element ? event.target.closest('[data-action]') : null;
-  if (!actionElement) return;
+  if (!actionElement) {
+    console.log('No action element found for click on:', event.target);
+    return;
+  }
 
   const action = actionElement.dataset.action;
+  console.log('Click detected:', action, actionElement.dataset);
   if (action === 'open-review-item') {
     openReviewModal(actionElement.dataset.reviewKey || '');
   } else if (action === 'open-review-filter') {
