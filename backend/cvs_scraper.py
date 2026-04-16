@@ -1537,6 +1537,7 @@ class CvsStockChecker:
             "inventory_count": self._inventory_count(store),
             "latitude": latitude,
             "longitude": longitude,
+            "pickup_available": True,
         }
 
     def check_product_availability(
