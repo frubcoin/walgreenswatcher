@@ -922,6 +922,14 @@ function renderTrendingProductsAdmin(trendingPayload) {
         </div>
         <div class="action-row">
           <button
+            class="button button-secondary button-compact"
+            type="button"
+            data-action="rename-trending-product"
+            data-product-id="${escapeHtml(product.id || '')}"
+            data-retailer="${escapeHtml(product.retailer || 'walgreens')}"
+            data-name="${escapeHtml(product.name || product.id || 'Product')}"
+          >Rename</button>
+          <button
             class="button button-danger button-compact"
             type="button"
             data-action="delete-trending-product"
@@ -1545,6 +1553,43 @@ async function restoreTrendingProduct(actionElement) {
   }
 }
 
+async function renameTrendingProduct(actionElement) {
+  const productId = String(actionElement?.dataset.productId || '').trim();
+  const retailer = String(actionElement?.dataset.retailer || 'walgreens').trim();
+  const currentName = String(actionElement?.dataset.name || productId).trim() || productId;
+
+  if (!productId) {
+    showBanner('Trending product ID missing', 'error');
+    return;
+  }
+
+  const newName = window.prompt(`Rename "${currentName}" to:`, currentName);
+  if (!newName || newName.trim() === '' || newName.trim() === currentName) {
+    return;
+  }
+
+  const normalizedName = newName.trim();
+  const originalLabel = actionElement.textContent;
+  actionElement.disabled = true;
+  actionElement.textContent = 'Renaming...';
+
+  try {
+    await apiRequest('/api/admin/trending-products/rename', 'POST', {
+      id: productId,
+      retailer,
+      name: normalizedName,
+      old_name: currentName
+    });
+    await loadAdminOverview();
+    showBanner(`Trending product renamed to "${normalizedName}"`, 'success');
+  } catch (error) {
+    showBanner(error.message, 'error');
+  } finally {
+    actionElement.disabled = false;
+    actionElement.textContent = originalLabel;
+  }
+}
+
 async function banUser(userId) {
   const reason = document.getElementById(`ban-reason-${userId}`)?.value.trim() || '';
   try {
@@ -1637,6 +1682,8 @@ document.addEventListener('click', event => {
     deleteTrendingProduct(actionElement);
   } else if (action === 'restore-trending-product') {
     restoreTrendingProduct(actionElement);
+  } else if (action === 'rename-trending-product') {
+    renameTrendingProduct(actionElement);
   }
 });
 

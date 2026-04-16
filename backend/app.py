@@ -1674,6 +1674,41 @@ def restore_trending_product_admin():
     return jsonify({"product": restored_product})
 
 
+@app.route("/api/admin/trending-products/rename", methods=["POST"])
+@require_admin
+def rename_trending_product_admin():
+    admin_user = _session_user()
+    data = request.json or {}
+    product_id = str(data.get("id") or "").strip()
+    retailer = str(data.get("retailer") or "").strip().lower() or "walgreens"
+    new_name = str(data.get("name") or "").strip()
+    old_name = str(data.get("old_name") or "").strip()
+
+    if not product_id:
+        return jsonify({"error": "Product ID required"}), 400
+    if not new_name:
+        return jsonify({"error": "New name is required"}), 400
+
+    renamed = db.admin_rename_trending_product(product_id, retailer, new_name)
+    if not renamed:
+        return jsonify({"error": "No trending products found to rename"}), 404
+
+    _record_audit_event(
+        "admin.trending_product_renamed",
+        f'Trending product renamed from "{old_name or product_id}" to "{new_name}"',
+        actor_user=admin_user,
+        metadata={
+            "product_id": product_id,
+            "retailer": retailer,
+            "old_name": old_name or product_id,
+            "new_name": new_name,
+            "trending_only": True,
+        },
+        alert_category="user_action",
+    )
+    return jsonify({"id": product_id, "retailer": retailer, "name": new_name})
+
+
 @app.route("/api/admin/settings", methods=["POST"])
 @require_admin
 def update_admin_settings():

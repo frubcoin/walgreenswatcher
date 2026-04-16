@@ -1325,6 +1325,30 @@ class StockDatabase:
                 )
         return cursor.rowcount > 0
 
+    def admin_rename_trending_product(
+        self,
+        article_id: str,
+        retailer: str,
+        name: str,
+    ) -> bool:
+        """Update the name for all trending product entries matching article_id and retailer.
+        This affects all users tracking this product, for admin use only."""
+        normalized_article_id = str(article_id or "").strip()
+        normalized_retailer = str(retailer or "walgreens").strip().lower() or "walgreens"
+        normalized_name = str(name or "").strip()
+        if not normalized_article_id or not normalized_name:
+            return False
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE trending_products
+                SET name = ?
+                WHERE article_id = ? AND retailer = ?
+                """,
+                (normalized_name, normalized_article_id, normalized_retailer),
+            )
+            return cursor.rowcount > 0
+
     def update_product_image(
         self,
         user_id: int,

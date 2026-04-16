@@ -7264,6 +7264,7 @@
     let manualLocationHighlightedIndex = -1;
     let progressLastProductIndex = -1;
     let progressProductStartTime = 0;
+    let progressDelayDisclaimerShown = false;
     let manualLocationAutocompleteBusy = false;
     let manualLocationAutocompleteTimer = 0;
     let settingsMapAddressSuggestions = [];
@@ -13923,6 +13924,7 @@
       // Reset product timing for conditional disclaimer
       progressLastProductIndex = -1;
       progressProductStartTime = 0;
+      progressDelayDisclaimerShown = false;
       if (progressHeartbeatInterval) {
         clearInterval(progressHeartbeatInterval);
       }
@@ -13932,8 +13934,9 @@
       progressHeartbeatInterval = setInterval(() => {
         if (progressProductStartTime > 0) {
           const elapsed = Date.now() - progressProductStartTime;
-          if (elapsed > 15000) {
+          if (elapsed > 15000 && !progressDelayDisclaimerShown) {
             document.getElementById('progress-delay-disclaimer').style.display = 'block';
+            progressDelayDisclaimerShown = true;
           }
         }
       }, 1000);
@@ -14039,12 +14042,15 @@
 
       document.getElementById('progress-count').textContent = `Store processing: ${checked} / ${total} | Current product hits: ${storesWithStock}`;
 
-      // Reset timing when a new product starts
+      // Reset timing when a new product starts (but keep disclaimer visible if already shown)
       const currentIdx = progress.current_product_index || 0;
       if (currentIdx !== progressLastProductIndex) {
         progressLastProductIndex = currentIdx;
         progressProductStartTime = Date.now();
-        document.getElementById('progress-delay-disclaimer').style.display = 'none';
+        // Only hide disclaimer if it hasn't been shown yet for this check session
+        if (!progressDelayDisclaimerShown) {
+          document.getElementById('progress-delay-disclaimer').style.display = 'none';
+        }
       }
     }
 
