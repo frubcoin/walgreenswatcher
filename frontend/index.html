@@ -10529,9 +10529,6 @@
     }
 
     function renderMapPopup(location) {
-      const locationBadgeOptions = {
-        compactPickupLabel: ['walgreens', 'fivebelow'].includes(retailerKey(location?.retailer || ''))
-      };
       const productsHtml = location.products.map(product => `
           <div class="map-popup-product">
             <div class="map-popup-product-copy">
@@ -10550,7 +10547,7 @@
         `).join('');
 
       return `
-          <div class="map-popup-title">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(location.name)} ${renderFulfillmentBadges(location, location.retailer, locationBadgeOptions)}</div>
+          <div class="map-popup-title">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(location.name)}</div>
           <div class="map-popup-address">${renderAddressLink(location.address)}</div>
           <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${locationUsesFulfillmentAvailability(location) ? escapeHtml(getLocationFulfillmentSummary(location)) : `${location.total_inventory} total units`} | ${location.product_count} product${location.product_count === 1 ? '' : 's'}${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
           <div class="map-popup-products">${productsHtml}</div>
@@ -13100,7 +13097,7 @@
       <div class="result-store-index">${index + 1}.</div>
       <div class="result-store-copy">
         ${renderAddressLink(store.address)}
-        <div class="result-store-meta">${isFulfillmentOnlyStore(store) ? `Availability: <strong>${escapeHtml(getStoreAvailabilitySummary(store, retailer))}</strong>` : `Qty: <strong>${Number(store.inventory_count || 0)}</strong>`} | Distance: ${escapeHtml(formatDistance(getEffectiveStoreDistance(store)))}${renderFulfillmentBadges(store, retailer)}</div>
+        <div class="result-store-meta">${isFulfillmentOnlyStore(store) ? `Availability: <strong>${escapeHtml(getStoreAvailabilitySummary(store, retailer))}</strong>` : `Qty: <strong>${Number(store.inventory_count || 0)}</strong>`} | Distance: ${escapeHtml(formatDistance(getEffectiveStoreDistance(store)))}</div>
       </div>
     </div>
   `).join('');
@@ -13135,6 +13132,7 @@
             ${sourceUrl ? `<a class="result-card-link" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Product Page</a>` : ''}
           </div>
           <div class="result-card-subtitle">${getProductSecondarySummary(product)}</div>
+          ${renderFulfillmentBadges(product, product.retailer)}
         </div>
         ${imageUrl ? `
           <div class="result-card-thumb">
