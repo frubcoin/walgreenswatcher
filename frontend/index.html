@@ -7121,6 +7121,21 @@
             <span class="form-hint">Set a webhook URL for each destination. Role ID is optional and only applies to that
               webhook.</span>
           </div>
+
+          <div class="form-group" style="margin-top: 20px;">
+            <label class="form-label">Discord Ping Behavior</label>
+            <div class="toggle-container" style="display: flex; align-items: center; gap: 12px;">
+              <label class="switch">
+                <input type="checkbox" id="cfg-discord-ping-on-change-only">
+                <span class="slider round"></span>
+              </label>
+              <span class="toggle-label" id="cfg-discord-ping-label">Ping every time stock is found</span>
+            </div>
+            <span class="form-hint">
+              When enabled, the @ role mention will only be sent when product information changes
+              (different stores or inventory counts). Otherwise, you'll be pinged on every check that finds stock.
+            </span>
+          </div>
         </div>
 
         <div class="settings-actions">
@@ -9462,6 +9477,15 @@
       applyPokemonBackgroundSettings();
     }
 
+    function updatePingToggleLabel(isPingOnChangeOnly) {
+      const label = document.getElementById('cfg-discord-ping-label');
+      if (label) {
+        label.textContent = isPingOnChangeOnly
+          ? 'Only ping when product information changes'
+          : 'Ping every time stock is found';
+      }
+    }
+
     function initializeSettingsAutoSave() {
       const autoSaveFields = [
         { id: 'cfg-zip', event: 'blur' },
@@ -9470,7 +9494,8 @@
         { id: 'cfg-map-provider', event: 'change' },
         { id: 'cfg-pokemon-bg-enabled', event: 'change' },
         { id: 'cfg-pokemon-bg-theme', event: 'change' },
-        { id: 'cfg-pokemon-bg-size', event: 'change' }
+        { id: 'cfg-pokemon-bg-size', event: 'change' },
+        { id: 'cfg-discord-ping-on-change-only', event: 'change' }
       ];
 
       autoSaveFields.forEach(({ id, event }) => {
@@ -9490,6 +9515,13 @@
             void saveSettings();
           }
         }, true);
+      }
+
+      const pingToggle = document.getElementById('cfg-discord-ping-on-change-only');
+      if (pingToggle) {
+        pingToggle.addEventListener('change', (e) => {
+          updatePingToggleLabel(e.target.checked);
+        });
       }
 
       // Live update slider value labels while sliding
@@ -13812,6 +13844,12 @@
         theme: status.pokemon_background_theme || DEFAULT_POKEMON_BACKGROUND_THEME,
         tileSize: status.pokemon_background_tile_size ?? DEFAULT_POKEMON_BACKGROUND_TILE_SIZE
       });
+      const pingOnChangeOnly = status.discord_ping_on_change_only ?? false;
+      const pingToggle = document.getElementById('cfg-discord-ping-on-change-only');
+      if (pingToggle) {
+        pingToggle.checked = pingOnChangeOnly;
+        updatePingToggleLabel(pingOnChangeOnly);
+      }
       renderDiscordDestinationRows(status.discord_destinations || []);
       syncManualLocationSearchUi();
 
@@ -13829,6 +13867,7 @@
       const pokemonBackgroundTheme = document.getElementById('cfg-pokemon-bg-theme').value || DEFAULT_POKEMON_BACKGROUND_THEME;
       const pokemonBackgroundTileSize = normalizePokemonBackgroundTileSize(document.getElementById('cfg-pokemon-bg-size').value);
       const mapProvider = document.getElementById('cfg-map-provider').value || 'google';
+      const discordPingOnChangeOnly = document.getElementById('cfg-discord-ping-on-change-only').checked;
       manualLocationQuery = mapAddress;
       syncManualLocationSearchUi();
       let mapAddressResolved = true;
@@ -13849,6 +13888,7 @@
       data.pokemon_background_theme = pokemonBackgroundTheme;
       data.pokemon_background_tile_size = pokemonBackgroundTileSize;
       data.map_provider = mapProvider;
+      data.discord_ping_on_change_only = discordPingOnChangeOnly;
 
       const result = await apiCall('/api/configure', 'POST', data);
       if (result) {

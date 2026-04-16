@@ -441,13 +441,13 @@ class DiscordNotifier:
             
         return f"{self._address_link(address)} ({distance_text})"
 
-    def notify_stock_found(self, products_with_stock: Dict, configured_zip: str) -> bool:
+    def notify_stock_found(self, products_with_stock: Dict, configured_zip: str, mention_roles: bool = True) -> bool:
         """Notify when stock is found."""
         if not products_with_stock:
             return False
 
         embeds = self._build_stock_embeds(products_with_stock, configured_zip)
-        return self.send_message(embeds, mention_roles=True)
+        return self.send_message(embeds, mention_roles=mention_roles)
 
     def notify_no_stock(self, total_stores_checked: int) -> bool:
         """Notify when check completes with no stock."""

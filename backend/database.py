@@ -85,6 +85,7 @@ class StockDatabase:
                     pokemon_background_tile_size INTEGER NOT NULL DEFAULT 645,
                     scheduler_enabled INTEGER NOT NULL DEFAULT 0,
                     map_provider TEXT NOT NULL DEFAULT 'google',
+                    discord_ping_on_change_only INTEGER NOT NULL DEFAULT 0,
                     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
 
@@ -497,6 +498,9 @@ class StockDatabase:
             conn, "user_settings", "map_provider", "TEXT NOT NULL DEFAULT 'google'"
         )
         StockDatabase._add_column_if_not_exists(
+            conn, "user_settings", "discord_ping_on_change_only", "INTEGER NOT NULL DEFAULT 0"
+        )
+        StockDatabase._add_column_if_not_exists(
             conn, "tracked_products", "exclude_from_discord", "INTEGER NOT NULL DEFAULT 0"
         )
         StockDatabase._add_column_if_not_exists(
@@ -514,9 +518,10 @@ class StockDatabase:
                 pokemon_background_theme,
                 pokemon_background_tile_size,
                 scheduler_enabled,
-                map_provider
+                map_provider,
+                discord_ping_on_change_only
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'google')
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'google', 0)
             ON CONFLICT(user_id) DO NOTHING
             """,
             (
@@ -607,6 +612,7 @@ class StockDatabase:
                 "pokemon_background_tile_size": DEFAULT_POKEMON_BACKGROUND_TILE_SIZE,
                 "scheduler_enabled": False,
                 "map_provider": "google",
+                "discord_ping_on_change_only": False,
             }
 
         data = dict(row)
@@ -622,6 +628,7 @@ class StockDatabase:
             "pokemon_background_tile_size": int(data["pokemon_background_tile_size"] or DEFAULT_POKEMON_BACKGROUND_TILE_SIZE),
             "scheduler_enabled": bool(data["scheduler_enabled"]),
             "map_provider": data.get("map_provider") or "google",
+            "discord_ping_on_change_only": bool(data.get("discord_ping_on_change_only", 0)),
         }
 
     def update_user_settings(self, user_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -644,7 +651,8 @@ class StockDatabase:
                     pokemon_background_theme = ?,
                     pokemon_background_tile_size = ?,
                     scheduler_enabled = ?,
-                    map_provider = ?
+                    map_provider = ?,
+                    discord_ping_on_change_only = ?
                 WHERE user_id = ?
                 """,
                 (
@@ -657,6 +665,7 @@ class StockDatabase:
                     int(merged["pokemon_background_tile_size"]),
                     int(bool(merged.get("scheduler_enabled"))),
                     merged.get("map_provider", "google"),
+                    int(bool(merged.get("discord_ping_on_change_only", False))),
                     user_id,
                 ),
             )

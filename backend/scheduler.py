@@ -76,6 +76,7 @@ class StockCheckScheduler:
         self.is_running = False
         self.last_check_time: Optional[datetime] = None
         self.last_products_with_stock: Dict[str, Dict[str, Any]] = {}
+        self.last_notified_products: Dict[str, Dict[str, Any]] = {}
 
         self.current_zipcode = TARGET_ZIP_CODE
         self.check_interval_minutes = DEFAULT_CHECK_INTERVAL_MINUTES
@@ -85,6 +86,7 @@ class StockCheckScheduler:
         self.pokemon_background_theme = DEFAULT_POKEMON_BACKGROUND_THEME
         self.pokemon_background_tile_size = DEFAULT_POKEMON_BACKGROUND_TILE_SIZE
         self.map_provider = "google"
+        self.discord_ping_on_change_only = False
         self.tracked_products: Dict[str, Dict[str, str]] = {}
 
         self.check_in_progress = False
@@ -159,6 +161,7 @@ class StockCheckScheduler:
         self.pokemon_background_theme = settings["pokemon_background_theme"]
         self.pokemon_background_tile_size = settings["pokemon_background_tile_size"]
         self.map_provider = settings.get("map_provider", "google")
+        self.discord_ping_on_change_only = settings.get("discord_ping_on_change_only", False)
         self.notifier = DiscordNotifier(self.discord_destinations or None, map_provider=self.map_provider)
         self.tracked_products = {
             self._tracked_product_key(product["id"], product.get("retailer", "walgreens")): {
@@ -382,6 +385,12 @@ class StockCheckScheduler:
         self.notifier = DiscordNotifier(self.discord_destinations or None, map_provider=normalized)
         return self.map_provider
 
+    def set_discord_ping_on_change_only(self, value: Any) -> bool:
+        normalized = bool(value)
+        self._update_setting(discord_ping_on_change_only=normalized)
+        self.discord_ping_on_change_only = normalized
+        return self.discord_ping_on_change_only
+
     def _product_specs(self) -> List[Dict[str, str]]:
         return [
             {
@@ -480,6 +489,61 @@ class StockCheckScheduler:
             }
 
         return filtered_products
+
+    def _products_info_changed(
+        self,
+        current_products: Dict[str, Dict[str, Any]],
+    ) -> bool:
+        """Check if product information has changed compared to last notification.
+
+        Returns True if:
+        - No previous notification recorded
+        - Different set of products in stock
+        - Different stores for any product
+        - Different inventory counts for any store
+        """
+        if not self.last_notified_products:
+            return True
+
+        current_keys = set(current_products.keys())
+        last_keys = set(self.last_notified_products.keys())
+
+        # Check if product set changed
+        if current_keys != last_keys:
+            return True
+
+        # Check each product's stores and inventory
+        for product_id, current_data in current_products.items():
+            last_data = self.last_notified_products.get(product_id, {})
+            current_stores = current_data.get("stores", [])
+            last_stores = last_data.get("stores", [])
+
+            # Build store lookup by ID for comparison
+            current_by_store: Dict[str, Dict] = {}
+            for store in current_stores:
+                store_id = str(store.get("store_id") or "").strip()
+                if store_id:
+                    current_by_store[store_id] = store
+
+            last_by_store: Dict[str, Dict] = {}
+            for store in last_stores:
+                store_id = str(store.get("store_id") or "").strip()
+                if store_id:
+                    last_by_store[store_id] = store
+
+            # Check if store set changed
+            if set(current_by_store.keys()) != set(last_by_store.keys()):
+                return True
+
+            # Check inventory counts for each store
+            for store_id, current_store in current_by_store.items():
+                last_store = last_by_store.get(store_id, {})
+                current_count = int(current_store.get("inventory_count", 0) or 0)
+                last_count = int(last_store.get("inventory_count", 0) or 0)
+                if current_count != last_count:
+                    return True
+
+        return False
 
     @staticmethod
     def _store_distance_miles(store: Dict[str, Any]) -> Optional[float]:
@@ -914,10 +978,16 @@ class StockCheckScheduler:
                     k: v for k, v in products_with_stock.items()
                     if not self.tracked_products.get(k, {}).get("exclude_from_discord", False)
                 }
-                
+
                 discord_products = self._filter_products_for_discord(discord_products)
-                
+
                 if discord_products:
+                    # Determine if we should ping based on settings and changes
+                    products_changed = self._products_info_changed(discord_products)
+                    should_mention = (
+                        not self.discord_ping_on_change_only
+                    ) or products_changed
+
                     self._set_progress(
                         current_phase="notifying",
                         progress_message=f"Sending Discord alerts for {len(discord_products)} product(s)...",
@@ -925,7 +995,13 @@ class StockCheckScheduler:
                         progress_completed_units=max(progress_total_units - 0.5, 0),
                         progress_total_units=progress_total_units,
                     )
-                    self.notifier.notify_stock_found(discord_products, self.current_zipcode)
+                    self.notifier.notify_stock_found(
+                        discord_products, self.current_zipcode, mention_roles=should_mention
+                    )
+
+                    # Track products that triggered a mention for future comparison
+                    if should_mention:
+                        self.last_notified_products = dict(discord_products)
 
             self._set_progress(
                 current_phase="complete",
@@ -1070,6 +1146,7 @@ class StockCheckScheduler:
             "pokemon_background_theme": self.pokemon_background_theme,
             "pokemon_background_tile_size": self.pokemon_background_tile_size,
             "map_provider": self.map_provider,
+            "discord_ping_on_change_only": self.discord_ping_on_change_only,
             "tracked_products": products_list,
         }
 
