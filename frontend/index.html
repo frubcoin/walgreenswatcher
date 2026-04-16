@@ -9752,7 +9752,7 @@
       }
       const badges = [];
       if (store.pickup_available) {
-        if (!compactPickupLabel && (normalizedRetailer === 'walgreens' || normalizedRetailer === 'cvs')) {
+        if (!compactPickupLabel && (normalizedRetailer === 'walgreens' || normalizedRetailer === 'cvs' || normalizedRetailer === 'fivebelow')) {
           badges.push('<span class="fulfillment-badge type-instore">Available for pickup</span>');
         } else {
           badges.push('<span class="fulfillment-badge type-pickup">Pickup</span>');

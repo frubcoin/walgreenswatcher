@@ -342,6 +342,7 @@ class FiveBelowStockChecker:
                 store_details[store_id] = {
                     **store_lookup[store_id],
                     "inventory_count": quantity,
+                    "pickup_available": True,
                 }
 
         for index, store in enumerate(stores, start=1):

@@ -223,6 +223,7 @@ class WalgreensStockChecker:
             "inventory_count": self._inventory_count(store, article_id),
             "latitude": latitude,
             "longitude": longitude,
+            "pickup_available": True,
         }
 
     def _product_name(self, product: Dict[str, Any]) -> str:
