@@ -240,13 +240,16 @@ class DiscordNotifier:
         inventory_count = store.get("inventory_count", 0)
         distance = store.get("distance")
         distance_text = self._distance_text(distance)
+        change_indicator = store.get("change_indicator", "")
         
         inventory_known = store.get("inventory_count_known", True)
         if not inventory_known:
             availability_text = store.get("availability_text") or "In Stock"
-            return f"{self._address_link(address)}\n{availability_text} | Distance: {distance_text}"
+            prefix = f"{change_indicator} " if change_indicator else ""
+            return f"{prefix}{self._address_link(address)}\n{availability_text} | Distance: {distance_text}"
 
-        return f"{self._address_link(address)}\nQty: **{inventory_count}** | Distance: {distance_text}"
+        prefix = f"{change_indicator} " if change_indicator else ""
+        return f"{prefix}{self._address_link(address)}\nQty: **{inventory_count}** | Distance: {distance_text}"
 
     def _chunk_store_lines(self, stores: List[Dict], limit: int = 3000) -> List[str]:
         """Chunk formatted store lines so each embed fits Discord limits."""
@@ -322,14 +325,14 @@ class DiscordNotifier:
         """Get display name and icon for a retailer code."""
         return self.RETAILER_INFO.get(retailer_code.lower(), {"name": retailer_code.title(), "icon": ""})
 
-    def _build_stock_embeds(self, products_with_stock: Dict, configured_zip: str) -> List[Dict[str, Any]]:
+    def _build_stock_embeds(self, products_with_stock: Dict, configured_zip: str, product_changes: Optional[Dict[str, Dict[str, str]]] = None) -> List[Dict[str, Any]]:
         """Build stock embeds while staying under Discord's embed size limits."""
         total_store_hits = sum(product.get("count", 0) for product in products_with_stock.values())
         total_inventory = sum(product.get("total_inventory", 0) for product in products_with_stock.values())
         embeds: List[Dict[str, Any]] = []
         total_products = len(products_with_stock)
 
-        for product_index, product_info in enumerate(products_with_stock.values(), start=1):
+        for product_index, (product_id, product_info) in enumerate(products_with_stock.items(), start=1):
             product_name = str(product_info["product_name"])[: self.EMBED_TITLE_LIMIT]
             retailer = product_info.get("retailer", "walgreens")
             retailer_info = self._get_retailer_info(retailer)
@@ -338,6 +341,9 @@ class DiscordNotifier:
             store_count = product_info.get("count", 0)
             total_units = product_info.get("total_inventory", 0)
             stores = product_info.get("stores", [])
+
+            # Get changes for this product
+            product_change_map = product_changes.get(product_id, {}) if product_changes else {}
             nearest_store = self._nearest_store_text(stores)[: self.EMBED_FIELD_VALUE_LIMIT]
             description_prefix = (
                 f"Near ZIP {configured_zip}\n"
@@ -361,14 +367,46 @@ class DiscordNotifier:
                     },
                 )
 
+            # Build change summary for title if there are changes
+            change_summary = ""
+            if product_change_map:
+                new_count = sum(1 for v in product_change_map.values() if v == "new")
+                up_count = sum(1 for v in product_change_map.values() if v == "up")
+                down_count = sum(1 for v in product_change_map.values() if v == "down")
+                indicators = []
+                if new_count:
+                    indicators.append(f"🆕 {new_count} new")
+                if up_count:
+                    indicators.append(f"📈 {up_count} up")
+                if down_count:
+                    indicators.append(f"📉 {down_count} down")
+                if indicators:
+                    change_summary = f" ({', '.join(indicators)})"
+
             # Always include retailer name in the title
             title_prefix = f"[{retailer_info['name']}] " if retailer_info["name"] else ""
             base_embed: Dict[str, Any] = {
-                "title": f"{title_prefix}{product_name}",
+                "title": f"{title_prefix}{product_name}{change_summary}",
                 "color": 3066993,
                 "timestamp": datetime.utcnow().isoformat(),
                 "author": self._brand_author(),
             }
+
+            # Prepare stores with change indicators
+            stores_with_indicators = []
+            for store in stores:
+                store_id = str(store.get("store_id") or "").strip()
+                change_type = product_change_map.get(store_id, "same") if product_change_map else "same"
+                store_copy = dict(store)
+                if change_type == "new":
+                    store_copy["change_indicator"] = "🆕"
+                elif change_type == "up":
+                    store_copy["change_indicator"] = "🔺"
+                elif change_type == "down":
+                    store_copy["change_indicator"] = "🔻"
+                else:
+                    store_copy["change_indicator"] = ""
+                stores_with_indicators.append(store_copy)
 
             # Use product image as thumbnail if available, otherwise use retailer icon
             if image_url:
@@ -388,7 +426,7 @@ class DiscordNotifier:
                 configured_zip=configured_zip,
                 store_count_hint=max(len(stores), 1),
             )
-            chunks = self._chunk_store_lines(stores, limit=chunk_limit)
+            chunks = self._chunk_store_lines(stores_with_indicators, limit=chunk_limit)
 
             for chunk_index, chunk in enumerate(chunks, start=1):
                 embed = dict(base_embed)
@@ -441,12 +479,12 @@ class DiscordNotifier:
             
         return f"{self._address_link(address)} ({distance_text})"
 
-    def notify_stock_found(self, products_with_stock: Dict, configured_zip: str, mention_roles: bool = True) -> bool:
+    def notify_stock_found(self, products_with_stock: Dict, configured_zip: str, mention_roles: bool = True, product_changes: Optional[Dict[str, Dict[str, str]]] = None) -> bool:
         """Notify when stock is found."""
         if not products_with_stock:
             return False
 
-        embeds = self._build_stock_embeds(products_with_stock, configured_zip)
+        embeds = self._build_stock_embeds(products_with_stock, configured_zip, product_changes=product_changes)
         return self.send_message(embeds, mention_roles=mention_roles)
 
     def notify_no_stock(self, total_stores_checked: int) -> bool:

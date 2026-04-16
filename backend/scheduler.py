@@ -545,6 +545,56 @@ class StockCheckScheduler:
 
         return False
 
+    def _compute_product_changes(
+        self,
+        current_products: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Dict[str, str]]:
+        """Compute detailed changes for each store compared to last notification.
+
+        Returns a dict mapping product_id -> store_id -> change_type
+        where change_type is: 'new', 'up', 'down', or 'same'
+        """
+        changes: Dict[str, Dict[str, str]] = {}
+
+        for product_id, current_data in current_products.items():
+            last_data = self.last_notified_products.get(product_id, {}) if self.last_notified_products else {}
+            last_stores = last_data.get("stores", []) if last_data else []
+
+            # Build store lookup by ID for last notification
+            last_by_store: Dict[str, Dict] = {}
+            for store in last_stores:
+                store_id = str(store.get("store_id") or "").strip()
+                if store_id:
+                    last_by_store[store_id] = store
+
+            product_changes: Dict[str, str] = {}
+            current_stores = current_data.get("stores", [])
+
+            for store in current_stores:
+                store_id = str(store.get("store_id") or "").strip()
+                if not store_id:
+                    continue
+
+                current_count = int(store.get("inventory_count", 0) or 0)
+                last_store = last_by_store.get(store_id)
+
+                if last_store is None:
+                    # New store not in last notification
+                    product_changes[store_id] = "new"
+                else:
+                    last_count = int(last_store.get("inventory_count", 0) or 0)
+                    if current_count > last_count:
+                        product_changes[store_id] = "up"
+                    elif current_count < last_count:
+                        product_changes[store_id] = "down"
+                    else:
+                        product_changes[store_id] = "same"
+
+            if product_changes:
+                changes[product_id] = product_changes
+
+        return changes
+
     @staticmethod
     def _store_distance_miles(store: Dict[str, Any]) -> Optional[float]:
         try:
@@ -988,6 +1038,9 @@ class StockCheckScheduler:
                         not self.discord_ping_on_change_only
                     ) or products_changed
 
+                    # Compute detailed changes for display in notifications
+                    product_changes = self._compute_product_changes(discord_products)
+
                     self._set_progress(
                         current_phase="notifying",
                         progress_message=f"Sending Discord alerts for {len(discord_products)} product(s)...",
@@ -996,7 +1049,7 @@ class StockCheckScheduler:
                         progress_total_units=progress_total_units,
                     )
                     self.notifier.notify_stock_found(
-                        discord_products, self.current_zipcode, mention_roles=should_mention
+                        discord_products, self.current_zipcode, mention_roles=should_mention, product_changes=product_changes
                     )
 
                     # Track products that triggered a mention for future comparison
