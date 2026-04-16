@@ -3540,6 +3540,20 @@
       transition: transform 0.2s ease, filter 0.2s ease;
     }
 
+    /* Ensure markers are visible during flyTo/zoom animations */
+    .leaflet-container.leaflet-zoom-anim .leaflet-marker-icon,
+    .leaflet-container.leaflet-fly-anim .leaflet-marker-icon,
+    .leaflet-container .results-store-marker,
+    .leaflet-container .results-store-marker * {
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+
+    /* Prevent markerCluster from hiding markers during zoom */
+    .leaflet-marker-cluster {
+      transition: transform 0.2s ease !important;
+    }
+
     .results-map-card .leaflet-bar a {
       background: rgba(33, 37, 41, 0.92);
       color: var(--text-primary);
@@ -10797,38 +10811,36 @@
               if (focusRequestId !== resultsMapFocusRequestId) return;
               if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
               resultsMap.invalidateSize();
-
-              const revealVisibleMarker = () => {
-                if (focusRequestId !== resultsMapFocusRequestId) return;
-                if (!resultsMap) return;
-                resultsMap.invalidateSize();
-                openMarkerPopupWithoutAutoPan(marker);
-              };
-
-              const visibleParent = typeof resultsMapClusterGroup?.getVisibleParent === 'function'
-                ? resultsMapClusterGroup.getVisibleParent(marker)
-                : marker;
-
-              if (resultsMapClusterGroup && visibleParent && visibleParent !== marker) {
-                resultsMapClusterGroup.zoomToShowLayer(marker, revealVisibleMarker);
-                return;
-              }
-
-              revealVisibleMarker();
+              openMarkerPopupWithoutAutoPan(marker);
             });
           };
 
-          if (animate && typeof resultsMap.flyTo === 'function') {
-            resultsMap.once('moveend', openPopupAfterFocus);
-            resultsMap.flyTo(focusLatLng, targetZoom, {
-              animate: true,
-              duration,
-              easeLinearity: 0.1
-            });
-          } else {
-            resultsMap.setView(focusLatLng, targetZoom, { animate });
-            openPopupAfterFocus();
+          // Ensure marker is visible (not clustered) before flying
+          const visibleParent = typeof resultsMapClusterGroup?.getVisibleParent === 'function'
+            ? resultsMapClusterGroup.getVisibleParent(marker)
+            : marker;
+
+          const performFlyTo = () => {
+            if (animate && typeof resultsMap.flyTo === 'function') {
+              resultsMap.once('moveend', openPopupAfterFocus);
+              resultsMap.flyTo(focusLatLng, targetZoom, {
+                animate: true,
+                duration,
+                easeLinearity: 0.1
+              });
+            } else {
+              resultsMap.setView(focusLatLng, targetZoom, { animate });
+              openPopupAfterFocus();
+            }
+          };
+
+          // If marker is clustered, uncluster it first so logo is visible during fly
+          if (resultsMapClusterGroup && visibleParent && visibleParent !== marker) {
+            resultsMapClusterGroup.zoomToShowLayer(marker, performFlyTo);
+            return;
           }
+
+          performFlyTo();
         });
       };
 
