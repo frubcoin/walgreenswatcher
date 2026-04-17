@@ -387,7 +387,7 @@ class StockCheckScheduler:
         return self.map_provider
 
     def set_discord_ping_on_change_only(self, value: Any) -> bool:
-        normalized = bool(value)
+        normalized = self._validate_boolean_setting(value, "Discord ping-on-change-only")
         self._update_setting(discord_ping_on_change_only=normalized)
         self.discord_ping_on_change_only = normalized
         return self.discord_ping_on_change_only
@@ -491,23 +491,36 @@ class StockCheckScheduler:
 
         return filtered_products
 
+    def _prepare_products_for_discord(
+        self,
+        products_with_stock: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Dict[str, Any]]:
+        discord_products = {
+            product_id: product_data
+            for product_id, product_data in (products_with_stock or {}).items()
+            if not self.tracked_products.get(product_id, {}).get("exclude_from_discord", False)
+        }
+        return self._filter_products_for_discord(discord_products)
+
     def _products_info_changed(
         self,
         current_products: Dict[str, Dict[str, Any]],
+        previous_products: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> bool:
-        """Check if product information has changed compared to last notification.
+        """Check if product information has changed compared to a prior scan snapshot.
 
         Returns True if:
-        - No previous notification recorded
+        - No previous snapshot recorded
         - Different set of products in stock
         - Different stores for any product
         - Different inventory counts for any store
         """
-        if not self.last_notified_products:
+        baseline_products = previous_products if previous_products is not None else self.last_notified_products
+        if not baseline_products:
             return True
 
         current_keys = set(current_products.keys())
-        last_keys = set(self.last_notified_products.keys())
+        last_keys = set(baseline_products.keys())
 
         # Check if product set changed
         if current_keys != last_keys:
@@ -515,7 +528,7 @@ class StockCheckScheduler:
 
         # Check each product's stores and inventory
         for product_id, current_data in current_products.items():
-            last_data = self.last_notified_products.get(product_id, {})
+            last_data = baseline_products.get(product_id, {})
             current_stores = current_data.get("stores", [])
             last_stores = last_data.get("stores", [])
 
@@ -549,16 +562,18 @@ class StockCheckScheduler:
     def _compute_product_changes(
         self,
         current_products: Dict[str, Dict[str, Any]],
+        previous_products: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> Dict[str, Dict[str, str]]:
-        """Compute detailed changes for each store compared to last notification.
+        """Compute detailed changes for each store compared to a prior scan snapshot.
 
         Returns a dict mapping product_id -> store_id -> change_type
         where change_type is: 'new', 'up', 'down', or 'same'
         """
         changes: Dict[str, Dict[str, str]] = {}
+        baseline_products = previous_products if previous_products is not None else self.last_notified_products
 
         for product_id, current_data in current_products.items():
-            last_data = self.last_notified_products.get(product_id, {}) if self.last_notified_products else {}
+            last_data = baseline_products.get(product_id, {}) if baseline_products else {}
             last_stores = last_data.get("stores", []) if last_data else []
 
             # Build store lookup by ID for last notification
@@ -1001,6 +1016,7 @@ class StockCheckScheduler:
                         }
 
             products_with_stock = self._extract_products_with_stock(check_results, self.tracked_products)
+            previous_discord_products = self._prepare_products_for_discord(self.last_products_with_stock)
 
             timestamp = datetime.utcnow().isoformat()
             self._set_progress(
@@ -1024,23 +1040,23 @@ class StockCheckScheduler:
             self.last_total_stores_checked = len(scanned_store_keys)
 
             if products_with_stock:
-                # Filter out products excluded from Discord notifications
-                discord_products = {
-                    k: v for k, v in products_with_stock.items()
-                    if not self.tracked_products.get(k, {}).get("exclude_from_discord", False)
-                }
-
-                discord_products = self._filter_products_for_discord(discord_products)
+                discord_products = self._prepare_products_for_discord(products_with_stock)
 
                 if discord_products:
-                    # Determine if we should ping based on settings and changes
-                    products_changed = self._products_info_changed(discord_products)
+                    # Compare against the previous scan, not the last role ping.
+                    products_changed = self._products_info_changed(
+                        discord_products,
+                        previous_products=previous_discord_products,
+                    )
                     should_mention = (
                         not self.discord_ping_on_change_only
                     ) or products_changed
 
                     # Compute detailed changes for display in notifications
-                    product_changes = self._compute_product_changes(discord_products)
+                    product_changes = self._compute_product_changes(
+                        discord_products,
+                        previous_products=previous_discord_products,
+                    )
 
                     self._set_progress(
                         current_phase="notifying",

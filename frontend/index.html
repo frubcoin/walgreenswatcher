@@ -7133,7 +7133,8 @@
             </div>
             <span class="form-hint">
               When enabled, the @ role mention will only be sent when product information changes
-              (different stores or inventory counts). Otherwise, you'll be pinged on every check that finds stock.
+              from the previous scan (different stores or inventory counts). Otherwise, you'll be pinged
+              on every check that finds stock.
             </span>
           </div>
         </div>
@@ -9481,8 +9482,8 @@
       const label = document.getElementById('cfg-discord-ping-label');
       if (label) {
         label.textContent = isPingOnChangeOnly
-          ? 'Only ping when product information changes'
-          : 'Only ping role when stock changes from last scan';
+          ? 'Only ping when stock changes from last scan'
+          : 'Ping every time stock is found';
       }
     }
 
