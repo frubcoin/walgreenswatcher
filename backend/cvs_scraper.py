@@ -22,6 +22,10 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency
     curl_requests = None
 try:
+    from scrapling.engines._browsers._stealth import StealthySession
+except ImportError:  # pragma: no cover - optional runtime dependency
+    StealthySession = None
+try:
     import zendriver as zd
     from zendriver import cdp as zendriver_cdp
 except ImportError:  # pragma: no cover - optional runtime dependency
@@ -470,6 +474,10 @@ class CvsStockChecker:
             return default_timeout_seconds
 
     @staticmethod
+    def _scrapling_bootstrap_enabled() -> bool:
+        return CvsStockChecker._env_bool("CVS_SCRAPLING_BOOTSTRAP_ENABLED", True)
+
+    @staticmethod
     def _playwright_node_script_path() -> Path:
         configured = os.getenv("CVS_PLAYWRIGHT_NODE_SCRIPT_PATH", "").strip()
         if configured:
@@ -490,6 +498,115 @@ class CvsStockChecker:
             if isinstance(payload, dict):
                 return payload
         raise ValueError("CVS node-script output did not include a machine-readable result marker")
+
+    @staticmethod
+    def _sync_cookies_to_session(session: requests.Session, cookies: Any) -> int:
+        cookie_items: List[Dict[str, Any]] = []
+        if isinstance(cookies, dict):
+            cookie_items = [{"name": key, "value": value} for key, value in cookies.items()]
+        elif isinstance(cookies, (list, tuple)):
+            for cookie in cookies:
+                if isinstance(cookie, dict):
+                    cookie_items.append(cookie)
+
+        applied = 0
+        for cookie in cookie_items:
+            name = str(cookie.get("name") or "").strip()
+            if not name:
+                continue
+            value = str(cookie.get("value") or "")
+            kwargs: Dict[str, Any] = {}
+            domain = str(cookie.get("domain") or "").strip()
+            path = str(cookie.get("path") or "").strip()
+            if domain:
+                kwargs["domain"] = domain
+            if path:
+                kwargs["path"] = path
+            try:
+                session.cookies.set(name, value, **kwargs)
+                applied += 1
+            except Exception:
+                continue
+        return applied
+
+    @staticmethod
+    def _session_proxy_url(session: requests.Session) -> str:
+        proxies = getattr(session, "proxies", {}) or {}
+        for key in ("https", "http"):
+            value = str(proxies.get(key) or "").strip()
+            if value:
+                return value
+        return ""
+
+    def _bootstrap_session_via_scrapling(
+        self,
+        session: requests.Session,
+        product: Dict[str, Any],
+        *,
+        referer: str,
+        bootstrap_urls: List[str],
+    ) -> str:
+        if StealthySession is None or not self._scrapling_bootstrap_enabled():
+            return ""
+
+        proxy_url = self._session_proxy_url(session)
+        proxy_label = self._proxy_label(proxy_url) if proxy_url else "direct server IP"
+        last_error: Exception | None = None
+
+        for url in bootstrap_urls:
+            logger.info("CVS bootstrap attempting Scrapling fallback via %s for %s", proxy_label, url)
+            try:
+                with StealthySession(
+                    proxy=proxy_url or None,
+                    headless=True,
+                    real_chrome=True,
+                    solve_cloudflare=True,
+                    timeout=30_000,
+                ) as browser_session:
+                    response = browser_session.fetch(url, referer=referer)
+                    if int(getattr(response, "status", 0) or 0) >= 400:
+                        last_error = ValueError(f"HTTP {response.status} via {proxy_label}")
+                        logger.warning(
+                            "CVS bootstrap Scrapling fallback blocked for %s via %s with HTTP %s",
+                            url,
+                            proxy_label,
+                            response.status,
+                        )
+                        continue
+
+                    html = (getattr(response, "body", b"") or b"").decode("utf-8", errors="replace")
+                    if not html.strip():
+                        last_error = ValueError(f"empty bootstrap HTML via {proxy_label}")
+                        continue
+
+                    challenge = self._detect_browser_challenge(html)
+                    if challenge:
+                        last_error = ValueError(f"challenge={challenge} via {proxy_label}")
+                        logger.warning(
+                            "CVS bootstrap Scrapling fallback still saw challenge %s for %s via %s",
+                            challenge,
+                            url,
+                            proxy_label,
+                        )
+                        continue
+
+                    applied = self._sync_cookies_to_session(session, getattr(response, "cookies", ()))
+                    api_key = self._extract_api_key(html)
+                    logger.info(
+                        "CVS bootstrap Scrapling fallback succeeded via %s for %s (cookies=%s, api_key=%s)",
+                        proxy_label,
+                        url,
+                        applied,
+                        bool(api_key),
+                    )
+                    return api_key
+            except Exception as exc:
+                last_error = exc
+                logger.warning("CVS bootstrap Scrapling fallback failed for %s via %s: %s", url, proxy_label, exc)
+
+        if last_error:
+            logger.info("CVS bootstrap Scrapling fallback exhausted via %s: %s", proxy_label, last_error)
+        return ""
 
     @staticmethod
     def _run_async(coro: Any) -> Any:
@@ -1077,6 +1194,16 @@ class CvsStockChecker:
             except Exception as exc:
                 logger.warning("CVS bootstrap request failed for %s: %s", url, exc)
                 continue
+
+        if not api_key:
+            scrapling_api_key = self._bootstrap_session_via_scrapling(
+                session,
+                product,
+                referer=referer,
+                bootstrap_urls=bootstrap_urls,
+            )
+            if scrapling_api_key:
+                api_key = scrapling_api_key
         return referer, api_key
 
     @staticmethod
