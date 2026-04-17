@@ -70,6 +70,21 @@ function detectChallenge(text) {
     return '';
 }
 
+async function buildChallengeResult(page, proxyConfig, challengeType, extractedImageUrl, buttonClicked) {
+    const screenshotPath = path.join(OUTPUT_DIR, `debug_challenge_${Date.now()}.png`);
+    await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
+    return {
+        ok: false,
+        proxy: proxyLabel(proxyConfig),
+        buttonClicked,
+        image_url: extractedImageUrl,
+        challengeDetected: true,
+        challengeType: String(challengeType || '').trim(),
+        error: `CVS challenge page detected: ${challengeType}; screenshot=${screenshotPath}`,
+        screenshotPath,
+    };
+}
+
 function normalizeCvsImageUrl(rawValue) {
     const value = String(rawValue || '').trim();
     if (!value) return '';
@@ -653,6 +668,7 @@ async function runAttempt(proxyConfig) {
         pageChallenge = detectChallenge(html);
         if (pageChallenge) {
             console.log(`[page] challenge marker detected: ${pageChallenge}`);
+            return await buildChallengeResult(page, proxyConfig, pageChallenge, extractedImageUrl, buttonClicked);
         }
         extractedImageUrl = await extractProductImageUrl(page, html);
         if (extractedImageUrl) {
@@ -727,6 +743,7 @@ async function runAttempt(proxyConfig) {
             const refreshedChallenge = detectChallenge(await page.content().catch(() => ''));
             if (refreshedChallenge) {
                 pageChallenge = refreshedChallenge;
+                return await buildChallengeResult(page, proxyConfig, pageChallenge, extractedImageUrl, buttonClicked);
             }
             if (!buttonClicked && inventoryRequestCount === 0) {
                 const screenshotPath = path.join(OUTPUT_DIR, `debug_nobutton_${Date.now()}.png`);
@@ -763,6 +780,8 @@ async function runAttempt(proxyConfig) {
             proxy: proxyLabel(proxyConfig),
             buttonClicked,
             image_url: extractedImageUrl,
+            challengeDetected: Boolean(pageChallenge),
+            challengeType: pageChallenge || '',
             error: pageChallenge && !String(error?.message || '').includes('page challenge detected:')
                 ? `${error.message}; page challenge detected: ${pageChallenge}`
                 : error.message,

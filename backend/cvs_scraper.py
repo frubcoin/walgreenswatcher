@@ -1005,19 +1005,42 @@ class CvsStockChecker:
 
         attempts = result.get("attempts")
         if isinstance(attempts, list) and attempts:
-            errors = [str((attempt or {}).get("error") or "").strip() for attempt in attempts]
-            blocked_errors = [error for error in errors if "page challenge" in error.lower() or "access denied" in error.lower()]
-            if blocked_errors and len(blocked_errors) == len(errors):
+            normalized_attempts = [attempt for attempt in attempts if isinstance(attempt, dict)]
+            errors = [str((attempt or {}).get("error") or "").strip() for attempt in normalized_attempts]
+            blocked_attempts = []
+            for attempt in normalized_attempts:
+                challenge_type = str((attempt or {}).get("challengeType") or "").strip()
+                challenge_detected = bool((attempt or {}).get("challengeDetected"))
+                error_text = str((attempt or {}).get("error") or "").strip()
+                if challenge_type or challenge_detected:
+                    blocked_attempts.append(attempt)
+                    continue
+                lowered_error = error_text.lower()
+                if "page challenge" in lowered_error or "access denied" in lowered_error or "incapsula" in lowered_error:
+                    blocked_attempts.append(attempt)
+
+            if blocked_attempts and len(blocked_attempts) == len(normalized_attempts):
                 route_labels = [
                     str((attempt or {}).get("proxy") or "").strip()
-                    for attempt in attempts
+                    for attempt in blocked_attempts
                     if str((attempt or {}).get("proxy") or "").strip()
                 ]
+                challenge_labels = list(
+                    dict.fromkeys(
+                        str((attempt or {}).get("challengeType") or "").strip()
+                        for attempt in blocked_attempts
+                        if str((attempt or {}).get("challengeType") or "").strip()
+                    )
+                )
+                challenge_summary = f" ({', '.join(challenge_labels)})" if challenge_labels else ""
                 raise CvsBlockedError(
                     "CVS Playwright node-script flow hit blocking on every configured route: "
-                    + ", ".join(route_labels or blocked_errors)
+                    + ", ".join(route_labels or ["browser route"])
+                    + challenge_summary
                 )
-            failure_detail = "; ".join(error for error in errors if error)[:1000].strip()
+
+            deduped_errors = list(dict.fromkeys(error for error in errors if error))
+            failure_detail = "; ".join(deduped_errors)[:1000].strip()
             if failure_detail:
                 raise ValueError(f"CVS Playwright node-script flow failed: {failure_detail}")
 

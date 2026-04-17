@@ -85,7 +85,7 @@ class StockDatabase:
                     pokemon_background_tile_size INTEGER NOT NULL DEFAULT 645,
                     scheduler_enabled INTEGER NOT NULL DEFAULT 0,
                     map_provider TEXT NOT NULL DEFAULT 'google',
-                    discord_ping_on_change_only INTEGER NOT NULL DEFAULT 0,
+                    discord_ping_on_change_only INTEGER NOT NULL DEFAULT 1,
                     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
 
@@ -498,7 +498,7 @@ class StockDatabase:
             conn, "user_settings", "map_provider", "TEXT NOT NULL DEFAULT 'google'"
         )
         StockDatabase._add_column_if_not_exists(
-            conn, "user_settings", "discord_ping_on_change_only", "INTEGER NOT NULL DEFAULT 0"
+            conn, "user_settings", "discord_ping_on_change_only", "INTEGER NOT NULL DEFAULT 1"
         )
         StockDatabase._add_column_if_not_exists(
             conn, "tracked_products", "exclude_from_discord", "INTEGER NOT NULL DEFAULT 0"
@@ -525,7 +525,7 @@ class StockDatabase:
                 discord_ping_on_change_only,
                 last_notified_products
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'google', 0, '')
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'google', 1, '')
             ON CONFLICT(user_id) DO NOTHING
             """,
             (
@@ -616,7 +616,7 @@ class StockDatabase:
                 "pokemon_background_tile_size": DEFAULT_POKEMON_BACKGROUND_TILE_SIZE,
                 "scheduler_enabled": False,
                 "map_provider": "google",
-                "discord_ping_on_change_only": False,
+                "discord_ping_on_change_only": True,
                 "last_notified_products": {},
             }
 

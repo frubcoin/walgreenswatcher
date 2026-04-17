@@ -7019,14 +7019,6 @@
             <span class="form-hint" style="text-align: center; display: block;">Time between automatic checks.</span>
           </div>
           <div class="form-group">
-            <label class="form-label" for="cfg-max-range">Discord Alert Range</label>
-            <input type="range" class="form-input" id="cfg-max-range" min="1" max="50" step="1" value="20">
-            <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;"><span
-                id="cfg-max-range-value">20</span> miles</div>
-            <span class="form-hint" style="text-align: center; display: block;">Limits Discord alerts only. Dashboard
-              results still show all stores found in the scan.</span>
-          </div>
-          <div class="form-group">
             <label class="form-label">Install App</label>
             <button class="btn btn-secondary install-app-btn" type="button" data-action="prompt-install" hidden>
               <svg class="btn-svg-icon" viewBox="0 -960 960 960" aria-hidden="true">
@@ -7120,6 +7112,15 @@
             </div>
             <span class="form-hint">Set a webhook URL for each destination. Role ID is optional and only applies to that
               webhook.</span>
+          </div>
+
+          <div class="form-group" style="margin-top: 20px;">
+            <label class="form-label" for="cfg-max-range">Discord Alert Range</label>
+            <input type="range" class="form-input" id="cfg-max-range" min="1" max="50" step="1" value="20">
+            <div style="text-align: center; font-weight: 600; color: var(--text-primary); margin-top: 4px;"><span
+                id="cfg-max-range-value">20</span> miles</div>
+            <span class="form-hint" style="text-align: center; display: block;">Limits Discord alerts only. Dashboard
+              results still show all stores found in the scan.</span>
           </div>
 
           <div class="form-group" style="margin-top: 20px;">
@@ -8459,6 +8460,7 @@
         mapAddress: document.getElementById('cfg-map-address')?.value.trim() || loadStoredMapAddress(),
         webhookUrl: primaryDestination.url || '',
         webhookRoleId: primaryDestination.role_id || '',
+        discordPingOnChangeOnly: status.discord_ping_on_change_only ?? true,
         productUrl: '',
         productName: '',
         runManualCheck: (stats.total_checks || 0) === 0,
@@ -8520,6 +8522,7 @@
       const mapAddressInput = document.getElementById('onboarding-map-address');
       const webhookInput = document.getElementById('onboarding-webhook-url');
       const webhookRoleInput = document.getElementById('onboarding-webhook-role');
+      const pingOnChangeOnlyInput = document.getElementById('onboarding-discord-ping-on-change-only');
       const productUrlInput = document.getElementById('onboarding-product-url');
       const productNameInput = document.getElementById('onboarding-product-name');
       const runCheckInput = document.getElementById('onboarding-run-check');
@@ -8531,6 +8534,7 @@
       if (mapAddressInput) draft.mapAddress = mapAddressInput.value.trim();
       if (webhookInput) draft.webhookUrl = webhookInput.value.trim();
       if (webhookRoleInput) draft.webhookRoleId = webhookRoleInput.value.replace(/[^\d]/g, '');
+      if (pingOnChangeOnlyInput) draft.discordPingOnChangeOnly = pingOnChangeOnlyInput.checked;
       if (productUrlInput) draft.productUrl = productUrlInput.value.trim();
       if (productNameInput) draft.productName = productNameInput.value.trim();
       if (runCheckInput) draft.runManualCheck = runCheckInput.checked;
@@ -8637,6 +8641,14 @@
                   <input type="text" class="form-input" id="onboarding-webhook-role" inputmode="numeric" placeholder="Optional role id" value="${escapeHtml(draft.webhookRoleId)}">
                   <span class="form-hint">Optional. Mention a role only for this webhook.</span>
                 </div>
+                <div class="form-group" style="margin-top: 8px;">
+                  <label class="form-label">Discord ping behavior</label>
+                  <label class="toggle-row">
+                    <input type="checkbox" class="toggle-input" id="onboarding-discord-ping-on-change-only" ${draft.discordPingOnChangeOnly ? 'checked' : ''}>
+                    <span>Only ping the role when stock changes from the previous scan</span>
+                  </label>
+                  <span class="form-hint">Recommended default. Discord messages still send when stock is found; this only controls the @ role mention.</span>
+                </div>
               </div>
             `,
           onNext: saveOnboardingSettings
@@ -8712,6 +8724,7 @@
                 <div class="onboarding-summary-row"><span>Discord alert range</span><strong>${escapeHtml(draft.range || '20')} mi</strong></div>
                 <div class="onboarding-summary-row"><span>Map view address</span><strong>${draft.mapAddress ? 'Saved locally' : 'Add later'}</strong></div>
                 <div class="onboarding-summary-row"><span>Discord</span><strong>${draft.webhookUrl ? 'Configured' : 'Add later'}</strong></div>
+                <div class="onboarding-summary-row"><span>Role ping mode</span><strong>${draft.discordPingOnChangeOnly ? 'Changes only' : 'Every stock hit'}</strong></div>
                 <div class="onboarding-summary-row"><span>Tracked products</span><strong>${trackedCount}</strong></div>
               </div>
               <div class="onboarding-choice-list">
@@ -8974,6 +8987,7 @@
       const interval = Number(draft.interval);
       const range = Number(draft.range) || 20;
       const mapAddress = storeMapAddress(draft.mapAddress || '');
+      const discordPingOnChangeOnly = draft.discordPingOnChangeOnly !== false;
       const destinations = [];
       let mapAddressResolved = true;
 
@@ -9018,7 +9032,8 @@
         zipcode: zip,
         check_interval_minutes: interval,
         max_notification_distance_miles: range,
-        discord_destinations: destinations
+        discord_destinations: destinations,
+        discord_ping_on_change_only: discordPingOnChangeOnly
       });
 
       if (!result) {
@@ -9029,6 +9044,11 @@
       document.getElementById('cfg-zip').value = zip;
       document.getElementById('cfg-interval').value = interval;
       document.getElementById('cfg-max-range').value = range;
+      const pingToggle = document.getElementById('cfg-discord-ping-on-change-only');
+      if (pingToggle) {
+        pingToggle.checked = discordPingOnChangeOnly;
+        updatePingToggleLabel(discordPingOnChangeOnly);
+      }
       document.getElementById('cfg-map-address').value = mapAddress;
       setSettingsMapAddressStatus(
         mapAddress && mapAddressResolved
@@ -13862,7 +13882,7 @@
         theme: status.pokemon_background_theme || DEFAULT_POKEMON_BACKGROUND_THEME,
         tileSize: status.pokemon_background_tile_size ?? DEFAULT_POKEMON_BACKGROUND_TILE_SIZE
       });
-      const pingOnChangeOnly = status.discord_ping_on_change_only ?? false;
+      const pingOnChangeOnly = status.discord_ping_on_change_only ?? true;
       const pingToggle = document.getElementById('cfg-discord-ping-on-change-only');
       if (pingToggle) {
         pingToggle.checked = pingOnChangeOnly;
