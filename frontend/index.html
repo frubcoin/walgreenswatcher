@@ -7629,6 +7629,10 @@
       updateCsrfToken(payload?.csrf_token);
     }
 
+    function isCsrfValidationError(status, payload) {
+      return Number(status || 0) === 403 && String(payload?.error || '').trim() === 'CSRF validation failed';
+    }
+
     function writeUserScopedCache(prefix, value, user = currentUser) {
       const cacheKey = getUserScopedCacheKey(prefix, user);
       if (!cacheKey) return;
@@ -9307,17 +9311,23 @@
       updateAuthStatus('Verifying Google sign-in...');
       let result = null;
       try {
-        const authResponse = await fetch(apiUrl('/api/auth/google'), {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
-          },
-          body: JSON.stringify({ credential: response.credential })
-        });
-        result = await authResponse.json();
-        updateCsrfTokenFromPayload(result);
+        let authResponse = null;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          authResponse = await fetch(apiUrl('/api/auth/google'), {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+            },
+            body: JSON.stringify({ credential: response.credential })
+          });
+          result = await authResponse.json();
+          updateCsrfTokenFromPayload(result);
+          if (!isCsrfValidationError(authResponse.status, result) || attempt > 0) {
+            break;
+          }
+        }
         const isWaitlisted = result?.access_state === 'waitlisted';
         if (authResponse.status >= 500) {
           showServerOutageOverlay('Google sign-in cannot finish because the server is not responding right now.');
@@ -13605,6 +13615,21 @@
         };
         if (data) opts.body = JSON.stringify(data);
         const r = await fetch(apiUrl(url), opts);
+        let csrfRetried = false;
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod)) {
+          try {
+            const clone = r.clone();
+            const retryPayload = await clone.json();
+            updateCsrfTokenFromPayload(retryPayload);
+            if (options.retryOnCsrf !== false && isCsrfValidationError(r.status, retryPayload)) {
+              csrfRetried = true;
+            }
+          } catch (e) {
+          }
+        }
+        if (csrfRetried) {
+          return apiCall(url, method, data, { ...options, retryOnCsrf: false });
+        }
         if (r.status === 401) {
           if (!options.allowUnauthorized && !options.suppressAuthRedirect) {
             const userId = currentUser?.id ?? null;

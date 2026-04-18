@@ -533,7 +533,12 @@ def enforce_api_csrf() -> Optional[Response]:
     expected = str(session.get(CSRF_SESSION_KEY) or "").strip()
     provided = str(request.headers.get("X-CSRF-Token") or "").strip()
     if not expected or not provided or not secrets.compare_digest(expected, provided):
-        return jsonify({"error": "CSRF validation failed"}), 403
+        return jsonify(
+            {
+                "error": "CSRF validation failed",
+                "csrf_token": _get_or_create_csrf_token(),
+            }
+        ), 403
 
     return None
 

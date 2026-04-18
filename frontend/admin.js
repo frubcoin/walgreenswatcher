@@ -209,6 +209,10 @@ function updateCsrfTokenFromPayload(payload) {
   updateCsrfToken(payload?.csrf_token);
 }
 
+function isCsrfValidationError(status, payload) {
+  return Number(status || 0) === 403 && String(payload?.error || '').trim() === 'CSRF validation failed';
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -302,7 +306,7 @@ function scrollToPanel(panelId) {
   document.getElementById(panelId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function apiRequest(path, method = 'GET', body = null) {
+async function apiRequest(path, method = 'GET', body = null, options = {}) {
   try {
     const normalizedMethod = String(method || 'GET').toUpperCase();
     const response = await fetch(apiUrl(path), {
@@ -327,6 +331,10 @@ async function apiRequest(path, method = 'GET', body = null) {
     }
 
     if (!response.ok) {
+      if (options.retryOnCsrf !== false && isCsrfValidationError(response.status, payload)) {
+        return apiRequest(path, method, body, { ...options, retryOnCsrf: false });
+      }
+
       const message = payload?.error || `Request failed (${response.status})`;
       const err = new Error(message);
       err.status = response.status;
