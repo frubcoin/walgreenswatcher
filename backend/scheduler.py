@@ -113,6 +113,14 @@ class StockCheckScheduler:
         normalized_article_id = str(article_id or "").strip()
         return f"{normalized_retailer}:{normalized_article_id}"
 
+    @staticmethod
+    def _empty_product_result() -> Dict[str, Any]:
+        return {
+            "availability": {},
+            "stores": {},
+            "location_ids": [],
+        }
+
     def _load_last_check_snapshot(self) -> None:
         last_check = self.db.get_last_check(self.user_id)
         if not last_check:
@@ -894,11 +902,7 @@ class StockCheckScheduler:
                             product_display_name,
                             exc,
                         )
-                        product_result = {
-                            "availability": {},
-                            "stores": {},
-                            "location_ids": [],
-                        }
+                        product_result = self._empty_product_result()
                     except CvsBlockedError as exc:
                         logger.warning(
                             "CVS inventory blocked for user %s product %s: %s",
@@ -906,11 +910,15 @@ class StockCheckScheduler:
                             product_display_name,
                             exc,
                         )
-                        product_result = {
-                            "availability": {},
-                            "stores": {},
-                            "location_ids": [],
-                        }
+                        product_result = self._empty_product_result()
+                    except Exception as exc:
+                        logger.warning(
+                            "CVS inventory failed for user %s product %s: %s",
+                            self.user_id,
+                            product_display_name,
+                            exc,
+                        )
+                        product_result = self._empty_product_result()
                 elif retailer == "fivebelow":
                     product_result = self.fivebelow_checker.check_product_availability(
                         product,

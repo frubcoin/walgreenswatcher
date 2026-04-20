@@ -1,5 +1,6 @@
 import os
 import sys
+import threading
 import unittest
 
 
@@ -25,6 +26,92 @@ class SchedulerJobDispatchTests(unittest.TestCase):
         scheduler._run_scheduled_check()
 
         self.assertEqual(calls, ["scheduled"])
+
+    def test_check_stock_tolerates_generic_cvs_failure(self):
+        scheduler = StockCheckScheduler.__new__(StockCheckScheduler)
+        scheduler.user_id = 7
+        scheduler.state_lock = threading.RLock()
+        scheduler.check_in_progress = False
+        scheduler.active_check_thread = None
+        scheduler.current_phase = "idle"
+        scheduler.progress_message = "Idle"
+        scheduler.current_store = None
+        scheduler.current_product = None
+        scheduler.stores_checked = 0
+        scheduler.total_stores = 0
+        scheduler.current_product_index = 0
+        scheduler.total_products = 0
+        scheduler.stores_with_stock_current = 0
+        scheduler.progress_completed_units = 0.0
+        scheduler.progress_total_units = 0.0
+        scheduler.current_zipcode = "85001"
+        scheduler.max_notification_distance_miles = 25
+        scheduler.last_products_with_stock = {}
+        scheduler.last_total_stores_checked = 0
+        scheduler.last_notified_products = {}
+        scheduler.tracked_products = {
+            "cvs:444357": {
+                "article_id": "444357",
+                "retailer": "cvs",
+                "name": "Poke Ball Tin",
+                "image_url": "",
+                "source_url": "https://www.cvs.com/example",
+                "exclude_from_discord": False,
+            }
+        }
+        scheduler.notifier = type(
+            "NotifierStub",
+            (),
+            {
+                "notify_stock_found": staticmethod(lambda *args, **kwargs: None),
+                "notify_error": staticmethod(lambda *args, **kwargs: None),
+            },
+        )()
+        scheduler.db = type(
+            "DbStub",
+            (),
+            {
+                "add_check_result": staticmethod(lambda *args, **kwargs: None),
+                "update_user_settings": staticmethod(lambda *args, **kwargs: None),
+                "update_product_image": staticmethod(lambda *args, **kwargs: None),
+            },
+        )()
+        scheduler.walgreens_checker = type("WalgreensStub", (), {"custom_product_names": {}})()
+        scheduler.fivebelow_checker = type("FiveBelowStub", (), {})()
+        scheduler.ace_checker = type("AceStub", (), {})()
+        scheduler.cvs_checker = type(
+            "CvsStub",
+            (),
+            {
+                "check_product_availability": staticmethod(
+                    lambda *args, **kwargs: (_ for _ in ()).throw(
+                        ValueError("CVS Playwright node-script flow failed: net::ERR_TIMED_OUT")
+                    )
+                )
+            },
+        )()
+
+        scheduler.refresh_from_db = lambda: None
+        scheduler._reset_progress = lambda: None
+        scheduler._set_progress = lambda **kwargs: None
+        scheduler._product_specs = lambda: [
+            {
+                "article_id": "444357",
+                "retailer": "cvs",
+                "name": "Poke Ball Tin",
+                "key": "cvs:444357",
+                "image_url": "",
+                "source_url": "https://www.cvs.com/example",
+            }
+        ]
+        scheduler._extract_products_with_stock = lambda check_results, tracked_products: {}
+        scheduler._prepare_products_for_discord = lambda products: {}
+        scheduler._products_info_changed = lambda *args, **kwargs: False
+        scheduler._compute_product_changes = lambda *args, **kwargs: {}
+
+        scheduler._check_stock()
+
+        self.assertFalse(scheduler.check_in_progress)
 
 
 if __name__ == "__main__":
