@@ -102,6 +102,7 @@ class StockCheckScheduler:
         self.progress_completed_units = 0.0
         self.progress_total_units = 0.0
         self.last_total_stores_checked = 0
+        self.active_check_thread: Optional[threading.Thread] = None
 
         self.refresh_from_db()
         self._load_last_check_snapshot()
@@ -1092,7 +1093,35 @@ class StockCheckScheduler:
             )
             self.notifier.notify_error(str(exc))
         finally:
-            self.check_in_progress = False
+            with self.state_lock:
+                self.check_in_progress = False
+                current_thread = threading.current_thread()
+                if self.active_check_thread is current_thread:
+                    self.active_check_thread = None
+
+    def _start_check_thread(self, *, reason: str) -> bool:
+        with self.state_lock:
+            if self.check_in_progress:
+                logger.info(
+                    "Skipping %s stock check launch for user %s because a check is already running",
+                    reason,
+                    self.user_id,
+                )
+                return False
+
+            thread = threading.Thread(
+                target=self._check_stock,
+                daemon=True,
+                name=f"stock-check-user-{self.user_id}",
+            )
+            self.active_check_thread = thread
+            thread.start()
+            return True
+
+    def _run_scheduled_check(self) -> None:
+        started = self._start_check_thread(reason="scheduled")
+        if not started:
+            logger.info("Scheduled stock check skipped for user %s because the previous run is still active", self.user_id)
 
     def start(self, *, run_immediately: bool = True) -> bool:
         with self.state_lock:
@@ -1102,20 +1131,21 @@ class StockCheckScheduler:
             self.refresh_from_db()
             self.scheduler = BackgroundScheduler()
             self.scheduler.add_job(
-                self._check_stock,
+                self._run_scheduled_check,
                 "interval",
                 minutes=self.check_interval_minutes,
                 id=self._job_id,
                 name=f"Retail Stock Check (user {self.user_id})",
                 replace_existing=True,
+                max_instances=1,
+                coalesce=True,
             )
             self.scheduler.start()
             self.is_running = True
             self.db.update_user_settings(self.user_id, {"scheduler_enabled": True})
 
             if run_immediately:
-                thread = threading.Thread(target=self._check_stock, daemon=True)
-                thread.start()
+                self._start_check_thread(reason="startup")
             return True
 
     def stop(self) -> bool:
@@ -1134,8 +1164,9 @@ class StockCheckScheduler:
         if self.check_in_progress:
             return {"success": False, "error": "Check already in progress"}
 
-        thread = threading.Thread(target=self._check_stock, daemon=True)
-        thread.start()
+        started = self._start_check_thread(reason="manual")
+        if not started:
+            return {"success": False, "error": "Check already in progress"}
         return {"success": True, "message": "Check started in background"}
 
     def get_progress(self) -> Dict[str, Any]:
