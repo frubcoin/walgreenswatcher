@@ -358,15 +358,6 @@ class DiscordNotifier:
             ]
 
             reserved_fields = [dict(field) for field in base_fields]
-            if product_index == total_products:
-                reserved_fields.insert(
-                    0,
-                    {
-                        "name": "Check Summary",
-                        "value": f"{total_inventory} total units across {total_store_hits} store hits\n🗺️ [Open map view]({FRONTEND_BASE_URL}/map)",
-                        "inline": False,
-                    },
-                )
 
             # Build change summary for title if there are changes
             change_summary = ""
@@ -442,15 +433,8 @@ class DiscordNotifier:
                 is_last_chunk = chunk_index == len(chunks)
                 if is_last_chunk:
                     embed_fields = [dict(field) for field in base_fields]
-                    if is_last_product:
-                        embed_fields.insert(
-                            0,
-                            {
-                                "name": "Check Summary",
-                                "value": f"{total_inventory} total units across {total_store_hits} store hits\n🗺️ [Open map view]({FRONTEND_BASE_URL}/map)",
-                                "inline": False,
-                            },
-                        )
+                    if True:
+                        pass
                     embed["fields"] = embed_fields
 
                 embeds.append(embed)
