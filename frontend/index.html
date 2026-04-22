@@ -10004,14 +10004,18 @@
       if (productUsesFulfillmentAvailability(product)) {
         return `${Number(product?.count || 0)} stores available | ${getProductFulfillmentSummary(product)}`;
       }
-      return `${Number(product?.count || 0)} stores in stock | ${Number(product?.total_inventory || 0)} total units`;
+      const isAldi = retailerKey(product?.retailer) === 'aldi';
+      const unitsLabel = isAldi ? 'QTY UNKNOWN' : `${Number(product?.total_inventory || 0)} total units`;
+      return `${Number(product?.count || 0)} stores in stock | ${unitsLabel}`;
     }
 
     function getLocationSecondarySummary(location) {
       if (locationUsesFulfillmentAvailability(location)) {
         return `${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${getLocationFulfillmentSummary(location)}`;
       }
-      return `${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${location.total_inventory} units`;
+      const isAldi = retailerKey(location?.retailer) === 'aldi';
+      const unitsLabel = isAldi ? 'QTY UNKNOWN' : `${location.total_inventory} units`;
+      return `${location.product_count} product${location.product_count === 1 ? '' : 's'} | ${unitsLabel}`;
     }
 
     function productIdentityKey(productId, retailer = 'walgreens') {
@@ -10739,7 +10743,7 @@
       return `
           <div class="map-popup-title">${renderRetailerIconHtml(location.retailer, 'map-popup-retailer-icon')} ${escapeHtml(location.name)}</div>
           <div class="map-popup-address">${renderAddressLink(location.address)}</div>
-          <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${locationUsesFulfillmentAvailability(location) ? escapeHtml(getLocationFulfillmentSummary(location)) : `${location.total_inventory} total units`} | ${location.product_count} product${location.product_count === 1 ? '' : 's'}${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
+          <div class="map-popup-meta">${escapeHtml(retailerLabel(location.retailer))} | ${locationUsesFulfillmentAvailability(location) ? escapeHtml(getLocationFulfillmentSummary(location)) : (retailerKey(location.retailer) === 'aldi' ? 'QTY UNKNOWN' : `${location.total_inventory} total units`)} | ${location.product_count} product${location.product_count === 1 ? '' : 's'}${location.distance !== null ? ` | ${escapeHtml(formatDistance(location.distance))}` : ''}</div>
           <div class="map-popup-products">${productsHtml}</div>
         `;
     }
@@ -13361,11 +13365,11 @@
           <div class="result-stat-value">${Number(product.count || 0)}</div>
         </div>
         <div class="result-stat">
-          <div class="result-stat-label">${productUsesFulfillmentAvailability(product) ? 'Fulfillment' : 'Units'}</div>
-          ${productUsesFulfillmentAvailability(product)
-          ? `<div class="result-stat-text">${escapeHtml(getProductFulfillmentSummary(product))}</div>`
-          : `<div class="result-stat-value">${Number(product.total_inventory || 0)}</div>`
-        }
+          <div class="result-stat-label">${(productUsesFulfillmentAvailability(product) || retailerKey(product?.retailer) === 'aldi') ? 'Quantity' : 'Units'}</div>
+          ${(productUsesFulfillmentAvailability(product) || retailerKey(product?.retailer) === 'aldi')
+      ? `<div class="result-stat-text">${retailerKey(product?.retailer) === 'aldi' ? 'Unknown' : escapeHtml(getProductFulfillmentSummary(product))}</div>`
+      : `<div class="result-stat-value">${Number(product.total_inventory || 0)}</div>`
+    }
         </div>
         <div class="result-stat">
           <div class="result-stat-label">Nearest</div>
