@@ -319,6 +319,7 @@ class DiscordNotifier:
         "cvs": {"name": "CVS", "icon": f"{FRONTEND_BASE_URL}/icons/cvs.svg"},
         "fivebelow": {"name": "Five Below", "icon": f"{FRONTEND_BASE_URL}/icons/fivebelow.svg"},
         "ace": {"name": "Ace Hardware", "icon": "https://www.acehardware.com/favicon.ico"},
+        "aldi": {"name": "ALDI", "icon": f"{FRONTEND_BASE_URL}/icons/aldi.png"},
     }
 
     def _get_retailer_info(self, retailer_code: str) -> Dict[str, str]:

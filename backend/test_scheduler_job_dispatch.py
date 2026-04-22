@@ -79,6 +79,7 @@ class SchedulerJobDispatchTests(unittest.TestCase):
         scheduler.walgreens_checker = type("WalgreensStub", (), {"custom_product_names": {}})()
         scheduler.fivebelow_checker = type("FiveBelowStub", (), {})()
         scheduler.ace_checker = type("AceStub", (), {})()
+        scheduler.aldi_checker = type("AldiStub", (), {})()
         scheduler.cvs_checker = type(
             "CvsStub",
             (),

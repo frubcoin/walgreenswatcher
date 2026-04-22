@@ -200,6 +200,24 @@ def _is_allowed_ace_image_host(hostname: str) -> bool:
     )
 
 
+def _is_allowed_aldi_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return bool(normalized) and (normalized == "aldi.us" or normalized.endswith(".aldi.us"))
+
+
+def _is_allowed_aldi_image_host(hostname: str) -> bool:
+    normalized = str(hostname or "").strip().lower()
+    return bool(normalized) and (
+        _is_allowed_aldi_host(normalized)
+        or normalized == "instacart.com"
+        or normalized.endswith(".instacart.com")
+        or normalized in {
+            "d1s8987jlndkbs.cloudfront.net",
+            "d2lnr5mha7bycj.cloudfront.net",
+        }
+    )
+
+
 
 
 
@@ -209,6 +227,7 @@ def _is_allowed_product_source_host(hostname: str) -> bool:
         or _is_allowed_cvs_host(hostname)
         or _is_allowed_fivebelow_host(hostname)
         or _is_allowed_ace_host(hostname)
+        or _is_allowed_aldi_host(hostname)
     )
 
 
@@ -218,6 +237,7 @@ def _is_allowed_product_image_host(hostname: str) -> bool:
         _is_allowed_product_source_host(normalized)
         or _is_allowed_fivebelow_image_host(normalized)
         or _is_allowed_ace_image_host(normalized)
+        or _is_allowed_aldi_image_host(normalized)
     )
 
 

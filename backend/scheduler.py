@@ -11,6 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from ace import AceBrowserClient, AceBrowserError
 from ace_scraper import AceStockChecker
+from aldi_scraper import AldiStockChecker
 from config import (
     DEFAULT_CHECK_INTERVAL_MINUTES,
     DEFAULT_TRACKED_PRODUCTS,
@@ -71,6 +72,7 @@ class StockCheckScheduler:
         self.cvs_checker = CvsStockChecker()
         self.fivebelow_checker = FiveBelowStockChecker()
         self.ace_checker = AceStockChecker()
+        self.aldi_checker = AldiStockChecker()
 
         self.notifier = DiscordNotifier([])
         self.is_running = False
@@ -195,6 +197,8 @@ class StockCheckScheduler:
         self.fivebelow_checker.current_zip_code = self.current_zipcode
         self.ace_checker.current_zip_code = self.current_zipcode
         self.ace_checker.search_radius_miles = self.max_notification_distance_miles
+        self.aldi_checker.current_zip_code = self.current_zipcode
+        self.aldi_checker.search_radius_miles = self.max_notification_distance_miles
         self._load_last_check_snapshot()
 
     def get_last_check_snapshot(self) -> Optional[Dict[str, Any]]:
@@ -763,6 +767,9 @@ class StockCheckScheduler:
             self.ace_checker.progress_callback = update_progress
             self.ace_checker.current_zip_code = self.current_zipcode
             self.ace_checker.search_radius_miles = self.max_notification_distance_miles
+            self.aldi_checker.progress_callback = update_progress
+            self.aldi_checker.current_zip_code = self.current_zipcode
+            self.aldi_checker.search_radius_miles = self.max_notification_distance_miles
 
             walgreens_products = [
                 product for product in product_specs if product.get("retailer", "walgreens") == "walgreens"
@@ -772,6 +779,9 @@ class StockCheckScheduler:
             ]
             ace_products = [
                 product for product in product_specs if product.get("retailer", "walgreens") == "ace"
+            ]
+            aldi_products = [
+                product for product in product_specs if product.get("retailer", "walgreens") == "aldi"
             ]
             walgreens_stores: List[Dict[str, Any]] = []
             fivebelow_stores: List[Dict[str, Any]] = []
@@ -846,6 +856,15 @@ class StockCheckScheduler:
                     current_phase="stores_loaded",
                     progress_message=f"Ace checks will use the live nearby-store tray near {self.current_zipcode}",
                     current_store="Ace browser flow ready",
+                    progress_completed_units=1.0,
+                    progress_total_units=progress_total_units,
+                )
+
+            if aldi_products:
+                self._set_progress(
+                    current_phase="stores_loaded",
+                    progress_message=f"ALDI checks will use the Instacart-backed store context near {self.current_zipcode}",
+                    current_store="ALDI storefront API ready",
                     progress_completed_units=1.0,
                     progress_total_units=progress_total_units,
                 )
@@ -929,6 +948,28 @@ class StockCheckScheduler:
                 elif retailer == "ace":
                     # Ace products are processed in batch after the loop to reuse browser session
                     continue
+                elif retailer == "aldi":
+                    product_result = self.aldi_checker.check_product_availability(
+                        product,
+                        self.current_zipcode,
+                        product_index=index,
+                        product_total=len(product_specs),
+                    )
+                    extracted_image = product_result.get("_extracted_image_url", "")
+                    if extracted_image and product.get("article_id"):
+                        try:
+                            self.db.update_product_image(
+                                self.user_id,
+                                product["article_id"],
+                                image_url=extracted_image,
+                                retailer="aldi",
+                            )
+                        except Exception as img_exc:
+                            logger.warning(
+                                "Failed to update ALDI product image for %s: %s",
+                                product_display_name,
+                                img_exc,
+                            )
                 else:
                     raise ValueError(f"Unsupported retailer: {retailer}")
 

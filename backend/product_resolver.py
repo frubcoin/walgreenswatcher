@@ -6,11 +6,12 @@ from typing import Dict
 from urllib.parse import urlparse
 
 from ace_product_resolver import AceProductResolver
+from aldi_product_resolver import AldiProductResolver
 from cvs_product_resolver import CvsProductResolver
 from fivebelow_product_resolver import FiveBelowProductResolver
 from walgreens_product_resolver import WalgreensProductResolver
 
-SUPPORTED_RETAILERS = {"walgreens", "cvs", "fivebelow", "ace"}
+SUPPORTED_RETAILERS = {"walgreens", "cvs", "fivebelow", "ace", "aldi"}
 
 
 def detect_product_retailer(product_link: str) -> str:
@@ -25,7 +26,9 @@ def detect_product_retailer(product_link: str) -> str:
         return "fivebelow"
     if hostname == "acehardware.com" or hostname.endswith(".acehardware.com"):
         return "ace"
-    raise ValueError("Only Walgreens, CVS, Five Below, and Ace Hardware product links are supported right now")
+    if hostname == "aldi.us" or hostname.endswith(".aldi.us"):
+        return "aldi"
+    raise ValueError("Only Walgreens, CVS, Five Below, Ace Hardware, and ALDI product links are supported right now")
 
 
 def resolve_product_link(product_link: str) -> Dict[str, str]:
@@ -38,6 +41,8 @@ def resolve_product_link(product_link: str) -> Dict[str, str]:
         resolved = FiveBelowProductResolver.resolve_product_link(product_link)
     elif retailer == "ace":
         resolved = AceProductResolver.resolve_product_link(product_link)
+    elif retailer == "aldi":
+        resolved = AldiProductResolver.resolve_product_link(product_link)
     else:
         raise ValueError(f"Unsupported retailer: {retailer}")
 

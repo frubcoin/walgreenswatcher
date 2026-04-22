@@ -9685,6 +9685,14 @@
       );
     }
 
+    function isAllowedAldiHost(hostname) {
+      const normalized = String(hostname || '').trim().toLowerCase();
+      return Boolean(normalized) && (
+        normalized === 'aldi.us' ||
+        normalized.endsWith('.aldi.us')
+      );
+    }
+
     function isAllowedFiveBelowImageHost(hostname) {
       const normalized = String(hostname || '').trim().toLowerCase();
       return Boolean(normalized) && (
@@ -9702,13 +9710,24 @@
       );
     }
 
+    function isAllowedAldiImageHost(hostname) {
+      const normalized = String(hostname || '').trim().toLowerCase();
+      return Boolean(normalized) && (
+        isAllowedAldiHost(normalized) ||
+        normalized === 'instacart.com' ||
+        normalized.endsWith('.instacart.com') ||
+        normalized === 'd1s8987jlndkbs.cloudfront.net' ||
+        normalized === 'd2lnr5mha7bycj.cloudfront.net'
+      );
+    }
+
     function isAllowedProductSourceHost(hostname) {
-      return isAllowedWalgreensHost(hostname) || isAllowedCvsHost(hostname) || isAllowedFiveBelowHost(hostname) || isAllowedAceHost(hostname);
+      return isAllowedWalgreensHost(hostname) || isAllowedCvsHost(hostname) || isAllowedFiveBelowHost(hostname) || isAllowedAceHost(hostname) || isAllowedAldiHost(hostname);
     }
 
     function isAllowedProductImageHost(hostname) {
       const normalized = String(hostname || '').trim().toLowerCase();
-      return isAllowedProductSourceHost(normalized) || isAllowedFiveBelowImageHost(normalized) || isAllowedAceImageHost(normalized);
+      return isAllowedProductSourceHost(normalized) || isAllowedFiveBelowImageHost(normalized) || isAllowedAceImageHost(normalized) || isAllowedAldiImageHost(normalized);
     }
 
     function sanitizeHttpUrl(value, { hostValidator = null } = {}) {
@@ -9738,6 +9757,7 @@
       if (normalized === 'cvs') return 'cvs';
       if (normalized === 'fivebelow') return 'fivebelow';
       if (normalized === 'ace') return 'ace';
+      if (normalized === 'aldi') return 'aldi';
       return 'walgreens';
     }
 
@@ -9749,6 +9769,8 @@
           return 'Five Below';
         case 'ace':
           return 'Ace Hardware';
+        case 'aldi':
+          return 'ALDI';
         default:
           return 'Walgreens';
       }
@@ -9762,6 +9784,8 @@
           return '/icons/fivebelow.svg';
         case 'ace':
           return '/icons/Ace_Hardware.svg';
+        case 'aldi':
+          return '/icons/aldi.png';
         default:
           return '/icons/walgreens.png';
       }
@@ -9783,7 +9807,7 @@
       }
       const badges = [];
       if (store.pickup_available) {
-        if (!compactPickupLabel && (normalizedRetailer === 'walgreens' || normalizedRetailer === 'cvs' || normalizedRetailer === 'fivebelow')) {
+        if (!compactPickupLabel && (normalizedRetailer === 'walgreens' || normalizedRetailer === 'cvs' || normalizedRetailer === 'fivebelow' || normalizedRetailer === 'aldi')) {
           badges.push('<span class="fulfillment-badge type-instore">Available for pickup</span>');
         } else {
           badges.push('<span class="fulfillment-badge type-pickup">Pickup</span>');
@@ -10570,7 +10594,7 @@
               <div class="map-popup-product-meta">
                 <span class="map-popup-product-availability">${escapeHtml(getStoreAvailabilitySummary(product, product.retailer))}</span>
                 ${renderFulfillmentBadges(product, product.retailer, {
-          compactPickupLabel: ['walgreens', 'fivebelow'].includes(retailerKey(product?.retailer || ''))
+          compactPickupLabel: ['walgreens', 'fivebelow', 'aldi'].includes(retailerKey(product?.retailer || ''))
         })}
               </div>
             </div>

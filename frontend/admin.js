@@ -267,6 +267,7 @@ function retailerLabel(retailer) {
   if (normalized === 'bestbuy') return 'Best Buy';
   if (normalized === 'fivebelow') return 'Five Below';
   if (normalized === 'ace') return 'Ace Hardware';
+  if (normalized === 'aldi') return 'ALDI';
   return 'Walgreens';
 }
 
