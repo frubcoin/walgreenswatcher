@@ -1,4 +1,4 @@
-"""Per-user scheduler management for the hosted local pick-up monitor."""
+﻿"""Per-user scheduler management for the hosted local pick-up monitor."""
 
 from __future__ import annotations
 
@@ -998,6 +998,23 @@ class StockCheckScheduler:
                         index for index, product in enumerate(product_specs, start=1)
                         if product.get("retailer", "walgreens") == "ace"
                     ]
+                    # Advance progress before the long browser session so the bar isn't frozen
+                    _ace_start_units = float(1 + ((ace_positions[0] - 1) * 2)) if ace_positions else self.progress_completed_units
+                    ace_names = ", ".join(p.get("name") or p.get("article_id", "") for p in ace_products[:2])
+                    if len(ace_products) > 2:
+                        ace_names += f" +{len(ace_products) - 2} more"
+                    self._set_progress(
+                        current_phase="fetching_inventory",
+                        progress_message=f"Running Ace Hardware browser: {ace_names}",
+                        current_store="Ace shared browser session",
+                        current_product=ace_products[0].get("name") or "",
+                        current_product_index=ace_positions[0] if ace_positions else self.current_product_index,
+                        total_products=len(product_specs),
+                        stores_checked=0,
+                        total_stores=0,
+                        progress_completed_units=_ace_start_units,
+                        progress_total_units=progress_total_units,
+                    )
                     ace_results = self.ace_checker.check_products_availability(
                         ace_products,
                         self.current_zipcode,

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -2498,6 +2498,25 @@
     @keyframes progress-fade-in {
       from { opacity: 0; transform: translateY(4px); }
       to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Indeterminate shimmer for browser-session phases */
+    @keyframes progress-shimmer {
+      0%   { background-position: -200% center; }
+      100% { background-position:  200% center; }
+    }
+    #progress-bar.is-indeterminate {
+      width: 100% !important;
+      background: linear-gradient(90deg,
+        var(--bg-elevated) 0%,
+        var(--accent) 30%,
+        #63b3ed 50%,
+        var(--accent) 70%,
+        var(--bg-elevated) 100%
+      );
+      background-size: 200% 100%;
+      animation: progress-shimmer 1.8s ease-in-out infinite;
+      transition: none;
     }
 
     .discord-destination {
@@ -14268,11 +14287,21 @@
       const totalProducts = progress.total_products || 0;
       const storesWithStock = progress.stores_with_stock_current || 0;
 
-      // Bar + percent
-      document.getElementById('progress-bar').style.width = pct + '%';
-      document.getElementById('progress-percent').textContent = pct + '%';
+      // Determine if we're in a browser-session (indeterminate) state
+      const isBrowserSession = phase === 'fetching_inventory' && total === 0;
 
-      // Status (full-width row)
+      // Bar: shimmer when browser session is running, normal otherwise
+      const bar = document.getElementById('progress-bar');
+      if (isBrowserSession) {
+        bar.classList.add('is-indeterminate');
+        document.getElementById('progress-percent').textContent = pct + '%';
+      } else {
+        bar.classList.remove('is-indeterminate');
+        bar.style.width = pct + '%';
+        document.getElementById('progress-percent').textContent = pct + '%';
+      }
+
+      // Status
       document.getElementById('progress-stage').textContent = stage || 'Working...';
 
       // Product
@@ -14282,7 +14311,7 @@
           ? `${productIndex} / ${totalProducts} — ${product}`
           : product;
       } else {
-        productEl.textContent = totalProducts ? `0 / ${totalProducts}` : '—';
+        productEl.textContent = totalProducts ? `${productIndex} / ${totalProducts}` : '—';
       }
 
       // Activity
@@ -14290,8 +14319,10 @@
 
       // Stores scanned
       const countEl = document.getElementById('progress-count');
-      if (!total) {
-        countEl.textContent = 'Waiting for store list...';
+      if (isBrowserSession) {
+        countEl.textContent = 'Browser session — scanning nearby stores…';
+      } else if (!total) {
+        countEl.textContent = '—';
       } else if (phase === 'fetching_inventory') {
         countEl.textContent = `Live API — ${total} stores`;
       } else {
@@ -14307,7 +14338,7 @@
         hitsEl.style.color = storesWithStock > 0 ? '#68d391' : '';
       }
 
-      // Phase badge (only update if not already in slow/error state)
+      // Phase badge
       const badge = document.getElementById('progress-phase-badge');
       const badgeLabel = document.getElementById('progress-phase-label');
       if (badge && badgeLabel && !progressDelayDisclaimerShown) {
