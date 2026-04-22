@@ -1349,13 +1349,25 @@ class StockDatabase:
         name: str,
     ) -> bool:
         """Update the name for all trending product entries matching article_id and retailer.
-        This affects all users tracking this product, for admin use only."""
+        This affects users tracking this product who have not set a custom name."""
         normalized_article_id = str(article_id or "").strip()
         normalized_retailer = str(retailer or "walgreens").strip().lower() or "walgreens"
         normalized_name = str(name or "").strip()
         if not normalized_article_id or not normalized_name:
             return False
         with self._connect() as conn:
+            old_name_row = conn.execute(
+                """
+                SELECT COALESCE(NULLIF(TRIM(name), ''), article_id) AS current_name
+                FROM trending_products
+                WHERE article_id = ? AND retailer = ?
+                ORDER BY last_tracked_at DESC, user_id DESC
+                LIMIT 1
+                """,
+                (normalized_article_id, normalized_retailer)
+            ).fetchone()
+            old_trending_name = old_name_row["current_name"] if old_name_row else normalized_article_id
+
             cursor = conn.execute(
                 """
                 UPDATE trending_products
@@ -1368,9 +1380,9 @@ class StockDatabase:
                 """
                 UPDATE tracked_products
                 SET name = ?
-                WHERE article_id = ? AND retailer = ?
+                WHERE article_id = ? AND retailer = ? AND (name = ? OR name = ?)
                 """,
-                (normalized_name, normalized_article_id, normalized_retailer),
+                (normalized_name, normalized_article_id, normalized_retailer, old_trending_name, normalized_article_id),
             )
             return cursor.rowcount > 0 or tracked_cursor.rowcount > 0
 
