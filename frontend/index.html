@@ -2413,6 +2413,93 @@
       mask-size: contain;
     }
 
+    .progress-phase-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.07);
+      color: var(--text-muted);
+      transition: background 0.3s, color 0.3s;
+    }
+    .progress-phase-badge.phase-running  { background: rgba(99,179,237,0.15); color: #63b3ed; }
+    .progress-phase-badge.phase-complete { background: rgba(72,187,120,0.15); color: #68d391; }
+    .progress-phase-badge.phase-error    { background: rgba(245,101,101,0.15); color: #fc8181; }
+    .progress-phase-badge.phase-slow     { background: rgba(237,137,54,0.15);  color: #f6ad55; }
+
+    .progress-phase-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .progress-phase-badge.phase-running .progress-phase-dot {
+      animation: progress-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes progress-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .progress-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .progress-meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .progress-meta-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: rgba(152,164,174,0.55);
+    }
+    .progress-meta-value {
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .progress-meta-value.is-highlight {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .progress-delay-disclaimer {
+      display: none;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(237,137,54,0.08);
+      border: 1px solid rgba(237,137,54,0.2);
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      animation: progress-fade-in 0.4s ease;
+    }
+    .progress-delay-disclaimer strong {
+      color: #f6ad55;
+      font-style: normal;
+    }
+    @keyframes progress-fade-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
     .discord-destination {
       display: flex;
       flex-direction: column;
@@ -6955,40 +7042,51 @@
 
       <div id="progress-section"
         style="display:none; margin-bottom:20px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:20px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
-          <div class="form-label progress-label"><span class="progress-label-icon" aria-hidden="true"></span><span>Live
-              Check Progress</span></div>
-          <div style="font-size:14px; font-weight:600; color:var(--text-primary);" id="progress-percent">0%</div>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+          <div class="form-label progress-label" style="margin:0; flex:1; min-width:0;">
+            <span class="progress-label-icon" aria-hidden="true"></span>
+            <span>Live Check Progress</span>
+          </div>
+          <span id="progress-phase-badge" class="progress-phase-badge phase-running">
+            <span class="progress-phase-dot"></span>
+            <span id="progress-phase-label">Starting</span>
+          </span>
+          <span id="progress-elapsed" style="font-size:12px; color:var(--text-muted); font-variant-numeric:tabular-nums;">0:00</span>
+          <span style="font-size:14px; font-weight:700; color:var(--text-primary);" id="progress-percent">0%</span>
         </div>
-        <div
-          style="background:var(--bg-elevated); border-radius:var(--radius-sm); height:10px; overflow:hidden; margin-bottom:12px;">
-          <div id="progress-bar" style="background:var(--accent); height:100%; width:0%; transition:width 0.3s ease;">
+        <div style="background:var(--bg-elevated); border-radius:20px; height:6px; overflow:hidden; margin-bottom:16px;">
+          <div id="progress-bar" style="background:linear-gradient(90deg,var(--accent),#63b3ed); height:100%; width:0%; transition:width 0.4s cubic-bezier(0.4,0,0.2,1); border-radius:20px;"></div>
+        </div>
+        <div class="progress-meta-grid">
+          <div class="progress-meta-item" style="grid-column:1/-1;">
+            <div class="progress-meta-label">Status</div>
+            <div class="progress-meta-value is-highlight" id="progress-stage">Preparing...</div>
+          </div>
+          <div class="progress-meta-item">
+            <div class="progress-meta-label">Product</div>
+            <div class="progress-meta-value" id="progress-product">&#8212;</div>
+          </div>
+          <div class="progress-meta-item">
+            <div class="progress-meta-label">Activity</div>
+            <div class="progress-meta-value" id="progress-store">&#8212;</div>
+          </div>
+          <div class="progress-meta-item">
+            <div class="progress-meta-label">Stores Scanned</div>
+            <div class="progress-meta-value" id="progress-count">&#8212;</div>
+          </div>
+          <div class="progress-meta-item">
+            <div class="progress-meta-label">Hits This Run</div>
+            <div class="progress-meta-value" id="progress-hits">&#8212;</div>
           </div>
         </div>
-        <div style="font-size:12px; color:var(--text-muted);">
-          <div id="progress-stage" style="margin-bottom:4px;">Stage: -</div>
-          <div id="progress-product" style="margin-bottom:4px;">Product: -</div>
-          <div id="progress-store" style="margin-bottom:4px;">Activity: -</div>
-          <div id="progress-count">Store processing: - / -</div>
-          <div
-            id="progress-delay-disclaimer"
-            style="display:none; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); font-style:italic; line-height:1.45; color:rgba(152, 164, 174, 0.8);">
-            <strong
-              style="color:var(--orange); font-style:normal; text-transform:uppercase; font-size:10px; letter-spacing:0.5px;">Note:</strong>
-            Ace Hardware and CVS checks can take significantly longer than other stores due to simulated browser
-            scraping.
-          </div>
+        <div id="progress-delay-disclaimer" class="progress-delay-disclaimer">
+          &#9203; <strong>Taking a while?</strong> CVS, Ace Hardware, and ALDI require simulated
+          browser sessions or live API scrapers that can take several minutes per product. Hang
+          tight &#8212; the check is still running in the background.
         </div>
       </div>
 
       <div class="tabs">
-        <button class="tab active" type="button" data-action="open-tab" data-tab-name="results"
-          id="tab-results">Results</button>
-        <button class="tab" type="button" data-action="open-tab" data-tab-name="settings"
-          id="tab-settings">Settings</button>
-        <button class="tab" type="button" data-action="open-tab" data-tab-name="history"
-          id="tab-history">History</button>
-      </div>
 
       <div class="tab-panel active" id="panel-results">
         <div id="results-container">
@@ -14057,18 +14155,38 @@
       }
       document.getElementById('progress-delay-disclaimer').style.display = 'none';
 
-      // Start a heartbeat timer to monitor for long-running checks
+      // Reset phase badge
+      const badge = document.getElementById('progress-phase-badge');
+      const badgeLabel = document.getElementById('progress-phase-label');
+      if (badge) { badge.className = 'progress-phase-badge phase-running'; }
+      if (badgeLabel) { badgeLabel.textContent = 'Starting'; }
+      const elapsedEl = document.getElementById('progress-elapsed');
+      if (elapsedEl) elapsedEl.textContent = '0:00';
+
+      // Heartbeat: elapsed timer + 60-second disclaimer
+      const checkStartTime = Date.now();
       progressHeartbeatInterval = setInterval(() => {
-        if (progressProductStartTime > 0) {
-          const elapsed = Date.now() - progressProductStartTime;
-          if (elapsed > 15000 && !progressDelayDisclaimerShown) {
-            document.getElementById('progress-delay-disclaimer').style.display = 'block';
-            progressDelayDisclaimerShown = true;
+        const elapsed = Date.now() - checkStartTime;
+        // Update elapsed clock
+        if (elapsedEl) {
+          const totalSecs = Math.floor(elapsed / 1000);
+          const mins = Math.floor(totalSecs / 60);
+          const secs = totalSecs % 60;
+          elapsedEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+        }
+        // Show disclaimer after 60 s
+        if (elapsed > 60000 && !progressDelayDisclaimerShown) {
+          const disclaimer = document.getElementById('progress-delay-disclaimer');
+          if (disclaimer) disclaimer.style.display = 'block';
+          progressDelayDisclaimerShown = true;
+          if (badge && badgeLabel) {
+            badge.className = 'progress-phase-badge phase-slow';
+            badgeLabel.textContent = 'Running (slow)';
           }
         }
-      }, 1000);
-      
-      // Start timing from now as the check is technically starting
+      }, 500);
+
+      // Start timing from now
       progressProductStartTime = Date.now();
 
       try {
@@ -14139,46 +14257,82 @@
     }
 
     function updateProgressDisplay(progress) {
-      const pct = progress.progress_percent || 0;
+      const pct = Math.min(100, Math.max(0, progress.progress_percent || 0));
       const phase = progress.phase || '';
       const stage = progress.message || 'Working...';
-      const store = progress.current_store || 'Working...';
-      const product = progress.current_product || 'Waiting for first product...';
+      const store = progress.current_store || '';
+      const product = progress.current_product || '';
       const checked = progress.stores_processed || progress.stores_checked || 0;
       const total = progress.total_stores || 0;
       const productIndex = progress.current_product_index || 0;
       const totalProducts = progress.total_products || 0;
       const storesWithStock = progress.stores_with_stock_current || 0;
 
+      // Bar + percent
       document.getElementById('progress-bar').style.width = pct + '%';
       document.getElementById('progress-percent').textContent = pct + '%';
-      document.getElementById('progress-stage').textContent = `Stage: ${stage}`;
-      document.getElementById('progress-product').textContent = totalProducts
-        ? `Product: ${productIndex} / ${totalProducts} - ${product}`
-        : `Product: ${product}`;
-      document.getElementById('progress-store').textContent = `Activity: ${store}`;
+
+      // Status (full-width row)
+      document.getElementById('progress-stage').textContent = stage || 'Working...';
+
+      // Product
+      const productEl = document.getElementById('progress-product');
+      if (product) {
+        productEl.textContent = totalProducts
+          ? `${productIndex} / ${totalProducts} — ${product}`
+          : product;
+      } else {
+        productEl.textContent = totalProducts ? `0 / ${totalProducts}` : '—';
+      }
+
+      // Activity
+      document.getElementById('progress-store').textContent = store || '—';
+
+      // Stores scanned
+      const countEl = document.getElementById('progress-count');
       if (!total) {
-        document.getElementById('progress-count').textContent = `Store processing: waiting for store list | Current product hits: ${storesWithStock}`;
-        return;
+        countEl.textContent = 'Waiting for store list...';
+      } else if (phase === 'fetching_inventory') {
+        countEl.textContent = `Live API — ${total} stores`;
+      } else {
+        countEl.textContent = `${checked} / ${total}`;
       }
 
-      if (phase === 'fetching_inventory') {
-        document.getElementById('progress-count').textContent = `Store processing: the retailer is checking all ${total} stores in one live request | Current product hits: ${storesWithStock}`;
-        return;
+      // Hits
+      const hitsEl = document.getElementById('progress-hits');
+      if (hitsEl) {
+        hitsEl.textContent = storesWithStock > 0
+          ? `🟢 ${storesWithStock} store${storesWithStock === 1 ? '' : 's'}`
+          : '—';
+        hitsEl.style.color = storesWithStock > 0 ? '#68d391' : '';
       }
 
-      document.getElementById('progress-count').textContent = `Store processing: ${checked} / ${total} | Current product hits: ${storesWithStock}`;
+      // Phase badge (only update if not already in slow/error state)
+      const badge = document.getElementById('progress-phase-badge');
+      const badgeLabel = document.getElementById('progress-phase-label');
+      if (badge && badgeLabel && !progressDelayDisclaimerShown) {
+        badge.className = 'progress-phase-badge ' + (phase === 'complete' ? 'phase-complete' : phase === 'error' ? 'phase-error' : 'phase-running');
+        badgeLabel.textContent = _progressPhaseLabel(phase);
+      }
 
-      // Reset timing when a new product starts (but keep disclaimer visible if already shown)
+      // Track product changes for per-product timing
       const currentIdx = progress.current_product_index || 0;
       if (currentIdx !== progressLastProductIndex) {
         progressLastProductIndex = currentIdx;
         progressProductStartTime = Date.now();
-        // Only hide disclaimer if it hasn't been shown yet for this check session
         if (!progressDelayDisclaimerShown) {
           document.getElementById('progress-delay-disclaimer').style.display = 'none';
         }
       }
+    }
+
+    function _progressPhaseLabel(phase) {
+      const labels = {
+        starting: 'Starting', locating_stores: 'Finding Stores', stores_loaded: 'Stores Ready',
+        checking_stock: 'Checking Stock', fetching_inventory: 'Fetching Inventory',
+        finalizing: 'Finalizing', notifying: 'Sending Alerts', complete: 'Complete', error: 'Error'
+      };
+      return labels[phase] || 'Running';
     }
 
     async function addProduct() {
