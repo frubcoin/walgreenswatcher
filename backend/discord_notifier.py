@@ -343,17 +343,24 @@ class DiscordNotifier:
             total_units = product_info.get("total_inventory", 0)
             stores = product_info.get("stores", [])
 
+            is_aldi = retailer == "aldi"
+
             # Get changes for this product
             product_change_map = product_changes.get(product_id, {}) if product_changes else {}
             nearest_store = self._nearest_store_text(stores)[: self.EMBED_FIELD_VALUE_LIMIT]
+            
+            units_summary = "QTY UNKNOWN" if is_aldi else f"{total_units} total units"
             description_prefix = (
                 f"Near ZIP {configured_zip}\n"
-                f"{store_count} stores in stock | {total_units} total units\n\n"
+                f"{store_count} stores in stock | {units_summary}\n\n"
             )
+            
+            units_label = "Quantity" if is_aldi else "Units"
+            units_value = "Unknown" if is_aldi else str(total_units)
 
             base_fields = [
                 {"name": "Store Hits", "value": str(store_count), "inline": True},
-                {"name": "Units", "value": str(total_units), "inline": True},
+                {"name": units_label, "value": units_value, "inline": True},
                 {"name": "Nearest", "value": nearest_store, "inline": False},
             ]
 
