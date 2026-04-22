@@ -8,16 +8,17 @@ import logging
 import math
 import random
 import re
+import secrets
 import threading
 import time
 from html import unescape
 from typing import Any, Dict, List, Optional
-from urllib.parse import unquote, urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse, urlsplit
 
 import requests
 from bs4 import BeautifulSoup
 
-from config import USER_AGENTS
+from config import CVS_PROXY_URLS, USER_AGENTS
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,73 @@ _operation_hash_cache_lock = threading.RLock()
 class AldiGraphqlClient:
     """Small client for ALDI's public Instacart storefront GraphQL layer."""
 
+    # Shared proxy list — set at startup from the admin-panel CVS_PROXY_URLS setting.
+    _proxy_urls_override: List[str] = []
+
+    @staticmethod
+    def normalize_proxy_urls(raw_value: Any) -> List[str]:
+        if isinstance(raw_value, (list, tuple, set)):
+            candidates = [str(item or "").strip() for item in raw_value]
+        else:
+            candidates = re.split(r"[\r\n,;]+", str(raw_value or ""))
+        normalized: List[str] = []
+        seen: set = set()
+        for candidate in candidates:
+            value = str(candidate or "").strip().strip("'\"")
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            normalized.append(value)
+        return normalized
+
+    @classmethod
+    def set_proxy_urls_override(cls, raw_value: Any) -> List[str]:
+        cls._proxy_urls_override = cls.normalize_proxy_urls(raw_value)
+        return list(cls._proxy_urls_override)
+
+    @classmethod
+    def _configured_proxy_urls(cls) -> List[str]:
+        if cls._proxy_urls_override:
+            return list(cls._proxy_urls_override)
+        return cls.normalize_proxy_urls(CVS_PROXY_URLS)
+
+    @classmethod
+    def _proxy_candidates(cls) -> List[str]:
+        proxies = cls._configured_proxy_urls()
+        if not proxies:
+            return [""]
+        start = secrets.randbelow(len(proxies))
+        rotated = proxies[start:] + proxies[:start]
+        return rotated + [""]  # always include a direct fallback
+
+    @staticmethod
+    def _proxy_label(proxy_url: str) -> str:
+        parsed = urlsplit(str(proxy_url or "").strip())
+        if not parsed.hostname:
+            return "direct"
+        return f"{parsed.hostname}:{parsed.port}" if parsed.port else parsed.hostname
+
+    @staticmethod
+    def _convert_proxy_format(proxy_url: str) -> str:
+        """Convert `host:port:user:pass` shorthand to a full http:// URL."""
+        if not proxy_url:
+            return proxy_url
+        if "://" in proxy_url:
+            return proxy_url
+        parts = proxy_url.split(":")
+        if len(parts) >= 4:
+            host, port, username = parts[0], parts[1], parts[2]
+            password = ":".join(parts[3:])
+            return f"http://{username}:{password}@{host}:{port}"
+        return proxy_url
+
+    @classmethod
+    def _new_session(cls, proxy_url: str = "") -> requests.Session:
+        session = requests.Session()
+        if proxy_url:
+            converted = cls._convert_proxy_format(proxy_url)
+            session.proxies.update({"http": converted, "https": converted})
+        return session
     @staticmethod
     def normalize_product_url(value: Any) -> str:
         normalized = str(value or "").strip()
@@ -85,16 +153,37 @@ class AldiGraphqlClient:
 
     @classmethod
     def fetch_product_page(cls, product_url: str) -> str:
-        response = requests.get(
-            product_url,
-            headers=cls._headers(
-                accept="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                referer=ALDI_BASE_URL,
-            ),
-            timeout=30,
+        """Fetch an ALDI product page, trying each configured proxy before falling back direct."""
+        headers = cls._headers(
+            accept="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            referer=ALDI_BASE_URL,
         )
-        response.raise_for_status()
-        return response.text
+        last_exc: Exception | None = None
+        for proxy_url in cls._proxy_candidates():
+            label = cls._proxy_label(proxy_url)
+            try:
+                session = cls._new_session(proxy_url)
+                response = session.get(product_url, headers=headers, timeout=30)
+                if response.status_code in (403, 407):
+                    logger.warning("ALDI product page blocked via %s (HTTP %s)", label, response.status_code)
+                    last_exc = requests.HTTPError(response=response)
+                    continue
+                response.raise_for_status()
+                logger.debug("ALDI product page fetched via %s", label)
+                return response.text
+            except requests.HTTPError as exc:
+                if exc.response is not None and exc.response.status_code in (403, 407):
+                    logger.warning("ALDI product page blocked via %s: %s", label, exc)
+                    last_exc = exc
+                    continue
+                raise
+            except Exception as exc:
+                logger.warning("ALDI product page fetch failed via %s: %s", label, exc)
+                last_exc = exc
+                continue
+        if last_exc:
+            raise last_exc
+        raise RuntimeError("ALDI product page: no proxy candidates available")
 
     @classmethod
     def extract_apollo_state(cls, html: str) -> Dict[str, Any]:
@@ -289,26 +378,48 @@ class AldiGraphqlClient:
         if not operation_hash:
             raise ValueError(f"ALDI operation hash missing for {operation_name}")
 
-        response = requests.get(
-            ALDI_GRAPHQL_URL,
-            params={
-                "operationName": operation_name,
-                "variables": json.dumps(variables, separators=(",", ":")),
-                "extensions": json.dumps(
-                    {"persistedQuery": {"version": 1, "sha256Hash": operation_hash}},
-                    separators=(",", ":"),
-                ),
-            },
-            headers=cls._headers(referer=referer, token=token),
-            timeout=30,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if payload.get("errors") and not (allow_partial and payload.get("data")):
-            raise ValueError(f"ALDI GraphQL {operation_name} returned errors: {payload['errors']}")
-        if payload.get("errors"):
-            logger.debug("ALDI GraphQL %s returned partial data with errors: %s", operation_name, payload["errors"])
-        return payload.get("data") or {}
+        params = {
+            "operationName": operation_name,
+            "variables": json.dumps(variables, separators=(",", ":")),
+            "extensions": json.dumps(
+                {"persistedQuery": {"version": 1, "sha256Hash": operation_hash}},
+                separators=(",", ":"),
+            ),
+        }
+        headers = cls._headers(referer=referer, token=token)
+
+        last_exc: Exception | None = None
+        for proxy_url in cls._proxy_candidates():
+            label = cls._proxy_label(proxy_url)
+            try:
+                session = cls._new_session(proxy_url)
+                response = session.get(ALDI_GRAPHQL_URL, params=params, headers=headers, timeout=30)
+                if response.status_code in (403, 407):
+                    logger.warning("ALDI GraphQL %s blocked via %s (HTTP %s)", operation_name, label, response.status_code)
+                    last_exc = requests.HTTPError(response=response)
+                    continue
+                response.raise_for_status()
+                payload = response.json()
+                if payload.get("errors") and not (allow_partial and payload.get("data")):
+                    raise ValueError(f"ALDI GraphQL {operation_name} returned errors: {payload['errors']}")
+                if payload.get("errors"):
+                    logger.debug("ALDI GraphQL %s returned partial data with errors: %s", operation_name, payload["errors"])
+                return payload.get("data") or {}
+            except requests.HTTPError as exc:
+                if exc.response is not None and exc.response.status_code in (403, 407):
+                    logger.warning("ALDI GraphQL %s blocked via %s: %s", operation_name, label, exc)
+                    last_exc = exc
+                    continue
+                raise
+            except ValueError:
+                raise
+            except Exception as exc:
+                logger.warning("ALDI GraphQL %s failed via %s: %s", operation_name, label, exc)
+                last_exc = exc
+                continue
+        if last_exc:
+            raise last_exc
+        raise RuntimeError(f"ALDI GraphQL {operation_name}: no proxy candidates available")
 
     @staticmethod
     def distance_miles(lat1: Any, lon1: Any, lat2: Any, lon2: Any) -> Optional[float]:

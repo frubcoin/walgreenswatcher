@@ -42,6 +42,7 @@ from config import (  # noqa: E402
 )
 from admin_notifications import AdminAlertService  # noqa: E402
 from ace import AceBrowserClient  # noqa: E402
+from aldi import AldiGraphqlClient  # noqa: E402
 from cvs_scraper import CvsStockChecker  # noqa: E402
 from database import StockDatabase  # noqa: E402
 from product_resolver import resolve_product_link, CvsProductResolver  # noqa: E402
@@ -110,6 +111,7 @@ CvsStockChecker.set_store_cache_db(db)
 CvsStockChecker.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
 CvsProductResolver.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
 AceBrowserClient.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
+AldiGraphqlClient.set_proxy_urls_override(db.get_admin_settings().get("cvs_proxy_urls"))
 scheduler_manager = SchedulerManager(db)
 scheduler_manager.start_enabled_schedulers()
 SERVICE_UPTIME_HEARTBEAT_SECONDS = 30
@@ -1764,6 +1766,7 @@ def update_admin_settings():
     CvsStockChecker.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
     CvsProductResolver.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
     AceBrowserClient.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
+    AldiGraphqlClient.set_proxy_urls_override(settings.get("cvs_proxy_urls"))
     scheduler_manager.refresh_all_from_db()
     for user in db.list_users_for_admin():
         if not user.get("is_authorized_email"):
