@@ -1364,7 +1364,15 @@ class StockDatabase:
                 """,
                 (normalized_name, normalized_article_id, normalized_retailer),
             )
-            return cursor.rowcount > 0
+            tracked_cursor = conn.execute(
+                """
+                UPDATE tracked_products
+                SET name = ?
+                WHERE article_id = ? AND retailer = ?
+                """,
+                (normalized_name, normalized_article_id, normalized_retailer),
+            )
+            return cursor.rowcount > 0 or tracked_cursor.rowcount > 0
 
     def update_product_image(
         self,

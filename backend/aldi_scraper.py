@@ -107,9 +107,16 @@ class AldiStockChecker:
         if label:
             return label
         stock_level = str(availability.get("stockLevel") or "").strip()
-        if stock_level:
+        is_available = bool(availability.get("available"))
+        
+        if stock_level.lower() in {"instock", "in_stock"}:
+            return "In stock (Quantity unknown)"
+        elif stock_level.lower() in {"lowstock", "low_stock"}:
+            return "Low stock (Quantity unknown)"
+        elif stock_level:
             return stock_level
-        return "Available" if availability.get("available") else "Unavailable"
+            
+        return "In stock (Quantity unknown)" if is_available else "Unavailable"
 
     @classmethod
     def _is_available(cls, item: Dict[str, Any]) -> bool:
