@@ -7106,6 +7106,13 @@
       </div>
 
       <div class="tabs">
+        <button class="tab active" type="button" data-action="open-tab" data-tab-name="results"
+          id="tab-results">Results</button>
+        <button class="tab" type="button" data-action="open-tab" data-tab-name="settings"
+          id="tab-settings">Settings</button>
+        <button class="tab" type="button" data-action="open-tab" data-tab-name="history"
+          id="tab-history">History</button>
+      </div>
 
       <div class="tab-panel active" id="panel-results">
         <div id="results-container">
@@ -11023,6 +11030,9 @@
             : marker;
 
           const performFlyTo = () => {
+            // Guard: Leaflet crashes with NaN lat/lng
+            const _ll = focusLatLng;
+            if (!_ll || !Number.isFinite(_ll.lat) || !Number.isFinite(_ll.lng)) return;
             if (animate && typeof resultsMap.flyTo === 'function') {
               resultsMap.once('moveend', openPopupAfterFocus);
               resultsMap.flyTo(focusLatLng, targetZoom, {
@@ -12509,7 +12519,9 @@
         }
       });
 
-      resultsMapMarkers = locations.map(location => {
+      resultsMapMarkers = [];
+      locations.forEach(location => {
+        if (!location || !Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) return;
         const marker = L.marker([location.latitude, location.longitude], {
           icon: createResultsMapMarkerIcon(location),
           keyboard: false,
@@ -12526,7 +12538,7 @@
         });
         bounds.push([location.latitude, location.longitude]);
         resultsMapMarkersByKey.set(location.location_key, marker);
-        return marker;
+        resultsMapMarkers.push(marker);
       });
 
       resultsMapClusterGroup.addLayers(resultsMapMarkers);
