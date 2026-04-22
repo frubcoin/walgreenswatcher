@@ -1720,9 +1720,12 @@ def rename_trending_product_admin():
     if not new_name:
         return jsonify({"error": "New name is required"}), 400
 
-    renamed = db.admin_rename_trending_product(product_id, retailer, new_name)
+    renamed = db.admin_rename_trending_product(product_id, retailer, new_name, old_name)
     if not renamed:
         return jsonify({"error": "No trending products found to rename"}), 404
+
+    # Refresh in-memory user schedulers so they instantly see the name change if it applied to them.
+    scheduler_manager.refresh_all_from_db()
 
     _record_audit_event(
         "admin.trending_product_renamed",
