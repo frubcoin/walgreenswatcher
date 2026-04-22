@@ -3649,10 +3649,22 @@
     /* Ensure markers are visible during flyTo/zoom animations */
     .leaflet-container.leaflet-zoom-anim .leaflet-marker-icon,
     .leaflet-container.leaflet-fly-anim .leaflet-marker-icon,
-    .leaflet-container .results-store-marker,
-    .leaflet-container .results-store-marker * {
+    .leaflet-container.leaflet-zoom-anim .results-store-marker,
+    .leaflet-container.leaflet-fly-anim .results-store-marker,
+    .leaflet-container .results-store-marker {
       opacity: 1 !important;
       visibility: visible !important;
+    }
+
+    /* Disable transitions DURING active map animations to prevent "ghosting" or disappearing logos */
+    .leaflet-zoom-anim .results-store-marker,
+    .leaflet-fly-anim .results-store-marker,
+    .leaflet-zoom-anim .results-store-marker__icon-stack,
+    .leaflet-fly-anim .results-store-marker__icon-stack,
+    .leaflet-zoom-anim .results-store-marker__icon,
+    .leaflet-fly-anim .results-store-marker__icon {
+      transition: none !important;
+      animation: none !important;
     }
 
     /* Prevent markerCluster from hiding markers during zoom */
@@ -11024,7 +11036,6 @@
           if (focusRequestId !== resultsMapFocusRequestId) return;
           if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
 
-          resultsMap.invalidateSize();
           const currentZoom = resultsMap.getZoom ? resultsMap.getZoom() : 12;
           const targetZoom = Math.max(currentZoom, 14);
           const targetLatLng = marker.getLatLng();
@@ -11034,7 +11045,6 @@
             window.requestAnimationFrame(() => {
               if (focusRequestId !== resultsMapFocusRequestId) return;
               if (!resultsMap || !resultsMapMarkersByKey.has(locationKey)) return;
-              resultsMap.invalidateSize();
               openMarkerPopupWithoutAutoPan(marker);
             });
           };
@@ -12516,6 +12526,8 @@
         zoomToBoundsOnClick: true,
         maxClusterRadius: 40,
         disableClusteringAtZoom: 17,
+        animate: true,
+        animateAddingMarkers: false, // Prevents flicker when markers are added/removed during zoom
         iconCreateFunction: function (cluster) {
           const childCount = cluster.getChildCount();
           let c = ' marker-cluster-';
