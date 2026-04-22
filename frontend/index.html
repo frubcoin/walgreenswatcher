@@ -7402,6 +7402,7 @@
     let currentResultsMapProductFilter = '';
     let resultsMapProductFilterOpen = false;
     let resultsMapProductMenuOpen = false;
+    let savedResultsMapState = null;
     let resultsMapRetailerMenuOpen = false;
     let cvsGeocodingInProgress = false;
     let manualLocationFallbackVisible = false;
@@ -10669,6 +10670,10 @@
       const refresh = () => {
         if (!resultsMap) return;
         resultsMap.invalidateSize();
+        if (savedResultsMapState) {
+          resultsMap.setView(savedResultsMapState.center, savedResultsMapState.zoom, { animate: false });
+          savedResultsMapState = null;
+        }
         if (preserveActive && resultsMapMarkers.length) {
           setActiveResultsMapItem(activeResultsMapKey || fallbackLocationKey || resultsMapMarkers[0]?.options?.locationKey || '');
         }
@@ -13673,6 +13678,12 @@
     function openTab(name, options = {}) {
       const { loadContent = true } = options;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      if (currentTab === 'results' && name !== 'results' && resultsMap) {
+        savedResultsMapState = {
+          center: resultsMap.getCenter(),
+          zoom: resultsMap.getZoom()
+        };
+      }
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById(`tab-${name}`).classList.add('active');
       document.getElementById(`panel-${name}`).classList.add('active');
