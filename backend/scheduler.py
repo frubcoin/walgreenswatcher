@@ -795,29 +795,38 @@ class StockCheckScheduler:
                     progress_completed_units=0.0,
                     progress_total_units=progress_total_units,
                 )
-                walgreens_stores = self.walgreens_checker._fetch_stores_near_zip(self.current_zipcode)
+                try:
+                    walgreens_stores = self.walgreens_checker._fetch_stores_near_zip(self.current_zipcode)
+                except Exception as exc:
+                    logger.warning(
+                        "Walgreens store lookup failed for user %s near %s: %s",
+                        self.user_id,
+                        self.current_zipcode,
+                        exc,
+                    )
+                    walgreens_stores = []
                 if not walgreens_stores:
                     self._set_progress(
-                        current_phase="error",
+                        current_phase="stores_loaded",
                         progress_message=f"No Walgreens stores found near {self.current_zipcode}",
                         current_store="Store locator",
-                        progress_completed_units=progress_total_units,
+                        progress_completed_units=1.0,
+                        progress_total_units=progress_total_units,
                     )
-                    return
-
-                scanned_store_keys.update(
-                    f"walgreens:{store.get('storeNumber')}"
-                    for store in walgreens_stores
-                    if store.get("storeNumber")
-                )
-                self.total_stores = len(walgreens_stores)
-                self._set_progress(
-                    current_phase="stores_loaded",
-                    progress_message=f"Found {len(walgreens_stores)} Walgreens stores near {self.current_zipcode}",
-                    current_store="Store list ready",
-                    progress_completed_units=1.0,
-                    progress_total_units=progress_total_units,
-                )
+                else:
+                    scanned_store_keys.update(
+                        f"walgreens:{store.get('storeNumber')}"
+                        for store in walgreens_stores
+                        if store.get("storeNumber")
+                    )
+                    self.total_stores = len(walgreens_stores)
+                    self._set_progress(
+                        current_phase="stores_loaded",
+                        progress_message=f"Found {len(walgreens_stores)} Walgreens stores near {self.current_zipcode}",
+                        current_store="Store list ready",
+                        progress_completed_units=1.0,
+                        progress_total_units=progress_total_units,
+                    )
 
             if fivebelow_products:
                 self._set_progress(
@@ -827,29 +836,38 @@ class StockCheckScheduler:
                     progress_completed_units=1.0,
                     progress_total_units=progress_total_units,
                 )
-                fivebelow_stores = self.fivebelow_checker._fetch_stores_near_zip(self.current_zipcode)
+                try:
+                    fivebelow_stores = self.fivebelow_checker._fetch_stores_near_zip(self.current_zipcode)
+                except Exception as exc:
+                    logger.warning(
+                        "Five Below store lookup failed for user %s near %s: %s",
+                        self.user_id,
+                        self.current_zipcode,
+                        exc,
+                    )
+                    fivebelow_stores = []
                 if not fivebelow_stores:
                     self._set_progress(
-                        current_phase="error",
+                        current_phase="stores_loaded",
                         progress_message=f"No Five Below stores found near {self.current_zipcode}",
                         current_store="Store locator",
-                        progress_completed_units=progress_total_units,
+                        progress_completed_units=1.0,
+                        progress_total_units=progress_total_units,
                     )
-                    return
-
-                scanned_store_keys.update(
-                    f"fivebelow:{store.get('store_id')}"
-                    for store in fivebelow_stores
-                    if store.get("store_id")
-                )
-                self.total_stores = max(self.total_stores, len(fivebelow_stores))
-                self._set_progress(
-                    current_phase="stores_loaded",
-                    progress_message=f"Found {len(fivebelow_stores)} Five Below stores near {self.current_zipcode}",
-                    current_store="Store list ready",
-                    progress_completed_units=1.0,
-                    progress_total_units=progress_total_units,
-                )
+                else:
+                    scanned_store_keys.update(
+                        f"fivebelow:{store.get('store_id')}"
+                        for store in fivebelow_stores
+                        if store.get("store_id")
+                    )
+                    self.total_stores = max(self.total_stores, len(fivebelow_stores))
+                    self._set_progress(
+                        current_phase="stores_loaded",
+                        progress_message=f"Found {len(fivebelow_stores)} Five Below stores near {self.current_zipcode}",
+                        current_store="Store list ready",
+                        progress_completed_units=1.0,
+                        progress_total_units=progress_total_units,
+                    )
 
             if ace_products:
                 self._set_progress(
@@ -884,12 +902,29 @@ class StockCheckScheduler:
                 logger.info("-" * 50)
 
                 if retailer == "walgreens":
-                    product_result = self.walgreens_checker.check_product_availability(
-                        product,
-                        walgreens_stores,
-                        product_index=index,
-                        product_total=len(product_specs),
-                    )
+                    if not walgreens_stores:
+                        logger.warning(
+                            "Walgreens inventory skipped for user %s product %s because no store list is available",
+                            self.user_id,
+                            product_display_name,
+                        )
+                        product_result = self._empty_product_result()
+                    else:
+                        try:
+                            product_result = self.walgreens_checker.check_product_availability(
+                                product,
+                                walgreens_stores,
+                                product_index=index,
+                                product_total=len(product_specs),
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "Walgreens inventory failed for user %s product %s: %s",
+                                self.user_id,
+                                product_display_name,
+                                exc,
+                            )
+                            product_result = self._empty_product_result()
                 elif retailer == "cvs":
                     try:
                         product_result = self.cvs_checker.check_product_availability(
@@ -939,37 +974,63 @@ class StockCheckScheduler:
                         )
                         product_result = self._empty_product_result()
                 elif retailer == "fivebelow":
-                    product_result = self.fivebelow_checker.check_product_availability(
-                        product,
-                        fivebelow_stores,
-                        product_index=index,
-                        product_total=len(product_specs),
-                    )
+                    if not fivebelow_stores:
+                        logger.warning(
+                            "Five Below inventory skipped for user %s product %s because no store list is available",
+                            self.user_id,
+                            product_display_name,
+                        )
+                        product_result = self._empty_product_result()
+                    else:
+                        try:
+                            product_result = self.fivebelow_checker.check_product_availability(
+                                product,
+                                fivebelow_stores,
+                                product_index=index,
+                                product_total=len(product_specs),
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "Five Below inventory failed for user %s product %s: %s",
+                                self.user_id,
+                                product_display_name,
+                                exc,
+                            )
+                            product_result = self._empty_product_result()
                 elif retailer == "ace":
                     # Ace products are processed in batch after the loop to reuse browser session
                     continue
                 elif retailer == "aldi":
-                    product_result = self.aldi_checker.check_product_availability(
-                        product,
-                        self.current_zipcode,
-                        product_index=index,
-                        product_total=len(product_specs),
-                    )
-                    extracted_image = product_result.get("_extracted_image_url", "")
-                    if extracted_image and product.get("article_id"):
-                        try:
-                            self.db.update_product_image(
-                                self.user_id,
-                                product["article_id"],
-                                image_url=extracted_image,
-                                retailer="aldi",
-                            )
-                        except Exception as img_exc:
-                            logger.warning(
-                                "Failed to update ALDI product image for %s: %s",
-                                product_display_name,
-                                img_exc,
-                            )
+                    try:
+                        product_result = self.aldi_checker.check_product_availability(
+                            product,
+                            self.current_zipcode,
+                            product_index=index,
+                            product_total=len(product_specs),
+                        )
+                        extracted_image = product_result.get("_extracted_image_url", "")
+                        if extracted_image and product.get("article_id"):
+                            try:
+                                self.db.update_product_image(
+                                    self.user_id,
+                                    product["article_id"],
+                                    image_url=extracted_image,
+                                    retailer="aldi",
+                                )
+                            except Exception as img_exc:
+                                logger.warning(
+                                    "Failed to update ALDI product image for %s: %s",
+                                    product_display_name,
+                                    img_exc,
+                                )
+                    except Exception as exc:
+                        logger.warning(
+                            "ALDI inventory failed for user %s product %s: %s",
+                            self.user_id,
+                            product_display_name,
+                            exc,
+                        )
+                        product_result = self._empty_product_result()
                 else:
                     raise ValueError(f"Unsupported retailer: {retailer}")
 
